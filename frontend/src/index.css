@@ -1,0 +1,38 @@
+/* src/index.css */
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #2563EB;      /* blue-600 */
+  --color-secondary: #F59E0B;    /* amber-500 (kept warm) */
+  --color-accent: #10B981;       /* emerald-500 (accent green) */
+  --color-background: #FFFFFF;   /* pure white for crisp light bg */
+  --color-surface: #F8FAFC;      /* subtle cool surface for cards */
+  --color-text: #0F172A;         /* very dark blue-gray for better readability */
+  --color-muted-text: #6B7280;   /* neutral muted text */
+  --color-border: #E6E9EE;       /* softer border than raw gray */
+  --color-error: #DC2626;        /* stronger red for errors (red-600) */
+  --color-warning: #F59E0B;      /* keep amber warning */
+  --color-success: #10B981;      /* keep success green */
+  --color-info: #3B82F6;         /* info blue (slightly lighter than primary) */
+}
+
+@layer theme {
+  :root, :host {
+    @variant dark {
+      --color-primary: #3B82F6;      /* blue-500 — visible on dark bg */
+      --color-secondary: #FCD34D;    /* amber-300 — warm but readable */
+      --color-accent: #34D399;       /* green-400 — good pop on dark */
+      --color-background: #0B1220;   /* very dark navy-gray for deep bg */
+      --color-surface: #111827;      /* surface slightly lighter than bg */
+      --color-text: #E6F0FA;         /* light bluish text — soft on dark bg */
+      --color-muted-text: #94A3B8;   /* muted text for dark */
+      --color-border: #374151;       /* dark border */
+      --color-error: #F87171;        /* red-400 for alerts on dark */
+      --color-warning: #FBBF24;      /* amber-400 for warnings */
+      --color-success: #34D399;      /* green-400 */
+      --color-info: #60A5FA;         /* info sky-blue */
+    }
+  }
+}

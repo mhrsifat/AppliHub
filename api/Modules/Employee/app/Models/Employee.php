@@ -1,0 +1,43 @@
+<?php
+
+namespace Modules\Employee\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable; 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Permission\Traits\HasRoles;
+
+class Employee extends Model
+{
+    use HasFactory, SoftDeletes, HasRoles;
+    
+    protected $guard_name = 'sanctum';
+
+    protected $table = 'employees'; 
+
+    protected static function newFactory()
+    {
+        return \Modules\Employee\Database\Factories\EmployeeFactory::new();
+    }
+
+    protected $fillable = [
+        'first_name',
+        'last_name',
+        'email',
+        'phone',
+        'password',
+        'avatar',
+        'status',
+        // add other columns as needed
+    ];
+
+    protected $hidden = [
+        'password',
+    ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+}

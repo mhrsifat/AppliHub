@@ -1,0 +1,31 @@
+// src/services/colors.js
+export const colorTokens = {
+  light: {
+    primary: "#2563EB",
+    secondary: "#F59E0B",
+    accent: "#10B981",
+    background: "#FFFFFF",
+    surface: "#F9FAFB",
+    text: "#111827",
+    mutedText: "#6B7280",
+    border: "#D1D5DB",
+    error: "#EF4444",
+    warning: "#F59E0B",
+    success: "#10B981",
+    info: "#3B82F6",
+  },
+  dark: {
+    primary: "#3B82F6",
+    secondary: "#FCD34D",
+    accent: "#34D399",
+    background: "#111827",
+    surface: "#1F2937",
+    text: "#F9FAFB",
+    mutedText: "#9CA3AF",
+    border: "#374151",
+    error: "#F87171",
+    warning: "#FBBF24",
+    success: "#34D399",
+    info: "#60A5FA",
+  },
+};

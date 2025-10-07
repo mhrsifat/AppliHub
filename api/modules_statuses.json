@@ -1,0 +1,11 @@
+{
+    "Blog": true,
+    "Message": true,
+    "Setting": true,
+    "Employee": true,
+    "Service": true,
+    "Order": true,
+    "Permission": true,
+    "Report": true,
+    "Invoice": true
+}

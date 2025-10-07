@@ -1,0 +1,28 @@
+<?php
+
+namespace Modules\Service\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreServiceRequest extends FormRequest
+{
+    public function authorize() { return true; }
+
+    public function rules()
+    {
+        return [
+            'title' => 'required|string|max:255',
+            'slug' => 'nullable|alpha_dash|unique:services,slug',
+            'sku' => 'nullable|string|max:100|unique:services,sku',
+            'service_category_id' => 'nullable|exists:service_categories,id',
+            'description' => 'nullable|string',
+            'price' => 'required|numeric|min:0',
+            'vat_applicable' => 'boolean',
+            'vat_percent' => 'numeric|min:0',
+            'price_includes_vat' => 'boolean',
+            'is_active' => 'boolean',
+            'stock' => 'nullable|integer|min:0',
+            'meta' => 'nullable|array',
+        ];
+    }
+}
