@@ -24,7 +24,7 @@ export default function InvoiceCreatePage() {
 
   async function submit() {
     const res = await createInvoice(form);
-    if (res.meta?.requestStatus === "fulfilled") navigate(`/invoices/${res.payload.id}`);
+    if (res.meta?.requestStatus === "fulfilled") navigate(`admin/invoices/${res.payload.id}`);
   }
 
   return (
@@ -82,7 +82,7 @@ export default function InvoiceCreatePage() {
       </div>
 
       <div className="flex justify-end gap-2">
-        <Button variant="outlined" onClick={() => navigate("/invoices")}>Cancel</Button>
+        <Button variant="outlined" onClick={() => navigate("admin/invoices")}>Cancel</Button>
         <Button variant="contained" onClick={submit}>Create Invoice</Button>
       </div>
     </Paper>

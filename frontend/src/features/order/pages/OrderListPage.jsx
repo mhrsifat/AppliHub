@@ -17,9 +17,9 @@ export default function OrderListPage() {
     <div className="p-6 space-y-4 bg-background text-text">
       <div className="flex justify-between items-center">
         <h1 className="text-xl font-semibold">Orders</h1>
-        <Button variant="contained" onClick={() => navigate("/orders/create")}>New Order</Button>
+        <Button variant="contained" onClick={() => navigate("admin/orders/create")}>New Order</Button>
       </div>
-      <OrderTable orders={list} loading={loading} onSelect={(o) => navigate(`/orders/${o.id}`)} />
+      <OrderTable orders={list} loading={loading} onSelect={(o) => navigate(`admin/orders/${o.id}`)} />
     </div>
   );
 }

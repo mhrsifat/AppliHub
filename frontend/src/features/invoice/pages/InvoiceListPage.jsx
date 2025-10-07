@@ -19,14 +19,14 @@ export default function InvoiceListPage() {
         <h1 className="text-xl font-semibold">Invoices</h1>
         <div className="flex gap-2">
           <Button variant="outlined" onClick={() => fetchInvoices()}>Refresh</Button>
-          <Button variant="contained" onClick={() => navigate("/invoices/create")}>New Invoice</Button>
+          <Button variant="contained" onClick={() => navigate("admin/invoices/create")}>New Invoice</Button>
         </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center p-6"><CircularProgress /></div>
       ) : (
-        <InvoiceTable invoices={list} onSelect={(i) => navigate(`/invoices/${i.id}`)} />
+        <InvoiceTable invoices={list} onSelect={(i) => navigate(`admin/invoices/${i.id}`)} />
       )}
     </div>
   );

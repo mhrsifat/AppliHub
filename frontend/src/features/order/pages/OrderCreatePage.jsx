@@ -11,7 +11,7 @@ export default function OrderCreatePage() {
 
   const handleSubmit = async () => {
     const res = await createOrder(form);
-    if (res.meta.requestStatus === "fulfilled") navigate(`/orders/${res.payload.id}`);
+    if (res.meta.requestStatus === "fulfilled") navigate(`admin/orders/${res.payload.id}`);
   };
 
   return (
