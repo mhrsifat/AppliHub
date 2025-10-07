@@ -7,7 +7,7 @@ const InvoiceCreatePage = lazy(() => import("./pages/InvoiceCreatePage"));
 const InvoiceDetailsPage = lazy(() => import("./pages/InvoiceDetailsPage"));
 const NotFound = lazy(() => import("@/components/common/NotFound"));
 
-const invoiceRoutes = (
+const InvoiceRoutes = (
   <>
     <Route path="invoices" element={<InvoiceListPage />} />
     <Route path="invoices/create" element={<InvoiceCreatePage />} />
@@ -16,4 +16,4 @@ const invoiceRoutes = (
   </>
 );
 
-export default invoiceRoutes;
+export default InvoiceRoutes;

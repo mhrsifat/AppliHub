@@ -11,12 +11,12 @@ export default function ServicesPage() {
     <Container>
       <Box className="flex items-center justify-between py-4">
         <h2>Services</h2>
-        <Button variant="contained" onClick={() => navigate('admin/services/create')}>Create Service</Button>
+        <Button variant="contained" onClick={() => navigate('create')}>Create Service</Button>
       </Box>
 
       <ServiceList
-        onEdit={(s) => navigate(`admin/services/${s.id}/edit`)}
-        onView={(s) => navigate(`admin/services/${s.id}`)}
+        onEdit={(s) => navigate(`${s.id}/edit`)}
+        onView={(s) => navigate(`/${s.id}`)}
       />
     </Container>
   );

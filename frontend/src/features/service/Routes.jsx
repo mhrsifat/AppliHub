@@ -8,7 +8,7 @@ const ServiceEditPage = lazy(() => import("./pages/ServiceEditPage"));
 const ServiceDetailsPage = lazy(() => import("./pages/ServiceDetailsPage"));
 const NotFound = lazy(() => import("@/components/common/NotFound"));
 
-const serviceRoutes = (
+const ServiceRoutes = (
   <>
     <Route path="services" element={<ServicesPage />} />
     <Route path="services/create" element={<ServiceCreatePage />} />
@@ -18,4 +18,4 @@ const serviceRoutes = (
   </>
 );
 
-export default serviceRoutes;
+export default ServiceRoutes;

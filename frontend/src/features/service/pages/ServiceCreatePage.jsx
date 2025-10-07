@@ -13,7 +13,7 @@ export default function ServiceCreatePage() {
   async function handleSubmit(payload) {
     try {
       const res = await dispatch(createService(payload)).unwrap();
-      navigate(`admin/services/${res.id}`);
+      navigate(`${res.id}`);
     } catch (err) {
       console.error(err);
     }

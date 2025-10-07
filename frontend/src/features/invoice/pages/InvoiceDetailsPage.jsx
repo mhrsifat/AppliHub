@@ -60,7 +60,7 @@ export default function InvoiceDetailsPage() {
         </div>
         <div className="flex items-center gap-4">
           <InvoiceStatusChip status={current.status} />
-          <Button onClick={() => navigate("admin/invoices")}>Back</Button>
+          <Button onClick={() => navigate("/")}>Back</Button>
         </div>
       </div>
 

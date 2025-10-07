@@ -19,7 +19,7 @@ export default function ServiceEditPage() {
   async function handleSubmit(payload) {
     try {
       const res = await dispatch(updateService({ id, payload })).unwrap();
-      navigate(`admin/services/${res.id}`);
+      navigate(`${res.id}`);
     } catch (err) {
       console.error(err);
     }

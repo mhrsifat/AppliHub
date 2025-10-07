@@ -19,7 +19,7 @@ export default function OrderListPage() {
         <h1 className="text-xl font-semibold">Orders</h1>
         <Button variant="contained" onClick={() => navigate("admin/orders/create")}>New Order</Button>
       </div>
-      <OrderTable orders={list} loading={loading} onSelect={(o) => navigate(`admin/orders/${o.id}`)} />
+      <OrderTable orders={list} loading={loading} onSelect={(o) => navigate(`${o.id}`)} />
     </div>
   );
 }
