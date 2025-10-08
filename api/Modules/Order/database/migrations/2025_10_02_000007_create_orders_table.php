@@ -35,7 +35,7 @@ class CreateOrdersTable extends Migration
             $table->decimal('grand_total', 14, 2)->default(0); // final due after vat/discount
 
             // payment_status: pending, partial, paid, refunded
-            $table->enum('payment_status', ['pending', 'partial', 'paid', 'refunded'])->default('pending');
+            $table->enum('payment_status', ['pending', 'unpaid', 'partial', 'paid', 'refunded'])->default('pending');
 
             // status: draft, confirmed, completed, cancelled
             $table->enum('status', ['draft', 'confirmed', 'completed', 'cancelled'])->default('draft');

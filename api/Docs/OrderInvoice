@@ -92,10 +92,10 @@ Response:
 Request:
 
 {
-  "guest_name": "Rahim",
-  "guest_email": "rahim@example.com",
-  "guest_phone": "018XXXXXXXX",
-  "guest_address": "Gulshan, Dhaka",
+  "customer_name": "Rahim",
+  "customer_email": "rahim@example.com",
+  "customer_phone": "018XXXXXXXX",
+  "customer_address": "Gulshan, Dhaka",
   "vat_percent": 5,
   "coupon_discount": 0,
   "items": [
@@ -147,7 +147,7 @@ Response:
 Request:
 
 {
-  "guest_phone": "019YYYYYYYY",
+  "customer_phone": "019YYYYYYYY",
   "vat_percent": 10,
   "coupon_discount": 100
 }
@@ -408,7 +408,7 @@ Status	Meaning	Example
 401	Unauthorized	{ "message": "Unauthenticated." }
 403	Forbidden	{ "message": "Permission denied." }
 404	Not Found	{ "message": "Order not found." }
-422	Validation Error	{ "message": "The guest_name field is required." }
+422	Validation Error	{ "message": "The customer_name field is required." }
 
 
 
