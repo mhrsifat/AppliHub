@@ -20,10 +20,10 @@ class Order extends Model
     protected $fillable = [
         'order_number',
         'customer_id',
-        'guest_name',
-        'guest_email',
-        'guest_phone',
-        'guest_address',
+        'customer_name',
+        'customer_email',
+        'customer_phone',
+        'customer_address',
         'total',
         'vat_percent',
         'vat_amount',
@@ -79,6 +79,6 @@ class Order extends Model
     // placeholder for invoices relation (Invoices module will define Invoice model)
     public function invoices()
     {
-        return $this->hasMany(\Modules\Invoice\Models\Invoice::class ?? 'App\Models\Invoice', 'order_id');
+        return $this->hasMany(\Modules\Invoice\Models\Invoice::class, 'order_id');
     }
 }

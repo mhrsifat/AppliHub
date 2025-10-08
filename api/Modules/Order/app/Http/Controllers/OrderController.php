@@ -23,6 +23,7 @@ class OrderController extends Controller
     {
         $this->invoiceController = $invoiceController;
     }
+
     public function index(Request $request)
     {
         $query = Order::with('items')->orderByDesc('id');
@@ -50,6 +51,7 @@ class OrderController extends Controller
         return new OrderResource($order);
     }
 
+    // Staff/Admin creates order -> default unpaid + generate invoice
     public function store(StoreOrderRequest $request)
     {
         $data = $request->only([
@@ -59,13 +61,18 @@ class OrderController extends Controller
             'guest_phone',
             'guest_address',
             'vat_percent',
-            'coupon_code'
+            'coupon_code',
+            'coupon_discount'
         ]);
 
         return DB::transaction(function () use ($request, $data) {
-            $order = Order::create($data);
+            $order = Order::create(array_merge($data, [
+                'payment_status' => 'unpaid',
+                'status' => 'pending',
+                'coupon_discount' => $data['coupon_discount'] ?? 0,
+                'created_by' => Auth::user()?->id ?? null,
+            ]));
 
-            // add items (accept both backend keys and frontend-friendly keys: description/price)
             $items = $request->get('items', []);
             foreach ($items as $i) {
                 $order->items()->create([
@@ -78,22 +85,20 @@ class OrderController extends Controller
                 ]);
             }
 
-            // Recompute totals
             $order->load('items');
             $order->total = $order->items->sum('total_price');
             $order->vat_amount = round(($order->vat_percent / 100) * $order->total, 2);
-            // coupon discount will be applied in Invoice module or via admin; keep as 0 here unless coupon logic added
             $order->grand_total = round($order->total + $order->vat_amount - $order->coupon_discount, 2);
             $order->save();
 
-            // Create invoice automatically
-            $invoice = $this->invoiceController->createFromOrder($request, $order->id);
+            // create invoice automatically; returns an InvoiceResource (or response)
+            $invoiceResponse = $this->invoiceController->createFromOrder($request, $order->id);
 
-            // Return both order and invoice in response
             $order->load('items');
+
             return response()->json([
                 'order' => new OrderResource($order),
-                'invoice' => $invoice->original ?? $invoice,
+                'invoice' => $invoiceResponse->original ?? $invoiceResponse,
             ], 201);
         });
     }
@@ -102,7 +107,6 @@ class OrderController extends Controller
     {
         $order = Order::with('items')->findOrFail($id);
 
-        // allow updates to shipping/customer and tax/coupon fields
         $order->fill($request->only([
             'customer_id',
             'guest_name',
@@ -116,12 +120,9 @@ class OrderController extends Controller
             'payment_status'
         ]));
 
-        // if VAT percent changed and items loaded, recalc
         $order->save();
 
-        // if items were passed for a full replace (optional)
         if ($request->has('items')) {
-            // expected items format: id (for existing) or no id (for new)
             $items = $request->get('items');
             foreach ($items as $it) {
                 if (!empty($it['id'])) {
@@ -148,7 +149,6 @@ class OrderController extends Controller
             }
         }
 
-        // reload and recalc totals if items changed
         $order->load('items');
         $order->total = $order->items->sum('total_price');
         $order->vat_amount = round(($order->vat_percent / 100) * $order->total, 2);
@@ -165,7 +165,7 @@ class OrderController extends Controller
         return response()->json(['message' => 'Order deleted.']);
     }
 
-    // Add an item (works pre/post payment)
+    // add item to order
     public function addItem(OrderItemRequest $request, $orderId)
     {
         $order = Order::with('items')->findOrFail($orderId);
@@ -174,7 +174,6 @@ class OrderController extends Controller
             'added_by' => Auth::user()?->id ?? null,
         ]));
 
-        // recalc
         $order->total = $order->items->sum('total_price');
         $order->vat_amount = round(($order->vat_percent / 100) * $order->total, 2);
         $order->grand_total = round($order->total + $order->vat_amount - $order->coupon_discount, 2);
@@ -183,7 +182,7 @@ class OrderController extends Controller
         return new OrderItemResource($item);
     }
 
-    // Update an order item
+    // update item
     public function updateItem(OrderItemRequest $request, $orderId, $itemId)
     {
         $order = Order::findOrFail($orderId);
@@ -191,7 +190,6 @@ class OrderController extends Controller
 
         $item->update($request->validated());
 
-        // recalc order totals
         $order->load('items');
         $order->total = $order->items->sum('total_price');
         $order->vat_amount = round(($order->vat_percent / 100) * $order->total, 2);
@@ -201,7 +199,7 @@ class OrderController extends Controller
         return new OrderItemResource($item);
     }
 
-    // Delete an item
+    // delete item
     public function deleteItem($orderId, $itemId)
     {
         $order = Order::findOrFail($orderId);

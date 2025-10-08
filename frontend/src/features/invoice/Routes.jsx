@@ -1,19 +1,18 @@
-// src/features/invoice/Routes
+// src/features/invoice/Routes.jsx
 import React, { lazy } from "react";
 import { Route } from "react-router-dom";
 
+// Lazy load pages for performance
 const InvoiceListPage = lazy(() => import("./pages/InvoiceListPage"));
 const InvoiceCreatePage = lazy(() => import("./pages/InvoiceCreatePage"));
-const InvoiceDetailsPage = lazy(() => import("./pages/InvoiceDetailsPage"));
-const NotFound = lazy(() => import("@/components/common/NotFound"));
+const InvoiceDetailPage = lazy(() => import("./pages/InvoiceDetailPage"));
 
-const InvoiceRoutes = (
+const invoiceRoutes = (
   <>
     <Route path="invoices" element={<InvoiceListPage />} />
     <Route path="invoices/create" element={<InvoiceCreatePage />} />
-    <Route path="invoices/:id" element={<InvoiceDetailsPage />} />
-    <Route path="invoices/*" element={<NotFound />} />
+    <Route path="invoices/:id" element={<InvoiceDetailPage />} />
   </>
 );
 
-export default InvoiceRoutes;
+export default invoiceRoutes;

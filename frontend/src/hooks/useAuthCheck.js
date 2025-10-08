@@ -20,9 +20,9 @@ export default function useAuthCheck() {
                 const newToken = refreshRes?.data?.access_token;
 
                 if (newToken) setAccessToken(newToken);
+                if (refreshRes?.data?.admin) dispatch(setAdmin(refreshRes.data.admin));
                 if (refreshRes?.data?.user) dispatch(setUser(refreshRes.data.user));
                 if (refreshRes?.data?.employee) dispatch(setEmployee(refreshRes.data.employee));
-                if (refreshRes?.data?.admin) dispatch(setAdmin(refreshRes.data.admin));
 
             } catch (error) {
                 console.error("Auth refresh failed:", error);

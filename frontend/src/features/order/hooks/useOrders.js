@@ -1,52 +1,23 @@
-// src/features/order/hooks/useOrders.js
-import { useDispatch, useSelector } from "react-redux";
-import { fetchOrders as fetchOrdersThunk, fetchOrder as fetchOrderThunk, createOrder as createOrderThunk, updateOrder as updateOrderThunk } from "../slices/orderSlice";
-import { useCallback } from "react";
+import { useEffect, useState, useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchOrders, fetchOrder, createOrder, updateOrder } from '../slices/orderSlice';
 
-export default function useOrders(autoFetch = false) {
+export default function useOrders({ initialPage = 1, perPage = 15 } = {}) {
   const dispatch = useDispatch();
-  const { list, current, loading, error } = useSelector((s) => s.orders);
+  const { list, meta, loading, error, current } = useSelector((s) => s.order || {});
+  const [page, setPage] = useState(initialPage);
+  const [q, setQ] = useState('');
 
-  // memoized bound action creators -> stable references
-  const fetchOrders = useCallback(
-    (params) => dispatch(fetchOrdersThunk(params)),
-    [dispatch]
-  );
+  const load = useCallback(() => {
+    dispatch(fetchOrders({ page, per_page: perPage, q }));
+  }, [dispatch, page, perPage, q]);
 
-  const fetchOrder = useCallback(
-    (id) => dispatch(fetchOrderThunk(id)),
-    [dispatch]
-  );
+  useEffect(() => { load(); }, [load]);
 
-  const createOrder = useCallback(
-    (data) => dispatch(createOrderThunk(data)),
-    [dispatch]
-  );
+  const search = (term) => { setQ(term); setPage(1); dispatch(fetchOrders({ page: 1, per_page: perPage, q: term })); };
+  const getOne = (id) => dispatch(fetchOrder(id));
+  const create = (payload) => dispatch(createOrder(payload));
+  const save = (id, payload) => dispatch(updateOrder({ id, payload }));
 
-  const updateOrder = useCallback(
-    (id, data) => dispatch(updateOrderThunk({ id, data })),
-    [dispatch]
-  );
-
-  // autoFetch behavior: keep simple — call only on mount when autoFetch true
-  // If you want to include fetchOrders in deps, it's safe now (it's stable).
-  // But keep autoFetch primitive to avoid accidental re-runs.
-  // If you call useOrders(true) inline from parent, ensure that arg is stable.
-  // Example: const orders = useOrders(true);
-  // That is fine because true is primitive and stable.
-  if (autoFetch) {
-    // Don't call during render — use an effect to trigger it
-    // but we avoid adding dispatch/fn here because below useEffect will do it.
-  }
-
-  return {
-    list,
-    current,
-    loading,
-    error,
-    fetchOrders,
-    fetchOrder,
-    createOrder,
-    updateOrder,
-  };
+  return { list, meta, loading, error, current, page, setPage, q, setQ, load, search, getOne, create, save };
 }

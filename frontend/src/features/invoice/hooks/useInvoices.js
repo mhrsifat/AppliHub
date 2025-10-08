@@ -1,32 +1,22 @@
-// src/features/invoice/hooks/useInvoices.js
-import { useDispatch, useSelector } from "react-redux";
-import {
-  fetchInvoices, fetchInvoice, createInvoice, updateInvoice,
-  addInvoiceItem, removeInvoiceItem, recordPayment, refundInvoice, clearCurrent
-} from "../slices/invoiceSlice";
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchInvoices, fetchInvoice, createInvoice, updateInvoice } from '../slices/invoiceSlice';
 
-export default function useInvoices(autoFetch = false) {
+export default function useInvoices({ initialPage = 1, perPage = 15 } = {}) {
   const dispatch = useDispatch();
-  const { list, current, loading, error } = useSelector((s) => s.invoices);
+  const { list, meta, loading, error, current } = useSelector((s) => s.invoice || {});
+  const [page, setPage] = useState(initialPage);
+  const [orderId, setOrderId] = useState(null);
 
-  useEffect(() => {
-    if (autoFetch) dispatch(fetchInvoices());
-  }, [autoFetch, dispatch]);
+  const load = useCallback((params = {}) => {
+    dispatch(fetchInvoices({ page: params.page ?? page, per_page: params.per_page ?? perPage, order_id: params.order_id ?? orderId }));
+  }, [dispatch, page, perPage, orderId]);
 
-  return {
-    list,
-    current,
-    loading,
-    error,
-    fetchInvoices: (params) => dispatch(fetchInvoices(params)),
-    fetchInvoice: (id) => dispatch(fetchInvoice(id)),
-    createInvoice: (payload) => dispatch(createInvoice(payload)),
-    updateInvoice: (id, payload) => dispatch(updateInvoice({ id, payload })),
-    addInvoiceItem: (invoiceId, payload) => dispatch(addInvoiceItem({ invoiceId, payload })),
-    removeInvoiceItem: (invoiceId, itemId) => dispatch(removeInvoiceItem({ invoiceId, itemId })),
-    recordPayment: (invoiceId, payload) => dispatch(recordPayment({ invoiceId, payload })),
-    refundInvoice: (invoiceId, payload) => dispatch(refundInvoice({ invoiceId, payload })),
-    clearCurrent: () => dispatch(clearCurrent()),
-  };
+  useEffect(() => { load(); }, [load]);
+
+  const getOne = (id) => dispatch(fetchInvoice(id));
+  const create = (payload) => dispatch(createInvoice(payload));
+  const save = (id, payload) => dispatch(updateInvoice({ id, payload }));
+
+  return { list, meta, loading, error, current, page, setPage, orderId, setOrderId, load, getOne, create, save };
 }

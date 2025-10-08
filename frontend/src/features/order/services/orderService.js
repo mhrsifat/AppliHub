@@ -1,31 +1,15 @@
-// src/features/order/services/orderService.js
-import api from "@/services/api";
+import api from '../../../services/api';
 
-const base = "/orders";
-
-export default {
-  list(params) {
-    return api.get(base, { params });
-  },
-  show(id) {
-    return api.get(`${base}/${id}`);
-  },
-  create(data) {
-    return api.post(base, data);
-  },
-  update(id, data) {
-    return api.put(`${base}/${id}`, data);
-  },
-  destroy(id) {
-    return api.delete(`${base}/${id}`);
-  },
-  addService(orderId, data) {
-    return api.post(`${base}/${orderId}/items`, data);
-  },
-  removeService(orderId, itemId) {
-    return api.delete(`${base}/${orderId}/items/${itemId}`);
-  },
-  pay(orderId, data) {
-    return api.post(`${base}/${orderId}/payments`, data);
-  },
-};
+export const fetchOrdersApi = ({ page = 1, per_page = 15, q = '' } = {}) =>
+  api.get('/orders', { params: { page, per_page, q } });
+export const fetchOrderApi = (id) => api.get(`/orders/${id}`);
+export const createOrderApi = (payload) => api.post('/orders', payload);
+export const updateOrderApi = (id, payload) => api.put(`/orders/${id}`, payload);
+export const addOrderItemApi = (orderId, payload) =>
+  api.post(`/orders/${orderId}/items`, payload);
+export const updateOrderItemApi = (orderId, itemId, payload) =>
+  api.put(`/orders/${orderId}/items/${itemId}`, payload);
+export const deleteOrderItemApi = (orderId, itemId) =>
+  api.delete(`/orders/${orderId}/items/${itemId}`);
+export const createInvoiceFromOrderApi = (orderId) =>
+  api.post(`/invoices/from-order/${orderId}`);
