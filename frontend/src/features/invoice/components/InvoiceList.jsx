@@ -35,8 +35,8 @@ export default function InvoiceList() {
                   <td className='px-4 py-2 text-right'>{Number(i.grand_total).toFixed(2)}</td>
                   <td className='px-4 py-2'>{i.status}</td>
                   <td className='px-4 py-2'>
-                    <Link to={`/invoices/${i.id}`} className='text-blue-600 mr-2'>View</Link>
-                    <Link to={`/invoices/${i.id}/edit`} className='text-green-600'>Edit</Link>
+                    <Link to={`/admin/invoices/${i.id}`} className='text-blue-600 mr-2'>View</Link>
+                    <Link to={`/admin/invoices/${i.id}/edit`} className='text-green-600'>Edit</Link>
                   </td>
                 </tr>
               ))}

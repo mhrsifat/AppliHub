@@ -37,8 +37,8 @@ export default function OrderList() {
                   <td className='px-4 py-2 text-right'>{Number(o.grand_total).toFixed(2)}</td>
                   <td className='px-4 py-2'>{o.payment_status}</td>
                   <td className='px-4 py-2'>
-                    <Link to={`/orders/${o.id}`} className='text-blue-600 mr-2'>View</Link>
-                    <Link to={`/orders/${o.id}/edit`} className='text-green-600'>Edit</Link>
+                    <Link to={`/admin/orders/${o.id}`} className='text-blue-600 mr-2'>View</Link>
+                    <Link to={`/admin/orders/${o.id}/edit`} className='text-green-600'>Edit</Link>
                   </td>
                 </tr>
               ))}
