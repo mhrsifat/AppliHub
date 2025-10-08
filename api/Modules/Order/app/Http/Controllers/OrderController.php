@@ -32,10 +32,10 @@ class OrderController extends Controller
             $q = $request->get('q');
             $query->where(function ($qry) use ($q) {
                 $qry->where('order_number', 'like', "%{$q}%")
-                    ->orWhere('guest_name', 'like', "%{$q}%")
-                    ->orWhere('guest_email', 'like', "%{$q}%")
-                    ->orWhere('guest_phone', 'like', "%{$q}%")
-                    ->orWhere('guest_address', 'like', "%{$q}%")
+                    ->orWhere('customer_name', 'like', "%{$q}%")
+                    ->orWhere('customer_email', 'like', "%{$q}%")
+                    ->orWhere('customer_phone', 'like', "%{$q}%")
+                    ->orWhere('customer_address', 'like', "%{$q}%")
                     ->orWhere('coupon_code', 'like', "%{$q}%");
             });
         }
@@ -56,10 +56,10 @@ class OrderController extends Controller
     {
         $data = $request->only([
             'customer_id',
-            'guest_name',
-            'guest_email',
-            'guest_phone',
-            'guest_address',
+            'customer_name',
+            'customer_email',
+            'customer_phone',
+            'customer_address',
             'vat_percent',
             'coupon_code',
             'coupon_discount'
@@ -109,10 +109,10 @@ class OrderController extends Controller
 
         $order->fill($request->only([
             'customer_id',
-            'guest_name',
-            'guest_email',
-            'guest_phone',
-            'guest_address',
+            'customer_name',
+            'customer_email',
+            'customer_phone',
+            'customer_address',
             'vat_percent',
             'coupon_code',
             'coupon_discount',

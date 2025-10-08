@@ -96,7 +96,7 @@ class InvoiceController extends Controller
 
             // Send email to customer if order has email
             $order = $invoice->order;
-            $recipient = $order->customer_email ?? $order->guest_email ?? null;
+            $recipient = $order->customer_email ?? $order->customer_email ?? null;
 
             if ($recipient) {
                 $html = $this->buildInvoiceHtml($invoice);
@@ -300,7 +300,7 @@ class InvoiceController extends Controller
             // Send payment email if customer email exists
             $invoice->load('order', 'items', 'payments');
             $order = $invoice->order;
-            $recipient = $order->customer_email ?? $order->guest_email ?? null;
+            $recipient = $order->customer_email ?? $order->customer_email ?? null;
 
             if ($recipient) {
                 $html = $this->buildPaymentHtml($invoice, $payment);
@@ -418,7 +418,7 @@ class InvoiceController extends Controller
         $html = "<div style='font-family:Arial,Helvetica,sans-serif;line-height:1.4'>
         <h2>Invoice #{$invoice->invoice_number}</h2>
         <p>Order: #{$invoice->order_id}</p>
-        <p>Customer: ".htmlspecialchars($order->customer_name ?? $order->guest_name ?? 'Customer')."</p>
+        <p>Customer: ".htmlspecialchars($order->customer_name ?? $order->customer_name ?? 'Customer')."</p>
         <table width='100%' style='border-collapse:collapse'>
             <thead>
                 <tr>

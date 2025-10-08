@@ -18,8 +18,8 @@ class OrderSeeder extends Seeder
                 $order = Order::create([
                     'order_number' => Order::generateUniqueOrderNumber(),
                     'customer_id' => (rand(0,1) ? rand(1, 20) : null),
-                    'guest_name' => rand(0,1) ? null : \Faker\Factory::create()->name,
-                    'guest_email' => rand(0,1) ? null : \Faker\Factory::create()->safeEmail,
+                    'customer_name' => rand(0,1) ? null : \Faker\Factory::create()->name,
+                    'customer_email' => rand(0,1) ? null : \Faker\Factory::create()->safeEmail,
                     'vat_percent' => $vat,
                     'coupon_code' => (rand(0,4) === 0) ? 'DISC10' : null,
                     'coupon_discount' => 0,

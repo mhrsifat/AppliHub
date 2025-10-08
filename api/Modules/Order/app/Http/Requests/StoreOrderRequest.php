@@ -16,8 +16,10 @@ class StoreOrderRequest extends FormRequest
     {
         return [
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
-            'guest_name' => ['nullable', 'string', 'max:255'],
-            'guest_email' => ['nullable', 'email', 'max:255'],
+            'customer_name' => ['nullable', 'string', 'max:255'],
+            'customer_phone' => ['nullable', 'numeric', 'max:255'],
+            'customer_address' => ['nullable', 'string', 'max:255'],
+            'customer_email' => ['nullable', 'email', 'max:255'],
             'vat_percent' => ['nullable', 'numeric', 'between:0,100'],
             'coupon_code' => ['nullable', 'string', 'max:100'],
             // items are optional; if provided they must be a non-empty array

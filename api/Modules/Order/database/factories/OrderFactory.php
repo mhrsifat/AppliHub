@@ -18,8 +18,10 @@ class OrderFactory extends Factory
         return [
             'order_number' => Order::generateUniqueOrderNumber(),
             'customer_id' => null,
-            'guest_name' => $this->faker->optional(0.6)->name,
-            'guest_email' => $this->faker->optional(0.6)->safeEmail,
+            'customer_name' => $this->faker->optional(0.6)->name,
+            'customer_phone' => 0170000000,
+            'customer_address' => 'kaha se ate he e log',
+            'customer_email' => $this->faker->optional(0.6)->safeEmail,
             'total' => 0,
             'vat_percent' => $vat,
             'vat_amount' => 0,

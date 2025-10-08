@@ -129,7 +129,7 @@ export default function OrderDetailPage() {
       <div className="flex justify-between items-start mb-4">
         <div>
           <h1 className="text-2xl font-semibold">Order #{order.order_number}</h1>
-          <div className="text-sm text-gray-600">Customer: {order.customer_name ?? order.guest_name}</div>
+          <div className="text-sm text-gray-600">Customer: {order.customer_name ?? "Unknown"}</div>
           <div className="text-sm text-gray-600">Email: {order.customer_email ?? order.guest_email}</div>
           <div className="text-sm text-gray-600">Phone: {order.customer_phone ?? order.guest_phone}</div>
         </div>

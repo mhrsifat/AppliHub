@@ -32,7 +32,7 @@ export default function OrderList() {
               {(list || []).map((o) => (
                 <tr key={o.id} className='border-t'>
                   <td className='px-4 py-2'>{o.order_number}</td>
-                  <td className='px-4 py-2'>{o.customer_name ?? o.guest_name}</td>
+                  <td className='px-4 py-2'>{o.customer_name ?? 'Unknown'}</td>
                   <td className='px-4 py-2 text-right'>{Number(o.grand_total).toFixed(2)}</td>
                   <td className='px-4 py-2'>{o.payment_status}</td>
                   <td className='px-4 py-2'>

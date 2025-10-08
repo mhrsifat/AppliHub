@@ -19,10 +19,10 @@ class CreateOrdersTable extends Migration
 
             // Customer may be anonymous; still keep customer_id for known customers
             $table->unsignedBigInteger('customer_id')->nullable();
-            $table->string('guest_name')->nullable();
-            $table->string('guest_phone')->nullable();
-            $table->string('guest_address')->nullable();
-            $table->string('guest_email')->nullable();
+            $table->string('customer_name')->nullable();
+            $table->string('customer_phone')->nullable();
+            $table->string('customer_address')->nullable();
+            $table->string('customer_email')->nullable();
 
             // Summary amounts
             $table->decimal('total', 14, 2)->default(0); // sum of items before VAT & discounts

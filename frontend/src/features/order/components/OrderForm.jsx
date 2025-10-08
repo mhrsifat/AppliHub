@@ -7,7 +7,7 @@ function blankItem() { return { service_name: '', unit_price: 0, quantity: 1 }; 
 export default function OrderForm() {
   const navigate = useNavigate();
   const { create } = useOrders();
-  const [form, setForm] = useState({ guest_name: '', guest_email: '', guest_phone: '', guest_address: '', vat_percent: 0, coupon_discount: 0, items: [blankItem()] });
+  const [form, setForm] = useState({ customer_name: '', customer_email: '', customer_phone: '', customer_address: '', vat_percent: 0, coupon_discount: 0, items: [blankItem()] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -18,7 +18,7 @@ export default function OrderForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.guest_name) return setError('Customer name required');
+    if (!form.customer_name) return setError('Customer name required');
     setSaving(true);
     try {
       const payload = { ...form, items: form.items.map((it) => ({ service_name: it.service_name, unit_price: it.unit_price, quantity: it.quantity })) };
@@ -31,7 +31,7 @@ export default function OrderForm() {
     <form onSubmit={handleSubmit} className='bg-white shadow p-4 rounded'>
       {error && <div className='text-red-600 mb-2'>{error}</div>}
       <div className='grid grid-cols-2 gap-3'>
-        {['guest_name', 'guest_email', 'guest_phone', 'guest_address'].map((k) => (
+        {['customer_name', 'customer_email', 'customer_phone', 'customer_address'].map((k) => (
           <div key={k}><label className='block text-sm capitalize'>{k.replace('_', ' ')}</label>
             <input value={form[k]} onChange={(e) => updateField(k, e.target.value)} className='border p-2 rounded w-full' />
           </div>
