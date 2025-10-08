@@ -27,11 +27,6 @@ const LoginPage = lazy(() => import("./features/auth/pages/LoginPage"));
 const Register = lazy(() => import("./features/auth/pages/Register"));
 
 function AppWrapper() {
-  const loading = useAuthCheck();
-
-  if (loading) {
-    return <Loader size="large" global={true} />;
-  }
 
   return (
     <Router>

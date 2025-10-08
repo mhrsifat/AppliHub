@@ -27,7 +27,7 @@ function AdminLayout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <AdminHeader />
         <main className="flex-1 overflow-auto p-4">
-          <Suspense fallback={<Loader />}>
+          <Suspense fallback={<Loader size="medium"  />}>
             <Outlet />
           </Suspense>
         </main>
