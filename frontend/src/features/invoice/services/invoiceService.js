@@ -1,4 +1,3 @@
-// src/features/invoice/services/invoiceService.js
 import api from "@/services/api";
 
 const base = "/invoices";

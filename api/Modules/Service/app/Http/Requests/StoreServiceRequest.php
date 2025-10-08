@@ -6,7 +6,10 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreServiceRequest extends FormRequest
 {
-    public function authorize() { return true; }
+    public function authorize()
+    {
+        return true;
+    }
 
     public function rules()
     {
@@ -16,6 +19,8 @@ class StoreServiceRequest extends FormRequest
             'sku' => 'nullable|string|max:100|unique:services,sku',
             'service_category_id' => 'nullable|exists:service_categories,id',
             'description' => 'nullable|string',
+            'icon' => 'nullable|image|max:2048',
+            'icon_delete' => 'sometimes|boolean',
             'price' => 'required|numeric|min:0',
             'vat_applicable' => 'boolean',
             'vat_percent' => 'numeric|min:0',

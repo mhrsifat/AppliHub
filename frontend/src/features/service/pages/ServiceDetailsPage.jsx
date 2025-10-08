@@ -42,7 +42,7 @@ export default function ServiceDetailsPage() {
       setDeleting(false);
       setConfirmOpen(false);
       // after deletion, go back to list
-      navigate('/services');
+      navigate('/admin/services');
     } catch (err) {
       console.error('Delete failed', err);
       setDeleting(false);
@@ -55,7 +55,7 @@ export default function ServiceDetailsPage() {
         <Box display="flex" alignItems="center" gap={2}>
           <Button
             startIcon={<ArrowBackIcon />}
-            onClick={() => navigate('/services')}
+            onClick={() => navigate('/admin/services')}
             variant="outlined"
             size="small"
           >
@@ -72,7 +72,7 @@ export default function ServiceDetailsPage() {
             startIcon={<EditIcon />}
             variant="contained"
             sx={{ mr: 1 }}
-            onClick={() => navigate(`/services/${id}/edit`)}
+            onClick={() => navigate(`/admin/services/${id}/edit`)}
             disabled={loading || !item}
           >
             Edit

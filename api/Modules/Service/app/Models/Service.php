@@ -16,9 +16,19 @@ class Service extends Model
     }
 
     protected $fillable = [
-        'title','slug','sku','service_category_id','description',
-        'price','price_includes_vat','vat_applicable','vat_percent',
-        'is_active','stock','meta'
+        'title',
+        'slug',
+        'sku',
+        'service_category_id',
+        'description',
+        'icon',
+        'price',
+        'price_includes_vat',
+        'vat_applicable',
+        'vat_percent',
+        'is_active',
+        'stock',
+        'meta'
     ];
 
     protected $casts = [
@@ -48,14 +58,14 @@ class Service extends Model
     public function orders()
     {
         return $this->belongsToMany(\Modules\Order\Models\Order::class, 'order_service')
-            ->withPivot(['unit_price','quantity','vat_percent','vat_amount','line_total','addons'])
+            ->withPivot(['unit_price', 'quantity', 'vat_percent', 'vat_amount', 'line_total', 'addons'])
             ->withTimestamps();
     }
 
     public function invoices()
     {
         return $this->belongsToMany(\Modules\Invoice\Models\Invoice::class, 'invoice_service')
-            ->withPivot(['unit_price','quantity','vat_percent','vat_amount','line_total','addons'])
+            ->withPivot(['unit_price', 'quantity', 'vat_percent', 'vat_amount', 'line_total', 'addons'])
             ->withTimestamps();
     }
 }

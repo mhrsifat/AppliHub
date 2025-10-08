@@ -20,6 +20,8 @@ class CreateOrdersTable extends Migration
             // Customer may be anonymous; still keep customer_id for known customers
             $table->unsignedBigInteger('customer_id')->nullable();
             $table->string('guest_name')->nullable();
+            $table->string('guest_phone')->nullable();
+            $table->string('guest_address')->nullable();
             $table->string('guest_email')->nullable();
 
             // Summary amounts

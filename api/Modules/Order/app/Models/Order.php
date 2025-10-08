@@ -22,6 +22,8 @@ class Order extends Model
         'customer_id',
         'guest_name',
         'guest_email',
+        'guest_phone',
+        'guest_address',
         'total',
         'vat_percent',
         'vat_amount',

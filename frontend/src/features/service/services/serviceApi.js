@@ -1,38 +1,54 @@
 // serviceApi.js
-import api from '../../../services/api';
+import api from "../../../services/api";
 
-const BASE = '/admin/services';
+const BASE = "/admin/services";
 
 export default {
-  list(params) {
-    return api.get(BASE, { params }).then(res => res.data);
+  async list(params) {
+    const res = await api.get(BASE, { params });
+    return res.data;
   },
-  show(id) {
-    return api.get(`${BASE}/${id}`).then(res => res.data);
+  async show(id) {
+    const res = await api.get(`${BASE}/${id}`);
+    return res.data;
   },
-  create(payload) {
-    return api.post(BASE, payload).then(res => res.data);
+  async create(payload) {
+    const config =
+      payload instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : {};
+    const res = await api.post(BASE, payload, config);
+    return res.data;
   },
-  update(id, payload) {
-    return api.put(`${BASE}/${id}`, payload).then(res => res.data);
+  async update(id, payload) {
+    const config =
+      payload instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : {};
+    const res = await api.put(`${BASE}/${id}`, payload, config);
+    return res.data;
   },
-  remove(id) {
-    return api.delete(`${BASE}/${id}`).then(res => res.data);
+  async remove(id) {
+    const res = await api.delete(`${BASE}/${id}`);
+    return res.data;
   },
-  import(file) {
+  async import(file) {
     const fd = new FormData();
-    fd.append('file', file);
-    return api.post(`${BASE}/import`, fd, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    }).then(res => res.data);
+    fd.append("file", file);
+    const res = await api.post(`${BASE}/import`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
   },
   exportCsv() {
-    return api.get(`${BASE}/export`, { responseType: 'blob' });
+    return api.get(`${BASE}/export`, { responseType: "blob" });
   },
-  priceHistory(id) {
-    return api.get(`${BASE}/${id}/price-history`).then(res => res.data);
+  async priceHistory(id) {
+    const res = await api.get(`${BASE}/${id}/price-history`);
+    return res.data;
   },
-  restore(id) {
-    return api.post(`${BASE}/${id}/restore`).then(res => res.data);
-  }
+  async restore(id) {
+    const res = await api.post(`${BASE}/${id}/restore`);
+    return res.data;
+  },
 };
