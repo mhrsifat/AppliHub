@@ -8,9 +8,7 @@ const ClientRoutes = [
   {
     path: "/",
     element: (
-      <Suspense fallback={<Loader size="medium" />}>
         <ClientHome />
-      </Suspense>
     ),
   },
   {

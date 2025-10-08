@@ -1,4 +1,4 @@
-import api from '../../../services/api';
+import api from '@/services/api';
 
 export const fetchOrdersApi = ({ page = 1, per_page = 15, q = '' } = {}) =>
   api.get('/orders', { params: { page, per_page, q } });

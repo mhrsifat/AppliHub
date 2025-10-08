@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useOrders from '../hooks/useOrders';
+import Loader from "@/components/common/Loader";
 
 export default function OrderList() {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ export default function OrderList() {
         </div>
       </div>
 
-      {loading ? <div>Loading...</div> : (
+      {loading ? <Loader /> : (
         <div className='bg-white shadow rounded'>
           <table className='min-w-full table-auto'>
             <thead><tr className='bg-gray-50'>

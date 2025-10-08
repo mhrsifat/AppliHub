@@ -9,8 +9,8 @@ import serviceReducer from '../features/service/slices/serviceSlice';
 const rootReducer = combineReducers({
   auth: authReducer,
   employee: employeeReducer,
-  invoices: invoiceReducer,
-  orders: orderReducer,
+  invoice: invoiceReducer,
+  order: orderReducer,
   service: serviceReducer,
 });
 
