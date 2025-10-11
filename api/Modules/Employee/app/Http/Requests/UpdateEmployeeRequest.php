@@ -23,7 +23,7 @@ class UpdateEmployeeRequest extends FormRequest
             'phone'      => ['sometimes', 'string', 'max:30', Rule::unique('employees', 'phone')->ignore($employeeId)],
             'password'   => ['sometimes', 'nullable', 'string', 'min:8', 'confirmed'],
             'status'     => ['sometimes', 'in:active,inactive'],
-            'location'   => ['sometimes', 'nullable', 'string', 'max:150'],
+            'location'   => ['sometimes', 'nullable', 'string', 'in:Dhaka,Narayanganj', 'max:150'],
             'full_address' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'roles'      => ['sometimes', 'array'],
             'roles.*'    => ['string'],

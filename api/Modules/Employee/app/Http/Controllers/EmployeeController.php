@@ -31,9 +31,9 @@ class EmployeeController extends Controller
             $s = $request->input('search');
             $query->where(function ($q) use ($s) {
                 $q->where('first_name', 'like', "%{$s}%")
-                  ->orWhere('last_name', 'like', "%{$s}%")
-                  ->orWhere('email', 'like', "%{$s}%")
-                  ->orWhere('phone', 'like', "%{$s}%");
+                    ->orWhere('last_name', 'like', "%{$s}%")
+                    ->orWhere('email', 'like', "%{$s}%")
+                    ->orWhere('phone', 'like', "%{$s}%");
             });
         }
 
@@ -64,6 +64,10 @@ class EmployeeController extends Controller
     public function store(StoreEmployeeRequest $request)
     {
         $data = $request->validated();
+
+        // normalize empty strings to null for nullable DB columns
+        $data['location'] = array_key_exists('location', $data) && $data['location'] !== '' ? $data['location'] : null;
+        $data['full_address'] = array_key_exists('full_address', $data) && $data['full_address'] !== '' ? $data['full_address'] : null;
 
         DB::beginTransaction();
         try {
@@ -121,6 +125,14 @@ class EmployeeController extends Controller
                 $data['password'] = Hash::make($data['password']);
             } else {
                 unset($data['password']); // don't overwrite with null
+            }
+
+            // normalize empty strings to null for nullable DB columns
+            if (array_key_exists('location', $data)) {
+                $data['location'] = $data['location'] !== '' ? $data['location'] : null;
+            }
+            if (array_key_exists('full_address', $data)) {
+                $data['full_address'] = $data['full_address'] !== '' ? $data['full_address'] : null;
             }
 
             // handle avatar replacement

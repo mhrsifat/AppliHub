@@ -21,7 +21,7 @@ class StoreEmployeeRequest extends FormRequest
             'phone'      => ['nullable', 'string', 'max:30', 'unique:employees,phone'],
             'password'   => ['required', 'string', 'min:8', 'confirmed'],
             'status'     => ['nullable', 'in:active,inactive'],
-            'location'   => ['nullable', 'string', 'max:150'],
+            'location'   => ['nullable', 'string', 'in:Dhaka,Narayanganj', 'max:150'],
             'full_address' => ['nullable', 'string', 'max:2000'],
             'roles'      => ['nullable', 'array'],
             'roles.*'    => ['string'],
