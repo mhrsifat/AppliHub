@@ -1,0 +1,244 @@
+📰 BLOGS
+1️⃣ GET /api/blogs
+
+📌 Purpose: সব ব্লগ লিস্ট করা, pagination সহ
+
+✅ Request Example:
+
+GET /api/blogs?page=1&category=tech&tag=react&search=animation
+
+
+✅ Response:
+
+{
+  "data": [
+    {
+      "id": 1,
+      "title": "10 React Tricks You Should Know",
+      "slug": "10-react-tricks-you-should-know",
+      "excerpt": "Learn how to optimize your React app...",
+      "thumbnail": "https://picsum.photos/800/400",
+      "views": 452,
+      "upvotes": 22,
+      "downvotes": 3,
+      "category": {
+        "id": 3,
+        "name": "Technology",
+        "slug": "technology"
+      },
+      "tags": [
+        { "id": 1, "name": "React" },
+        { "id": 4, "name": "Frontend" }
+      ],
+      "published_at": "2025-09-25T12:30:00Z"
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "last_page": 5,
+    "total": 50
+  }
+}
+
+2️⃣ GET /api/blogs/{slug}
+
+📌 Purpose: একক ব্লগ ডিটেইলস, views count + comments সহ
+
+✅ Request:
+
+GET /api/blogs/10-react-tricks-you-should-know
+
+
+✅ Response:
+
+{
+  "id": 1,
+  "title": "10 React Tricks You Should Know",
+  "slug": "10-react-tricks-you-should-know",
+  "content": "<p>React Hooks are powerful...</p>",
+  "views": 453,
+  "upvotes": 22,
+  "downvotes": 3,
+  "category": { "id": 3, "name": "Technology" },
+  "tags": [
+    { "id": 1, "name": "React" },
+    { "id": 4, "name": "Frontend" }
+  ],
+  "comments": [
+    {
+      "id": 11,
+      "user_name": "Sifat",
+      "comment_text": "Very helpful!",
+      "created_at": "2025-10-01T10:00:00Z",
+      "replies": [
+        {
+          "id": 12,
+          "user_name": "Admin",
+          "comment_text": "Thanks, glad you liked it!",
+          "is_admin_reply": true
+        }
+      ]
+    }
+  ]
+}
+
+3️⃣ POST /api/blogs
+
+📌 Purpose: নতুন ব্লগ তৈরি করা (Admin only)
+
+✅ Request (JSON):
+
+{
+  "title": "Mastering Framer Motion",
+  "excerpt": "Animate your React apps with Framer Motion.",
+  "content": "<p>Framer Motion is an animation library...</p>",
+  "thumbnail": "https://example.com/image.jpg",
+  "category_id": 2,
+  "tag_ids": [1, 3, 5],
+  "published_at": "2025-10-09 10:00:00"
+}
+
+
+✅ Response:
+
+{
+  "message": "Blog created successfully.",
+  "data": {
+    "id": 25,
+    "title": "Mastering Framer Motion",
+    "slug": "mastering-framer-motion",
+    "tags": [
+      { "id": 1, "name": "Animation" },
+      { "id": 3, "name": "React" }
+    ]
+  }
+}
+
+4️⃣ PUT /api/blogs/{id}
+
+📌 Purpose: ব্লগ আপডেট করা
+
+✅ Request:
+
+{
+  "title": "Mastering Framer Motion in 2025",
+  "excerpt": "Updated guide with new tricks.",
+  "tag_ids": [2, 4]
+}
+
+
+✅ Response:
+
+{
+  "message": "Blog updated successfully."
+}
+
+5️⃣ DELETE /api/blogs/{id}
+
+📌 Purpose: ব্লগ ডিলিট করা (Admin only)
+
+✅ Response:
+
+{
+  "message": "Blog deleted successfully."
+}
+
+💬 COMMENTS
+6️⃣ POST /api/blogs/{id}/comment
+
+📌 Purpose: নতুন কমেন্ট করা বা রিপ্লাই
+
+✅ Request:
+
+{
+  "user_name": "Sifat",
+  "comment_text": "Nice write-up!",
+  "parent_id": null
+}
+
+
+✅ Response:
+
+{
+  "message": "Comment added successfully.",
+  "data": {
+    "id": 44,
+    "user_name": "Sifat",
+    "comment_text": "Nice write-up!",
+    "created_at": "2025-10-09T10:12:00Z"
+  }
+}
+
+7️⃣ POST /api/blogs/{id}/comment/reply
+
+📌 Purpose: রিপ্লাই টু কমেন্ট / admin reply
+
+✅ Request:
+
+{
+  "user_name": "Admin",
+  "comment_text": "Appreciate your feedback!",
+  "parent_id": 44,
+  "is_admin_reply": true
+}
+
+
+✅ Response:
+
+{
+  "message": "Reply added successfully."
+}
+
+👍 VOTES
+8️⃣ POST /api/blogs/{id}/vote
+
+📌 Purpose: IP-based upvote / downvote
+
+✅ Request:
+
+{
+  "vote_type": "up"
+}
+
+
+✅ Response (First time):
+
+{
+  "message": "Vote recorded.",
+  "upvotes": 23,
+  "downvotes": 3
+}
+
+
+✅ Response (Same IP again):
+
+{
+  "message": "You have already voted.",
+  "upvotes": 23,
+  "downvotes": 3
+}
+
+🏷️ TAGS
+9️⃣ GET /api/tags
+
+📌 Purpose: সব ট্যাগ দেখা
+
+✅ Response:
+
+[
+  { "id": 1, "name": "React", "slug": "react" },
+  { "id": 2, "name": "Laravel", "slug": "laravel" },
+  { "id": 3, "name": "Tailwind", "slug": "tailwind" }
+]
+
+🗂️ CATEGORIES
+🔟 GET /api/categories
+
+📌 Purpose: সব ক্যাটেগরি দেখা
+
+✅ Response:
+
+[
+  { "id": 1, "name": "Technology", "slug": "technology" },
+  { "id": 2, "name": "Design", "slug": "design" }
+]

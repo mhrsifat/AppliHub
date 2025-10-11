@@ -14,25 +14,11 @@ class OrderItemRequest extends FormRequest
     public function rules()
     {
         return [
-            'service_id' => ['nullable', 'integer'],
-            'service_name' => ['required', 'string', 'max:255'],
-            'service_description' => ['nullable', 'string'],
-            'unit_price' => ['required', 'numeric', 'min:0'],
-            'quantity' => ['required', 'integer', 'min:1'],
+            'service_id' => 'nullable|integer',
+            'service_name' => 'required_without:service_id|string|max:191',
+            'service_description' => 'nullable|string|max:1000',
+            'unit_price' => 'required|numeric|min:0',
+            'quantity' => 'required|integer|min:1',
         ];
-    }
-
-    protected function prepareForValidation()
-    {
-        // support clients that send `description` and `price` keys
-        $data = $this->all();
-        if (isset($data['description']) && !isset($data['service_name'])) {
-            $data['service_name'] = $data['description'];
-        }
-        if (isset($data['price']) && !isset($data['unit_price'])) {
-            $data['unit_price'] = $data['price'];
-        }
-
-        $this->replace($data);
     }
 }

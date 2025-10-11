@@ -10,13 +10,10 @@ class BlogView extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     */
-    protected $fillable = [];
+    protected $fillable = ['blog_id', 'ip_address'];
 
-    // protected static function newFactory(): BlogViewFactory
-    // {
-    //     // return BlogViewFactory::new();
-    // }
+    public function blog()
+    {
+        return $this->belongsTo(Blog::class);
+    }
 }

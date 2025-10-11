@@ -2,36 +2,30 @@
 
 namespace Modules\Invoice\Http\Controllers;
 
-use Illuminate\Routing\Controller;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Contracts\Validation\Factory as ValidationFactory;
-use Illuminate\Support\Facades\Mail;
-
+use Illuminate\Support\Str;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceItem;
-use Modules\Invoice\Models\InvoicePayment;
-use Modules\Invoice\Models\Refund;
-use Modules\Invoice\Http\Requests\StoreInvoiceRequest;
-use Modules\Invoice\Http\Requests\RecordPaymentRequest;
-use Modules\Invoice\Http\Requests\RefundRequest;
 use Modules\Invoice\Transformers\InvoiceResource;
+use Modules\Invoice\Services\InvoiceService;
+use Modules\Invoice\Http\Requests\StoreInvoiceRequest;
+use Modules\Order\Models\Order;
 
 class InvoiceController extends Controller
 {
-    protected $validation;
+    protected InvoiceService $invoiceService;
 
-    public function __construct(ValidationFactory $validation)
+    public function __construct(InvoiceService $invoiceService)
     {
-        $this->validation = $validation;
+        $this->invoiceService = $invoiceService;
     }
 
-    // List invoices
+    // List invoices with filters
     public function index(Request $request)
     {
-        $q = Invoice::with(['items', 'payments', 'refunds', 'order'])
-            ->orderBy('created_at', 'desc');
+        $q = Invoice::with(['items', 'payments', 'refunds', 'order'])->orderBy('created_at', 'desc');
 
         if ($request->filled('order_id')) {
             $q->where('order_id', $request->order_id);
@@ -40,75 +34,22 @@ class InvoiceController extends Controller
         return InvoiceResource::collection($q->paginate(25));
     }
 
-    // Show invoice
+    // Show single invoice
     public function show(Invoice $invoice)
     {
         $invoice->load(['items', 'payments', 'refunds', 'order']);
         return new InvoiceResource($invoice);
     }
 
-    // Create invoice (accepts StoreInvoiceRequest or plain Request)
+    // Create invoice from payload
     public function store(Request $request)
     {
-        return DB::transaction(function () use ($request) {
-            $data = $request instanceof StoreInvoiceRequest ? $request->validated() : $request->all();
+        $data = $request instanceof StoreInvoiceRequest ? $request->validated() : $request->all();
+        $invoice = $this->invoiceService->createFromPayload($data);
 
-            $invoiceNumber = $data['invoice_number'] ?? 'INV-' . strtoupper(Str::random(8));
+        $this->syncOrderPayment($invoice);
 
-            $invoice = Invoice::create([
-                'order_id' => $data['order_id'] ?? null,
-                'invoice_number' => $invoiceNumber,
-                'type' => $data['type'] ?? 'initial',
-                'vat_percent' => $data['vat_percent'] ?? 0,
-                'coupon_discount' => $data['coupon_discount'] ?? 0,
-                'status' => 'issued',
-            ]);
-
-            $subtotal = 0;
-            foreach ($data['items'] as $it) {
-                $lineTotal = bcmul((string)$it['unit_price'], (string)$it['quantity'], 2);
-                $subtotal += (float)$lineTotal;
-
-                $invoice->items()->create([
-                    'service_id' => $it['service_id'] ?? null,
-                    'service_name' => $it['service_name'],
-                    'description' => $it['description'] ?? null,
-                    'unit_price' => $it['unit_price'],
-                    'quantity' => $it['quantity'],
-                    'line_total' => $lineTotal,
-                    'meta' => $it['meta'] ?? null,
-                ]);
-            }
-
-            $vatAmount = round($subtotal * (($invoice->vat_percent ?? 0) / 100), 2);
-            $coupon = (float) ($invoice->coupon_discount ?? 0);
-            $grandTotal = round($subtotal + $vatAmount - $coupon, 2);
-            if ($grandTotal < 0) $grandTotal = 0;
-
-            $invoice->update([
-                'subtotal' => $subtotal,
-                'vat_amount' => $vatAmount,
-                'grand_total' => $grandTotal,
-            ]);
-
-            // Load relations for email
-            $invoice->load('items', 'order');
-
-            // Send email to customer if order has email
-            $order = $invoice->order;
-            $recipient = $order->customer_email ?? $order->customer_email ?? null;
-
-            if ($recipient) {
-                $html = $this->buildInvoiceHtml($invoice);
-                Mail::send([], [], function ($message) use ($recipient, $invoice, $html) {
-                    $message->to($recipient)
-                        ->subject("Invoice #{$invoice->invoice_number}")
-                        ->setBody($html, 'text/html');
-                });
-            }
-
-            return new InvoiceResource($invoice->fresh(['items', 'payments']));
-        });
+        return new InvoiceResource($invoice);
     }
 
     // Update invoice (status/meta/vat/coupon)
@@ -121,123 +62,87 @@ class InvoiceController extends Controller
         if (isset($payload['status'])) $invoice->status = $payload['status'];
         if (isset($payload['meta'])) $invoice->meta = $payload['meta'];
 
-        if (isset($payload['vat_percent']) || isset($payload['coupon_discount'])) {
-            $subtotal = $invoice->items()->sum(DB::raw('unit_price * quantity'));
-            $vatAmount = round($subtotal * (($invoice->vat_percent ?? 0) / 100), 2);
-            $grandTotal = round($subtotal + $vatAmount - ($invoice->coupon_discount ?? 0), 2);
-            $invoice->subtotal = $subtotal;
-            $invoice->vat_amount = $vatAmount;
-            $invoice->grand_total = max(0, $grandTotal);
-        }
+        $invoice = $this->invoiceService->recalcAndRefresh($invoice);
 
-        $invoice->save();
-
-        $paid = $invoice->payments()->where('status', 'completed')->sum('amount');
-        if ($paid >= $invoice->grand_total && $invoice->grand_total > 0) {
-            $invoice->status = 'paid';
-            $invoice->save();
-        } elseif ($paid > 0) {
-            $invoice->status = 'partially_paid';
-            $invoice->save();
-        }
+        $this->syncOrderPayment($invoice);
 
         return new InvoiceResource($invoice->fresh(['items', 'payments', 'refunds']));
     }
 
-    // Add item to invoice
-    public function addItem(Request $request, Invoice $invoice)
-    {
-        $this->validate($request, [
-            'service_name' => 'required|string',
-            'unit_price' => 'required|numeric|min:0',
-            'quantity' => 'required|integer|min:1',
-            'service_id' => 'nullable|integer',
-            'description' => 'nullable|string',
+    // Add an item to invoice
+    
+    
+    // In InvoiceController - Fix the addItem method
+public function addItem(Request $request, Invoice $invoice)
+{
+    $validated = $request->validate([
+        'service_name' => 'required|string',
+        'unit_price' => 'required|numeric|min:0',
+        'quantity' => 'required|integer|min:1',
+        'service_id' => 'nullable|integer',
+        'description' => 'nullable|string',
+        'meta' => 'nullable',
+    ]);
+
+    return DB::transaction(function () use ($validated, $invoice) {
+        // Create the new item
+        $item = $invoice->items()->create([
+            'service_id' => $validated['service_id'] ?? null,
+            'service_name' => $validated['service_name'],
+            'description' => $validated['description'] ?? null,
+            'unit_price' => (float) $validated['unit_price'],
+            'quantity' => (int) $validated['quantity'],
+            'line_total' => round((float)$validated['unit_price'] * (int)$validated['quantity'], 2),
+            'meta' => $validated['meta'] ?? null,
         ]);
 
-        return DB::transaction(function () use ($request, $invoice) {
-            $it = $invoice->items()->create([
-                'service_id' => $request->service_id,
-                'service_name' => $request->service_name,
-                'description' => $request->description,
-                'unit_price' => $request->unit_price,
-                'quantity' => $request->quantity,
-                'line_total' => round($request->unit_price * $request->quantity, 2),
-                'meta' => $request->meta ?? null,
-            ]);
+        // Use the service to recalculate totals - this should now properly sum all items
+        $invoice = $this->invoiceService->recalcAndRefresh($invoice);
 
-            $subtotal = $invoice->items()->sum(DB::raw('unit_price * quantity'));
-            $vatAmount = round($subtotal * (($invoice->vat_percent ?? 0) / 100), 2);
-            $grandTotal = round($subtotal + $vatAmount - ($invoice->coupon_discount ?? 0), 2);
+        // Sync order
+        $this->syncOrderPayment($invoice);
 
-            $invoice->update([
-                'subtotal' => $subtotal,
-                'vat_amount' => $vatAmount,
-                'grand_total' => max(0, $grandTotal),
-            ]);
-
-            $paid = $invoice->payments()->where('status', 'completed')->sum('amount');
-            if ($paid >= $invoice->grand_total) {
-                $invoice->status = 'paid';
-                $invoice->save();
-            } elseif ($paid > 0) {
-                $invoice->status = 'partially_paid';
-                $invoice->save();
-            }
-
-            return response()->json([
-                'item' => $it,
-                'invoice' => $invoice->fresh(['items', 'payments']),
-            ], 201);
-        });
-    }
+        return response()->json([
+            'item' => $item,
+            'invoice' => $invoice->fresh(['items', 'payments', 'order']),
+        ], 201);
+    });
+}
 
     // Update invoice item
     public function updateItem(Request $request, Invoice $invoice, InvoiceItem $item)
     {
-        $this->validate($request, [
+        $validated = $request->validate([
             'unit_price' => 'nullable|numeric|min:0',
             'quantity' => 'nullable|integer|min:1',
             'service_name' => 'nullable|string',
             'description' => 'nullable|string',
+            'meta' => 'nullable',
         ]);
 
         if ($item->invoice_id !== $invoice->id) {
             return response()->json(['message' => 'mismatch'], 422);
         }
 
-        return DB::transaction(function () use ($request, $invoice, $item) {
-            $item->fill($request->only(['service_name', 'description', 'unit_price', 'quantity', 'meta']));
-            if ($request->filled('unit_price') || $request->filled('quantity')) {
+        return DB::transaction(function () use ($validated, $invoice, $item) {
+            $item->fill($validated);
+            if (isset($validated['unit_price']) || isset($validated['quantity'])) {
                 $item->line_total = round($item->unit_price * $item->quantity, 2);
             }
             $item->save();
 
-            $subtotal = $invoice->items()->sum(DB::raw('unit_price * quantity'));
-            $vatAmount = round($subtotal * (($invoice->vat_percent ?? 0) / 100), 2);
-            $grandTotal = round($subtotal + $vatAmount - ($invoice->coupon_discount ?? 0), 2);
+            $invoice = $this->invoiceService->recalcAndRefresh($invoice);
+            $this->syncOrderPayment($invoice);
 
-            $invoice->update([
-                'subtotal' => $subtotal,
-                'vat_amount' => $vatAmount,
-                'grand_total' => max(0, $grandTotal),
-            ]);
-
-            $paid = $invoice->payments()->where('status', 'completed')->sum('amount');
-            if ($paid >= $invoice->grand_total && $invoice->grand_total > 0) {
-                $invoice->status = 'paid';
-                $invoice->save();
-            } elseif ($paid > 0) {
-                $invoice->status = 'partially_paid';
-                $invoice->save();
-            }
-
-            return response()->json($invoice->fresh(['items', 'payments']));
+            return response()->json([
+                'item' => $item,
+                'invoice' => $invoice,
+            ], 200);
         });
     }
 
-    // Remove invoice item
-    public function removeItem(Request $request, Invoice $invoice, InvoiceItem $item)
+    // Delete invoice item
+    public function deleteItem(Invoice $invoice, InvoiceItem $item)
     {
         if ($item->invoice_id !== $invoice->id) {
             return response()->json(['message' => 'mismatch'], 422);
@@ -245,212 +150,259 @@ class InvoiceController extends Controller
 
         return DB::transaction(function () use ($invoice, $item) {
             $item->delete();
-
-            $subtotal = $invoice->items()->sum(DB::raw('unit_price * quantity'));
-            $vatAmount = round($subtotal * (($invoice->vat_percent ?? 0) / 100), 2);
-            $grandTotal = round($subtotal + $vatAmount - ($invoice->coupon_discount ?? 0), 2);
-
-            $invoice->update([
-                'subtotal' => $subtotal,
-                'vat_amount' => $vatAmount,
-                'grand_total' => max(0, $grandTotal),
-            ]);
-
-            $paid = $invoice->payments()->where('status', 'completed')->sum('amount');
-            if ($paid >= $invoice->grand_total && $invoice->grand_total > 0) {
-                $invoice->status = 'paid';
-                $invoice->save();
-            } elseif ($paid > 0) {
-                $invoice->status = 'partially_paid';
-                $invoice->save();
-            } else {
-                if (!in_array($invoice->status, ['refunded', 'cancelled'])) {
-                    $invoice->status = 'issued';
-                    $invoice->save();
-                }
-            }
-
-            return response()->json($invoice->fresh(['items', 'payments']));
-        });
-    }
-
-    // Record a payment
-    public function recordPayment(RecordPaymentRequest $request, Invoice $invoice)
-    {
-        return DB::transaction(function () use ($request, $invoice) {
-            $data = $request->validated();
-
-            $payment = $invoice->payments()->create([
-                'payment_reference' => $data['payment_reference'] ?? null,
-                'staff_id' => $data['staff_id'] ?? null,
-                'amount' => $data['amount'],
-                'method' => $data['method'] ?? 'cash',
-                'status' => 'completed',
-                'note' => $data['note'] ?? null,
-            ]);
-
-            $paid = $invoice->payments()->where('status', 'completed')->sum('amount');
-            if ($paid >= $invoice->grand_total && $invoice->grand_total > 0) {
-                $invoice->status = 'paid';
-            } elseif ($paid > 0) {
-                $invoice->status = 'partially_paid';
-            }
-            $invoice->save();
-
-            // Send payment email if customer email exists
-            $invoice->load('order', 'items', 'payments');
-            $order = $invoice->order;
-            $recipient = $order->customer_email ?? $order->customer_email ?? null;
-
-            if ($recipient) {
-                $html = $this->buildPaymentHtml($invoice, $payment);
-                Mail::send([], [], function ($message) use ($recipient, $invoice, $html) {
-                    $message->to($recipient)
-                        ->subject("Payment received for Invoice #{$invoice->invoice_number}")
-                        ->setBody($html, 'text/html');
-                });
-            }
+            $invoice = $this->invoiceService->recalcAndRefresh($invoice);
+            $this->syncOrderPayment($invoice);
 
             return response()->json([
-                'payment' => $payment,
-                'invoice' => $invoice->fresh(['payments', 'items'])
-            ], 201);
+                'invoice' => $invoice,
+            ], 200);
         });
     }
 
-    // Refund
-    public function refund(RefundRequest $request, Invoice $invoice)
-    {
-        return DB::transaction(function () use ($request, $invoice) {
-            $data = $request->validated();
-
-            $amount = $data['amount'];
-            $paid = $invoice->payments()->where('status', 'completed')->sum('amount');
-            $alreadyRefunded = $invoice->refunds()->where('status', 'completed')->sum('amount');
-            $available = $paid - $alreadyRefunded;
-            if ($amount > $available) {
-                return response()->json([
-                    'message' => 'refund exceeds available paid amount',
-                    'available' => $available
-                ], 422);
-            }
-
-            $refund = Refund::create([
-                'invoice_id' => $invoice->id,
-                'invoice_payment_id' => $data['invoice_payment_id'] ?? null,
-                'amount' => $amount,
-                'staff_id' => $data['staff_id'] ?? null,
-                'reason' => $data['reason'],
-                'note' => $data['note'] ?? null,
-                'status' => 'completed',
-            ]);
-
-            if (!empty($data['invoice_payment_id'])) {
-                $pay = $invoice->payments()->find($data['invoice_payment_id']);
-                if ($pay) {
-                    $pay->status = 'refunded';
-                    $pay->save();
-                }
-            }
-
-            $totalRefunded = $invoice->refunds()->where('status', 'completed')->sum('amount');
-            if ($totalRefunded >= $invoice->paid_amount && $invoice->paid_amount > 0) {
-                $invoice->status = 'refunded';
-            }
-            $invoice->save();
-
-            return response()->json([
-                'refund' => $refund,
-                'invoice' => $invoice->fresh(['payments', 'refunds']),
-            ], 201);
-        });
-    }
-
-    // Create invoice from order (helper)
+    // Create invoice from order (optionally accept items override)
     public function createFromOrder(Request $request, $orderId)
     {
-        $order = \Modules\Order\Models\Order::with('items')->findOrFail($orderId);
+        $order = Order::with('items')->findOrFail($orderId);
 
-        $items = $order->items->map(function($oi) {
-            return [
-                'service_id' => $oi->service_id ?? null,
-                'service_name' => $oi->service_name ?? $oi->name ?? 'Service',
-                'description' => $oi->service_description ?? null,
-                'unit_price' => $oi->unit_price,
-                'quantity' => $oi->quantity,
-            ];
-        })->toArray();
+        $items = $request->input('items');
+        if (!is_array($items) || empty($items)) {
+            $items = $order->items->map(fn($it) => [
+                'service_id' => $it->service_id,
+                'service_name' => $it->service_name,
+                'description' => $it->service_description ?? null,
+                'unit_price' => $it->unit_price,
+                'quantity' => $it->quantity,
+                'meta' => $it->meta ?? null,
+            ])->toArray();
+        }
 
-        $invoiceRequest = new Request([
+        $payload = [
             'order_id' => $order->id,
-            'type' => 'initial',
-            'vat_percent' => $order->vat_percent ?? 0,
-            'coupon_discount' => $order->coupon_discount ?? 0,
+            'vat_percent' => $request->input('vat_percent', $order->vat_percent),
+            'coupon_discount' => $request->input('coupon_discount', $order->coupon_discount),
+            'invoice_number' => $request->input('invoice_number', 'INV-'.Str::upper(Str::random(8))),
+            'type' => $request->input('type', 'initial'),
             'items' => $items,
+        ];
+
+        $invoice = $this->invoiceService->createFromPayload($payload);
+        $this->syncOrderPayment($invoice);
+
+        return response()->json([
+            'invoice' => $invoice
+        ], 201);
+    }
+
+    // --- Helper ---
+    private function syncOrderPayment(Invoice $invoice)
+    {
+        if (!$invoice->order) {
+            return;
+        }
+
+        $order = $invoice->order;
+        $order->payment_status = match ($invoice->status) {
+            'paid' => 'paid',
+            'partially_paid' => 'partially_paid',
+            default => 'unpaid',
+        };
+        $order->save();
+    }
+    
+    
+    // In InvoiceController - Simplified recordPayment method
+    
+    
+    // In InvoiceController - Use this recordPayment method
+    
+    public function recordPayment(Request $request, Invoice $invoice)
+{
+    $request->validate([
+        'amount' => 'required|numeric|min:0.01',
+        'method' => 'nullable|string',
+        'note' => 'nullable|string',
+    ]);
+
+    return DB::transaction(function () use ($request, $invoice) {
+        $paymentAmount = (float) $request->amount;
+
+        // create invoice payment record (this makes the accessor sum increase)
+        $payment = \Modules\Invoice\Models\InvoicePayment::create([
+            'invoice_id' => $invoice->id,
+            'payment_reference' => 'PAY-' . strtoupper(Str::random(8)),
+            'staff_id' => auth()->id() ?? null,
+            'amount' => $paymentAmount,
+            'method' => $request->method ?? 'cash',
+            'status' => 'completed',
+            'note' => $request->note ?? null,
         ]);
 
-        $validator = $this->validation->make(
-            $invoiceRequest->all(),
-            app(StoreInvoiceRequest::class)->rules()
-        );
+        // Recompute paid amount via accessor and set invoice status (persist status only)
+        $newPaidAmount = (float) $invoice->fresh()->paid_amount;
+        $grandTotal = (float) $invoice->grand_total;
 
-        if ($validator->fails()) {
-            throw new \Illuminate\Validation\ValidationException($validator);
+        $status = 'unpaid';
+        if ($grandTotal > 0) {
+            if ($newPaidAmount >= $grandTotal) {
+                $status = 'paid';
+            } elseif ($newPaidAmount > 0) {
+                $status = 'partially_paid';
+            }
         }
 
-        return $this->store($invoiceRequest);
-    }
+        $invoice->status = $status;
+        $invoice->save();
 
-    // Helpers: inline HTML builders (keeps file count low)
-    protected function buildInvoiceHtml(Invoice $invoice)
-    {
-        $order = $invoice->order;
-        $lines = '';
-        foreach ($invoice->items as $it) {
-            $lines .= "<tr>
-                <td style='padding:6px;border-bottom:1px solid #eee'>{$it->service_name}</td>
-                <td style='padding:6px;border-bottom:1px solid #eee;text-align:right'>{$it->quantity}</td>
-                <td style='padding:6px;border-bottom:1px solid #eee;text-align:right'>".number_format($it->unit_price,2)."</td>
-                <td style='padding:6px;border-bottom:1px solid #eee;text-align:right'>".number_format($it->line_total,2)."</td>
-            </tr>";
+        $this->syncOrderPayment($invoice);
+
+        return response()->json([
+            'message' => 'Payment recorded successfully',
+            'invoice' => $invoice->fresh(['items', 'payments', 'order'])
+        ], 200);
+    });
+}
+
+public function refund(Request $request, Invoice $invoice)
+{
+    $request->validate([
+        'amount' => 'required|numeric|min:0.01',
+        'invoice_payment_id' => 'nullable|exists:invoice_payments,id',
+        'reason' => 'nullable|string',
+        'note' => 'nullable|string',
+    ]);
+
+    return DB::transaction(function () use ($request, $invoice) {
+        $refundAmount = (float) $request->amount;
+
+        // Option A: If a specific payment is provided, mark that payment (partial/full) as refunded.
+        $invoicePaymentId = $request->invoice_payment_id;
+        if ($invoicePaymentId) {
+            $payment = \Modules\Invoice\Models\InvoicePayment::find($invoicePaymentId);
+            if ($payment) {
+                // If refund covers full payment, mark that payment refunded.
+                // For more complex partial-refund logic you'd need refund-amount tracking per payment.
+                $payment->status = 'refunded';
+                $payment->save();
+            }
+        } else {
+            // Option B: create a Refund record and (for simplicity) mark the oldest completed payment as refunded
+            // until refundAmount is consumed — simple strategy for tests/demo.
+            $remaining = $refundAmount;
+            $payments = $invoice->payments()->where('status','completed')->orderBy('created_at','desc')->get();
+            
+            foreach ($payments as $p) {
+    if ($remaining <= 0) break;
+
+    if ($remaining >= $p->amount) {
+        // Full refund for this payment
+        $p->status = 'refunded';
+        $remaining -= (float) $p->amount;
+    } else {
+        // Partial refund — reduce amount but keep it 'completed'
+        $p->amount = $p->amount - $remaining;
+        $remaining = 0;
+    }
+    $p->save();
+}
         }
 
-        $html = "<div style='font-family:Arial,Helvetica,sans-serif;line-height:1.4'>
-        <h2>Invoice #{$invoice->invoice_number}</h2>
-        <p>Order: #{$invoice->order_id}</p>
-        <p>Customer: ".htmlspecialchars($order->customer_name ?? $order->customer_name ?? 'Customer')."</p>
-        <table width='100%' style='border-collapse:collapse'>
-            <thead>
-                <tr>
-                    <th style='text-align:left;padding:6px'>Service</th>
-                    <th style='text-align:right;padding:6px'>Qty</th>
-                    <th style='text-align:right;padding:6px'>Unit</th>
-                    <th style='text-align:right;padding:6px'>Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {$lines}
-            </tbody>
-        </table>
-        <p>Subtotal: ".number_format($invoice->subtotal,2)."</p>
-        <p>VAT ({$invoice->vat_percent}%): ".number_format($invoice->vat_amount,2)."</p>
-        <p>Coupon Discount: ".number_format($invoice->coupon_discount,2)."</p>
-        <h3>Grand Total: ".number_format($invoice->grand_total,2)."</h3>
-        </div>";
+        // create refund record for audit
+        \Modules\Invoice\Models\Refund::create([
+            'invoice_id' => $invoice->id,
+            'invoice_payment_id' => $invoicePaymentId ?? null,
+            'amount' => $refundAmount,
+            'staff_id' => auth()->id() ?? null,
+            'reason' => $request->reason ?? null,
+            'note' => $request->note ?? null,
+            'status' => 'completed',
+        ]);
 
-        return $html;
+        // Recompute status based on remaining completed payments
+        $newPaidAmount = (float) $invoice->fresh()->paid_amount;
+        $grandTotal = (float) $invoice->grand_total;
+
+        $status = 'unpaid';
+        if ($grandTotal > 0) {
+            if ($newPaidAmount >= $grandTotal) {
+                $status = 'paid';
+            } elseif ($newPaidAmount > 0) {
+                $status = 'partially_paid';
+            }
+        }
+
+        $invoice->status = $status;
+        $invoice->save();
+
+        $this->syncOrderPayment($invoice);
+
+        return response()->json([
+            'message' => 'Refund processed successfully',
+            'invoice' => $invoice->fresh(['items', 'payments', 'order'])
+        ], 200);
+    });
+}
+
+/**
+ * Create a new invoice by cloning an existing invoice.
+ *
+ * Example: POST /invoices/{invoiceId}/clone
+ * Body (optional):
+ *  - invoice_number, type, vat_percent, coupon_discount, status, items (override)
+ *
+ * Returns created invoice (201).
+ */
+public function createFromInvoice(Request $request, $invoiceId)
+{
+    // find the source invoice
+    $source = Invoice::with('items')->findOrFail($invoiceId);
+
+    // allow overrides from request
+    $itemsOverride = $request->input('items'); // optional array to replace items
+    $invoiceNumber = $request->input('invoice_number');
+    $type = $request->input('type', $source->type ?? 'initial');
+    $vatPercent = $request->input('vat_percent', $source->vat_percent ?? 0);
+    $couponDiscount = $request->input('coupon_discount', $source->coupon_discount ?? 0);
+    $status = $request->input('status', 'unpaid'); // default to unpaid for cloned invoice
+    $paidAmount = $request->input('paid_amount', 0);
+
+    // build payload
+    $payload = [
+        'order_id' => $source->order_id,
+        'invoice_number' => $invoiceNumber ?? 'INV-'.\Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(8)),
+        'type' => $type,
+        'vat_percent' => $vatPercent,
+        'coupon_discount' => $couponDiscount,
+        'status' => $status,
+        'paid_amount' => $paidAmount,
+        'items' => [],
+    ];
+
+    if (is_array($itemsOverride) && !empty($itemsOverride)) {
+        // use provided items override (must be array of items)
+        $payload['items'] = $itemsOverride;
+    } else {
+        // copy items from source invoice
+        $payload['items'] = $source->items->map(function ($it) {
+            return [
+                'service_id' => $it->service_id,
+                'service_name' => $it->service_name,
+                'description' => $it->description ?? null,
+                'unit_price' => $it->unit_price,
+                'quantity' => $it->quantity,
+                'meta' => $it->meta ?? null,
+            ];
+        })->toArray();
     }
 
-    protected function buildPaymentHtml(Invoice $invoice, $payment)
-    {
-        $html = "<div style='font-family:Arial,Helvetica,sans-serif;line-height:1.4'>
-        <h3>Payment received</h3>
-        <p>Invoice: {$invoice->invoice_number}</p>
-        <p>Amount: ".number_format($payment->amount,2)."</p>
-        <p>Method: ".htmlspecialchars($payment->method)."</p>
-        <p>Status: {$payment->status}</p>
-        </div>";
+    // create new invoice via service (transaction handled there)
+    $newInvoice = $this->invoiceService->createFromPayload($payload);
 
-        return $html;
+    // ensure order payment_status sync if linked
+    if ($newInvoice) {
+        $this->syncOrderPayment($newInvoice);
     }
+
+    return response()->json(['invoice' => $newInvoice], 201);
+}
+    
 }

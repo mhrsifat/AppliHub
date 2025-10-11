@@ -3,15 +3,20 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Order\Http\Controllers\OrderController;
 
-Route::prefix('orders')->group(function () {
-    Route::get('/', [OrderController::class, 'index']);
-    Route::post('/', [OrderController::class, 'store']);
-    Route::get('{id}', [OrderController::class, 'show']);
-    Route::put('{id}', [OrderController::class, 'update']);
-    Route::delete('{id}', [OrderController::class, 'destroy']);
+Route::prefix('orders')->middleware(['auth:sanctum'])->group(function () {
+    Route::get('/', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('/{id}', [OrderController::class, 'show'])->name('orders.show');
+    Route::post('/', [OrderController::class, 'store'])->name('orders.store');
+    Route::put('/{id}', [OrderController::class, 'update'])->name('orders.update');
+    Route::delete('/{id}', [OrderController::class, 'destroy'])->name('orders.destroy');
 
-    // items
-    Route::post('{id}/items', [OrderController::class, 'addItem']);
-    Route::put('{id}/items/{itemId}', [OrderController::class, 'updateItem']);
-    Route::delete('{id}/items/{itemId}', [OrderController::class, 'deleteItem']);
+    // Order items
+    Route::post('/{orderId}/items', [OrderController::class, 'addItem'])->name('orders.items.add');
+    Route::put('/{orderId}/items/{itemId}', [OrderController::class, 'updateItem'])->name('orders.items.update');
+    Route::delete('/{orderId}/items/{itemId}', [OrderController::class, 'deleteItem'])->name('orders.items.delete');
+    
+    Route::post('/{id}/assign', [OrderController::class, 'assign'])->name('orders.assign');
+    Route::post('/{id}/unassign', [OrderController::class, 'unassign'])->name('orders.unassign');
+    
+    Route::post('/{order}/invoices', [\Modules\Invoice\Http\Controllers\InvoiceController::class, 'createFromOrder']);
 });

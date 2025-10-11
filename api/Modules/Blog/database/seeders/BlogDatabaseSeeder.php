@@ -3,6 +3,8 @@
 namespace Modules\Blog\Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Modules\Blog\Database\Seeders\BlogModuleSeeder;
+use Modules\Blog\Database\Seeders\BlogSeeder;
 
 class BlogDatabaseSeeder extends Seeder
 {
@@ -11,6 +13,7 @@ class BlogDatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // $this->call([]);
+        $this->call([BlogModuleSeeder::class]);
+        $this->call([BlogSeeder::class]);
     }
 }

@@ -19,8 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:5173', "https://test.mhrsifat.xyz", "http://test.mhrsifat.xyz", "https://appli-hub-git-test-mhrsifat-s-projects.vercel.app" , "https://appli-hub.vercel.app", "https://applihub-test.vercel.app"],
-    'allowed_origins' => ['http://localhost:5173', "https://test.mhrsifat.xyz", "http://test.mhrsifat.xyz", "https://appli-hub-git-test-mhrsifat-s-projects.vercel.app" , "http://appli-hub.vercel.app", "https://applihub-test.vercel.app, http://applihub-test.vercel.app"],
+    'allowed_origins' => ['http://localhost:5173', "https://test.mhrsifat.xyz", "http://test.mhrsifat.xyz", "https://appli-hub-git-test-mhrsifat-s-projects.vercel.app", "http://appli-hub.vercel.app", "https://appli-hub.vercel.app", "https://applihub-test.vercel.app", "http://applihub-test.vercel.app"],
 
     'allowed_origins_patterns' => [],
 

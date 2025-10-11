@@ -35,6 +35,11 @@ class Order extends Model
         'created_by',
         'updated_by',
     ];
+    
+    protected $attributes = [
+    'status' => 'pending',
+    'payment_status' => 'unpaid',
+];
 
     protected static function booted()
     {
@@ -75,6 +80,11 @@ class Order extends Model
     {
         return $this->hasMany(OrderItem::class, 'order_id');
     }
+    
+public function assignedTo()
+{
+    return $this->belongsTo(\App\Models\User::class, 'assigned_to');
+}
 
     // placeholder for invoices relation (Invoices module will define Invoice model)
     public function invoices()

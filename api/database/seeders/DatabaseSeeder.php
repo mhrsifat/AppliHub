@@ -7,6 +7,7 @@ use Modules\Employee\Database\Seeders\EmployeeDatabaseSeeder;
 use Modules\Order\Database\Seeders\OrderDatabaseSeeder;
 use Modules\Invoice\Database\Seeders\InvoiceDatabaseSeeder;
 use Modules\Service\Database\Seeders\ServiceSeeder;
+use Modules\Blog\Database\Seeders\BlogDatabaseSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -25,5 +26,6 @@ class DatabaseSeeder extends Seeder
         $this->call(OrderDatabaseSeeder::class);
         $this->call(InvoiceDatabaseSeeder::class);
         $this->call(ServiceSeeder::class);
+        $this->call(BlogDatabaseSeeder::class);
     }
 }

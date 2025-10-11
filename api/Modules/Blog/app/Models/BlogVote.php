@@ -10,13 +10,10 @@ class BlogVote extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     */
-    protected $fillable = [];
+    protected $fillable = ['blog_id', 'ip_address', 'vote_type'];
 
-    // protected static function newFactory(): BlogVoteFactory
-    // {
-    //     // return BlogVoteFactory::new();
-    // }
+    public function blog()
+    {
+        return $this->belongsTo(Blog::class);
+    }
 }

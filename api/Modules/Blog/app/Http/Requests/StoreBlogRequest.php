@@ -6,19 +6,24 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreBlogRequest extends FormRequest
 {
-    /**
-     * Get the validation rules that apply to the request.
-     */
-    public function rules(): array
+    public function authorize()
     {
-        return [];
+        // adjust authorization logic as needed (admin only)
+        return true;
     }
 
-    /**
-     * Determine if the user is authorized to make this request.
-     */
-    public function authorize(): bool
+    public function rules()
     {
-        return true;
+        return [
+            'title' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255|unique:blogs,slug,' . $this->route('blog'),
+            'excerpt' => 'nullable|string|max:1000',
+            'content' => 'required|string',
+            'thumbnail' => 'nullable|url',
+            'category_id' => 'nullable|exists:categories,id',
+            'tags' => 'nullable|array',
+            'tags.*' => 'exists:tags,id',
+            'published_at' => 'nullable|date',
+        ];
     }
 }

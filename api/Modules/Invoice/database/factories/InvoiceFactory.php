@@ -4,6 +4,7 @@ namespace Modules\Invoice\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Modules\Invoice\Models\Invoice;
+use Modules\Order\Models\Order;
 use Illuminate\Support\Str;
 
 class InvoiceFactory extends Factory
@@ -19,7 +20,7 @@ class InvoiceFactory extends Factory
         $grandTotal = $subtotal + $vatAmount - $couponDiscount;
 
         return [
-            'order_id' => null,
+            'order_id' => Order::factory(),
             'invoice_number' => 'INV-' . strtoupper(Str::random(8)),
             'type' => 'standard',
             'subtotal' => $subtotal,
@@ -27,7 +28,7 @@ class InvoiceFactory extends Factory
             'vat_amount' => $vatAmount,
             'coupon_discount' => $couponDiscount,
             'grand_total' => $grandTotal,
-            'status' => $this->faker->randomElement(['unpaid', 'partially_paid', 'paid']),
+            'status' => $this->faker->randomElement(['draft', 'issued', 'unpaid', 'partially_paid', 'paid', 'refunded', 'cancelled']),
             'meta' => [],
         ];
     }

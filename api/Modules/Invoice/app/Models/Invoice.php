@@ -15,7 +15,7 @@ class Invoice extends Model
     }
 
     protected $fillable = [
-        'order_id','invoice_number','type','subtotal','vat_percent','vat_amount','coupon_discount','grand_total','status','meta'
+        'order_id','invoice_number','type','subtotal','vat_percent','vat_amount', 'paid_amount','coupon_discount','grand_total','status','meta'
     ];
 
     protected $casts = [
