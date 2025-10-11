@@ -8,6 +8,7 @@ import { Outlet } from "react-router-dom";
 import OrderRoutes from "@/features/order/Routes";
 import InvoiceRoutes from "@/features/invoice/Routes";
 import ServiceRoutes from "@/features/service/Routes";
+import BlogRoutes from "@/features/blog/Routes";
 
 const Dashboard = lazy(() => import("../pages/admin/Dashboard"));
 const Employees = lazy(() => import("../features/employee/pages/EmployeesPage"));
@@ -46,6 +47,7 @@ export default function AdminRoutes() {
          {ServiceRoutes}
          {OrderRoutes}
          {InvoiceRoutes}
+         {BlogRoutes}
         <Route path="messages" element={<Messages />} />
         <Route path="permissions" element={<Permissions />} />
         <Route path="reports" element={<Reports />} />

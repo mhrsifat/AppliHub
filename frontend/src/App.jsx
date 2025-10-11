@@ -27,7 +27,6 @@ const LoginPage = lazy(() => import("./features/auth/pages/LoginPage"));
 const Register = lazy(() => import("./features/auth/pages/Register"));
 
 function AppWrapper() {
-
   return (
     <Router>
       <Suspense fallback={<Loader size="large" global={true} />}>

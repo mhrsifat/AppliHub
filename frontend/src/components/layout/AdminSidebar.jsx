@@ -11,6 +11,7 @@ import {
   ChartBarIcon,
   CogIcon,
   Bars3Icon,
+  PencilSquareIcon
 } from "@heroicons/react/24/outline";
 
 const navItems = [
@@ -19,8 +20,8 @@ const navItems = [
   { name: "Services", path: "/admin/services", icon: ClipboardDocumentListIcon },
   { name: "Orders", path: "/admin/orders", icon: ShoppingCartIcon },
   { name: "Invoices", path: "/admin/invoices", icon: DocumentTextIcon },
+  { name: "Blogs", path: "/admin/blogs", icon: PencilSquareIcon },
   { name: "Messages", path: "/admin/messages", icon: BellIcon },
-  { name: "Permissions", path: "/admin/permissions", icon: ShieldCheckIcon },
   { name: "Reports", path: "/admin/reports", icon: ChartBarIcon },
   { name: "Settings", path: "/admin/settings", icon: CogIcon },
 ];

@@ -1,0 +1,155 @@
+// src/features/order/components/OrderAssignment.jsx
+/**
+ * src/features/order/components/OrderAssignment.jsx
+ *
+ * A feature-rich, minimal MUI component to assign or unassign an employee
+ * to an order. Integrates useOrders() + useEmployees().
+ * Designed to be used inside a Dialog (like in OrderList.jsx).
+ */
+
+import React, { useEffect, useState, useMemo } from 'react';
+import {
+  Box,
+  Typography,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Avatar,
+  TextField,
+  Button,
+  CircularProgress,
+  Divider,
+  Stack,
+} from '@mui/material';
+import { UserIcon } from '@heroicons/react/24/outline';
+import useEmployees from '@/features/employee/hooks/useEmployees';
+import useOrders from '../hooks/useOrders';
+
+export default function OrderAssignment({ order, onClose }) {
+  const { assign, unassign } = useOrders();
+  const {
+    list: employees,
+    loading,
+    onSearch,
+    load,
+  } = useEmployees(1, 10);
+
+  const [selected, setSelected] = useState(order?.assigned_to ?? null);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    load(1, '');
+  }, [load]);
+
+  const handleAssign = async () => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      await assign({ id: order.id, employee_id: selected });
+      onClose?.();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUnassign = async () => {
+    setSaving(true);
+    try {
+      await unassign(order.id);
+      onClose?.();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return employees;
+    return employees.filter((e) =>
+      e.name?.toLowerCase().includes(search.toLowerCase()) ||
+      e.email?.toLowerCase().includes(search.toLowerCase()) ||
+      e.phone?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [employees, search]);
+
+  return (
+    <Box>
+      <Typography variant="subtitle1" gutterBottom>
+        {order?.assigned_to
+          ? `Currently assigned to: ${order.assigned_to_name ?? 'Unknown'}`
+          : 'This order is not assigned'}
+      </Typography>
+
+      <TextField
+        size="small"
+        fullWidth
+        placeholder="Search employees..."
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          onSearch(e.target.value);
+        }}
+        sx={{ mb: 2 }}
+      />
+
+      <Box sx={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
+        {loading ? (
+          <Box p={3} textAlign="center"><CircularProgress size={24} /></Box>
+        ) : (
+          <List dense disablePadding>
+            {filtered.map((e) => (
+              <React.Fragment key={e.id}>
+                <ListItem
+                  button
+                  selected={selected === e.id}
+                  onClick={() => setSelected(e.id)}
+                >
+                  <ListItemAvatar>
+                    <Avatar src={e.avatar ?? undefined}>
+                      {!e.avatar && <UserIcon width={18} />}
+                    </Avatar>
+                  </ListItemAvatar>
+
+                  <ListItemText
+                    primary={e.name}
+                    secondary={`${e.email ?? ''} ${e.phone ? '• ' + e.phone : ''}`}
+                  />
+                </ListItem>
+                <Divider component="li" />
+              </React.Fragment>
+            ))}
+
+            {filtered.length === 0 && (
+              <Box p={3} textAlign="center">
+                <Typography variant="body2" color="textSecondary">
+                  No employees found.
+                </Typography>
+              </Box>
+            )}
+          </List>
+        )}
+      </Box>
+
+      <Stack direction="row" spacing={2} justifyContent="flex-end" mt={3}>
+        {order?.assigned_to && (
+          <Button
+            variant="outlined"
+            color="error"
+            disabled={saving}
+            onClick={handleUnassign}
+          >
+            {saving ? 'Unassigning...' : 'Unassign'}
+          </Button>
+        )}
+        <Button
+          variant="contained"
+          disabled={!selected || saving}
+          onClick={handleAssign}
+        >
+          {saving ? 'Assigning...' : 'Assign'}
+        </Button>
+      </Stack>
+    </Box>
+  );
+}

@@ -1,23 +1,111 @@
-import { useEffect, useState, useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchOrders, fetchOrder, createOrder, updateOrder } from '../slices/orderSlice';
+// src/features/order/hooks/useOrders.js
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useDispatch, useSelector, shallowEqual } from "react-redux";
+import {
+  fetchOrders,
+  fetchOrder,
+  createOrder,
+  updateOrder,
+  assignOrder,
+  unassignOrder,
+} from "../slices/orderSlice";
+import {
+  selectAllOrders,
+  selectOrderMeta,
+  selectOrderLoading,
+  selectOrderError,
+  selectCurrentOrder,
+} from "../slices/orderSlice";
 
 export default function useOrders({ initialPage = 1, perPage = 15 } = {}) {
   const dispatch = useDispatch();
-  const { list, meta, loading, error, current } = useSelector((s) => s.order || {});
+
+  const list = useSelector(selectAllOrders, shallowEqual);
+  const meta = useSelector(selectOrderMeta, shallowEqual);
+  const loading = useSelector(selectOrderLoading, shallowEqual);
+  const error = useSelector(selectOrderError);
+  const current = useSelector(selectCurrentOrder, shallowEqual);
+
   const [page, setPage] = useState(initialPage);
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState("");
+  const [localPerPage, setLocalPerPage] = useState(perPage);
+
+  // debounce for search to avoid spamming API
+  const debounceRef = useRef(null);
+  const debouncedFetch = useCallback(
+    (term) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        dispatch(fetchOrders({ page: 1, per_page: localPerPage, q: term }));
+        setPage(1);
+      }, 400);
+    },
+    [dispatch, localPerPage]
+  );
 
   const load = useCallback(() => {
-    dispatch(fetchOrders({ page, per_page: perPage, q }));
-  }, [dispatch, page, perPage, q]);
+    dispatch(fetchOrders({ page, per_page: localPerPage, q }));
+  }, [dispatch, page, localPerPage, q]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [load]);
 
-  const search = (term) => { setQ(term); setPage(1); dispatch(fetchOrders({ page: 1, per_page: perPage, q: term })); };
-  const getOne = (id) => dispatch(fetchOrder(id));
-  const create = (payload) => dispatch(createOrder(payload));
-  const save = (id, payload) => dispatch(updateOrder({ id, payload }));
+  const search = useCallback(
+    (term) => {
+      setQ(term);
+      debouncedFetch(term);
+    },
+    [debouncedFetch]
+  );
 
-  return { list, meta, loading, error, current, page, setPage, q, setQ, load, search, getOne, create, save };
+  const getOne = useCallback((id) => dispatch(fetchOrder(id)), [dispatch]);
+  const create = useCallback(
+    (payload) => dispatch(createOrder(payload)),
+    [dispatch]
+  );
+  const save = useCallback(
+    (id, payload) => dispatch(updateOrder({ id, payload })),
+    [dispatch]
+  );
+
+  // assign an employee to an order
+  const assign = useCallback(
+    (orderId, employeeId) => {
+      return dispatch(assignOrder({ orderId, employeeId }));
+    },
+    [dispatch]
+  );
+
+  // unassign an order (no payload required)
+  const unassign = useCallback(
+    (orderId) => {
+      return dispatch(unassignOrder(orderId));
+    },
+    [dispatch]
+  );
+
+  return {
+    list,
+    meta,
+    loading,
+    error,
+    current,
+    page,
+    setPage,
+    q,
+    setQ,
+    perPage: localPerPage,
+    setPerPage: setLocalPerPage,
+    load,
+    search,
+    getOne,
+    create,
+    save,
+    assign,
+    unassign,
+  };
 }
