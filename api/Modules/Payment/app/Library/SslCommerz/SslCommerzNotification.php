@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Donation\Library\SslCommerz;
+namespace Modules\Payment\Library\SslCommerz;
 
 class SslCommerzNotification extends AbstractSslCommerz
 {

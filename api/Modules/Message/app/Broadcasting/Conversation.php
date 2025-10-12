@@ -2,7 +2,7 @@
 
 namespace Modules\Message\Broadcasting;
 
-class conversation
+class Conversation
 {
     /**
      * Create a new channel instance.

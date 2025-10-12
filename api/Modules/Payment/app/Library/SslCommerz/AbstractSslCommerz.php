@@ -1,5 +1,6 @@
 <?php
-namespace Modules\Donation\Library\SslCommerz;
+
+namespace Modules\Payment\Library\SslCommerz;
 
 abstract class AbstractSslCommerz implements SslCommerzInterface
 {
