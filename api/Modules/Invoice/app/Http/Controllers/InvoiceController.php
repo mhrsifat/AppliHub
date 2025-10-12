@@ -155,8 +155,29 @@ class InvoiceController extends Controller
         $order = Order::with(['items', 'invoices.payments'])->findOrFail($orderId);
 
         $items = $request->input('items');
+
+        // If caller didn't provide explicit items, default to only the order items
+        // that were added after the last invoice was created. This prevents the
+        // new invoice from re-invoicing previously invoiced items.
         if (!is_array($items) || empty($items)) {
-            $items = $order->items->map(fn($it) => [
+            $lastInvoice = $order->invoices()->orderByDesc('created_at')->first();
+
+            $query = $order->items();
+            if ($lastInvoice) {
+                $query = $query->where('created_at', '>', $lastInvoice->created_at);
+            }
+
+            $newItems = $query->get();
+
+            // If there are no new items to invoice, return a helpful error so
+            // callers can either pass explicit items or avoid creating empty invoices.
+            if ($newItems->isEmpty()) {
+                return response()->json([
+                    'message' => 'No new order items found to invoice. Provide items in request or add items to order first.'
+                ], 422);
+            }
+
+            $items = $newItems->map(fn($it) => [
                 'service_id' => $it->service_id,
                 'service_name' => $it->service_name,
                 'description' => $it->service_description ?? null,
