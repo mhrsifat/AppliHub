@@ -8,21 +8,25 @@ class UpdateOrderRequest extends FormRequest
 {
     public function authorize()
     {
-        // allow updates — restrict in policies in real app
         return true;
     }
 
     public function rules()
     {
         return [
-            'customer_id' => ['nullable','integer','exists:customers,id'],
-            'guest_name' => ['nullable','string','max:255'],
-            'guest_email' => ['nullable','email','max:255'],
-            'vat_percent' => ['nullable','numeric','between:0,100'],
-            'coupon_code' => ['nullable','string','max:100'],
-            'coupon_discount' => ['nullable','numeric','min:0'],
-            'status' => ['nullable','in:draft,confirmed,completed,cancelled'],
-            'payment_status' => ['nullable','in:pending,partial,paid,refunded'],
+            'customer_id' => 'nullable|integer',
+            'customer_name' => 'nullable|string|max:191',
+            'customer_email' => 'nullable|email|max:191',
+            'customer_phone' => 'nullable|string|max:50',
+            'customer_address' => 'nullable|string|max:1000',
+            'customer_note' => 'nullable|string|max:2000',
+            'vat_percent' => 'nullable|numeric|min:0',
+            'coupon_code' => 'nullable|string|max:100',
+            'coupon_discount' => 'nullable|numeric|min:0',
+            'status' => 'nullable|string',
+            'payment_status' => 'nullable|string',
+            'items' => 'nullable|array',
+            'items.*.id' => 'nullable|integer',
         ];
     }
 }

@@ -19,6 +19,8 @@ class EmployeeResource extends JsonResource
             'email'      => $this->email,
             'phone'      => $this->phone,
             'avatar'     => $avatarUrl,
+            'location'   => $this->location,
+            'full_address' => $this->full_address,
             'roles'      => $this->whenLoaded('roles') ? $this->roles->pluck('name') : $this->getRoleNames(),
             'status'     => $this->status,
             'created_at' => $this->created_at ? $this->created_at->toDateTimeString() : null,

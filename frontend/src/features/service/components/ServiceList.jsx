@@ -8,23 +8,39 @@ import {
 import useServiceSearch from '../hooks/useServiceSearch';
 import {
   Box, TextField, IconButton, Table, TableBody, TableCell, TableHead,
-  TableRow, TableContainer, Paper, Button, Pagination, Stack
+  TableRow, TableContainer, Paper, Button, Pagination, Stack,
+  Dialog, DialogTitle, DialogActions
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import ServiceCard from './ServiceCard';
+import Loader from '@/components/common/Loader';
 
 export default function ServiceList({ onEdit, onView }) {
   const dispatch = useDispatch();
   const { list, loading } = useSelector(s => s.service);
   const { query, setQuery, debounced } = useServiceSearch('', 300);
   const [page, setPage] = useState(1);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState(null);
   const perPage = 12;
 
   useEffect(() => {
     dispatch(fetchServices({ q: debounced, page, per_page: perPage }));
   }, [dispatch, debounced, page]);
+
+  const handleDeleteClick = (service) => {
+    setSelectedService(service);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (selectedService) {
+      dispatch(deleteService(selectedService.id));
+    }
+    setConfirmOpen(false);
+    setSelectedService(null);
+  };
 
   return (
     <Box>
@@ -38,48 +54,47 @@ export default function ServiceList({ onEdit, onView }) {
         <Button variant="contained" onClick={() => dispatch(fetchServices({}))}>Refresh</Button>
       </Stack>
 
-      <Box className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {list?.data?.length ? list.data.map(service => (
-          <ServiceCard
-            key={service.id}
-            service={service}
-            onEdit={() => onEdit?.(service)}
-            onView={() => onView?.(service)}
-            onDelete={() => dispatch(deleteService(service.id))}
-          />
-        )) : !loading && <Box>No services found.</Box>}
-      </Box>
-
-      <Box mt={4}>
-        <TableContainer component={Paper}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Title</TableCell>
-                <TableCell>SKU</TableCell>
-                <TableCell>Price</TableCell>
-                <TableCell>VAT</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {list?.data?.map(s => (
-                <TableRow key={s.id}>
-                  <TableCell>{s.title}</TableCell>
-                  <TableCell>{s.sku}</TableCell>
-                  <TableCell>{s.price}</TableCell>
-                  <TableCell>{s.vat_percent}%</TableCell>
-                  <TableCell align="right">
-                    <IconButton size="small" onClick={() => onView?.(s)}><VisibilityIcon /></IconButton>
-                    <IconButton size="small" onClick={() => onEdit?.(s)}><EditIcon /></IconButton>
-                    <IconButton size="small" onClick={() => dispatch(deleteService(s.id))}><DeleteIcon /></IconButton>
-                  </TableCell>
+      {loading && <Loader />}
+      {!loading && (
+        <Box mt={4}>
+          <TableContainer component={Paper}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Icon</TableCell>
+                  <TableCell>Title</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Slug</TableCell>
+                  <TableCell align="right" sx={{ width: 100 }}>Actions</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Box>
+              </TableHead>
+              <TableBody>
+                {list?.data?.map(s => (
+                  <TableRow key={s.id}>
+                    <TableCell>
+                      {s.icon
+                        ? <img src={s.icon} alt={s.title} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} />
+                        : <Box width={40} height={40} bgcolor="#eee" borderRadius={4} />}
+                    </TableCell>
+                    <TableCell>{s.title}</TableCell>
+                    <TableCell>{s.description}</TableCell>
+                    <TableCell>{s.is_active ? 'Active' : 'Inactive'}</TableCell>
+                    <TableCell>{s.slug}</TableCell>
+                    <TableCell align="right" sx={{ width: 100, whiteSpace: 'nowrap' }}>
+                      <IconButton size="small" onClick={() => onView?.(s)}><VisibilityIcon /></IconButton>
+                      <IconButton size="small" onClick={() => onEdit?.(s)}><EditIcon /></IconButton>
+                      <IconButton size="small" color="error" onClick={() => handleDeleteClick(s)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+      )}
 
       <Box mt={2} display="flex" justifyContent="center">
         <Pagination
@@ -88,6 +103,17 @@ export default function ServiceList({ onEdit, onView }) {
           onChange={(e, v) => setPage(v)}
         />
       </Box>
+
+      {/* Confirm Dialog */}
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle>
+          Are you sure you want to delete <strong>{selectedService?.title}</strong>?
+        </DialogTitle>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+          <Button color="error" onClick={handleConfirmDelete}>Delete</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

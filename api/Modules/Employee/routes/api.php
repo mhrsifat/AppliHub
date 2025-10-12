@@ -3,14 +3,16 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Employee\Http\Controllers\EmployeeController;
 
-Route::group(['prefix' => 'employees', 'middleware' => ['api','auth:sanctum']], function () {
+Route::prefix('employees')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/', [EmployeeController::class, 'index']);
     Route::post('/', [EmployeeController::class, 'store']);
     Route::get('/{id}', [EmployeeController::class, 'show']);
     Route::put('/{id}', [EmployeeController::class, 'update']);
     Route::delete('/{id}', [EmployeeController::class, 'destroy']);
+    Route::post('/restore/{id}', [EmployeeController::class, 'restore']);
 
-    // extra endpoints for soft-delete/restore/force-delete
-    Route::post('/{id}/restore', [EmployeeController::class, 'restore']);
-    Route::delete('/{id}/force', [EmployeeController::class, 'forceDestroy']);
+    // salary & promotion
+    Route::post('/{id}/salary', [EmployeeController::class, 'addSalary']);
+    Route::get('/{id}/salaries', [EmployeeController::class, 'salaries']);
+    Route::delete('/{id}/salaries/{salaryId}', [EmployeeController::class, 'deleteSalary']);
 });

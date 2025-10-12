@@ -15,6 +15,7 @@ class CreateServicesTable extends Migration
             $table->string('sku')->nullable()->index();
             $table->foreignId('service_category_id')->nullable()->constrained('service_categories')->nullOnDelete();
             $table->text('description')->nullable();
+            $table->string('icon')->nullable();
             $table->decimal('price', 14, 2)->default(0);
             $table->boolean('price_includes_vat')->default(false);
             $table->boolean('vat_applicable')->default(true);

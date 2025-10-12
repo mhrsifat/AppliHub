@@ -1,7 +1,7 @@
 // src/services/api.js
-import axios from 'axios';
-import { store } from '../app/store';
-import { setUser, clearUser } from '../features/auth/slices/authSlice';
+import axios from "axios";
+import store from "../app/store";
+import { setUser, clearUser } from "../features/auth/slices/authSlice";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -9,20 +9,20 @@ const API_BASE = import.meta.env.VITE_API_BASE;
 const api = axios.create({
   baseURL: API_BASE,
   withCredentials: true,
-  headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+  headers: { "Content-Type": "application/json", Accept: "application/json" },
 });
 
 // Helper to set/remove access token in memory
 export const setAccessToken = (token) => {
-  if (token) api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  else delete api.defaults.headers.common['Authorization'];
+  if (token) api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  else delete api.defaults.headers.common["Authorization"];
 };
 
 // Separate Axios instance for refresh to avoid interceptor recursion
 const refreshClient = axios.create({
   baseURL: API_BASE,
   withCredentials: true,
-  headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+  headers: { "Content-Type": "application/json", Accept: "application/json" },
 });
 
 // Queue for requests while refreshing
@@ -45,7 +45,7 @@ api.interceptors.response.use(
     if (!originalRequest) return Promise.reject(error);
 
     // If refresh endpoint itself fails, logout immediately
-    if (originalRequest.url?.includes('/auth/refresh')) {
+    if (originalRequest.url?.includes("/auth/refresh")) {
       store.dispatch(clearUser());
       return Promise.reject(error);
     }
@@ -57,7 +57,8 @@ api.interceptors.response.use(
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((token) => {
-          if (token) originalRequest.headers['Authorization'] = `Bearer ${token}`;
+          if (token)
+            originalRequest.headers["Authorization"] = `Bearer ${token}`;
           return api(originalRequest);
         });
       }
@@ -66,11 +67,15 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshRes = await refreshClient.post('/auth/refresh', {}, { withCredentials: true });
+        const refreshRes = await refreshClient.post(
+          "/auth/refresh",
+          {},
+          { withCredentials: true }
+        );
         const newToken = refreshRes.data?.access_token;
         const user = refreshRes.data?.user;
 
-        if (!newToken) throw new Error('No token returned');
+        if (!newToken) throw new Error("No token returned");
 
         // Set new token in Axios default headers
         setAccessToken(newToken);
@@ -82,7 +87,7 @@ api.interceptors.response.use(
         processQueue(null, newToken);
 
         // Retry the original request
-        originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+        originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (err) {
         processQueue(err);

@@ -1,11 +1,6 @@
-import React from 'react'
+// src/pages/employee/Reports.jsx
+import React from "react";
 
-const Reports = () => {
-  return (
-    <div>
-      reports
-    </div>
-  )
+export default function Reports() {
+  return <div className="text-xl font-semibold">Employee reports</div>;
 }
-
-export default Reports

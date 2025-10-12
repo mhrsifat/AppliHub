@@ -6,13 +6,16 @@ import AdminHeader from "../components/layout/AdminHeader";
 import { Outlet } from "react-router-dom";
 
 import OrderRoutes from "@/features/order/Routes";
+import InvoiceRoutes from "@/features/invoice/Routes";
+import ServiceRoutes from "@/features/service/Routes";
+import BlogRoutes from "@/features/blog/Routes";
 
 const Dashboard = lazy(() => import("../pages/admin/Dashboard"));
-const Employees = lazy(() => import("../features/employee/pages/EmployeesPage"));
+const Employees = lazy(() => import("../features/employee/pages/EmployeeListPage"));
 const Services = lazy(() => import("../features/service/pages/ServicesPage"));
 const Orders = lazy(() => import("../features/order/pages/OrderListPage"));
 const Invoices = lazy(() => import("../features/invoice/pages/InvoiceListPage"));
-const Messages = lazy(() => import("../pages/admin/Messages"));
+const Messages = lazy(() => import("../pages/Messages"));
 const Permissions = lazy(() => import("../pages/admin/Permissions"));
 const Reports = lazy(() => import("../pages/admin/Reports"));
 const Settings = lazy(() => import("../pages/admin/Settings"));
@@ -25,7 +28,7 @@ function AdminLayout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <AdminHeader />
         <main className="flex-1 overflow-auto p-4">
-          <Suspense fallback={<Loader />}>
+          <Suspense fallback={<Loader size="medium"  />}>
             <Outlet />
           </Suspense>
         </main>
@@ -41,9 +44,10 @@ export default function AdminRoutes() {
       <Route path="/" element={<AdminLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="employees" element={<Employees />} />
-        <Route path="services" element={<Services />} />
-          {OrderRoutes}
-        <Route path="invoices" element={<Invoices />} />
+         {ServiceRoutes}
+         {OrderRoutes}
+         {InvoiceRoutes}
+         {BlogRoutes}
         <Route path="messages" element={<Messages />} />
         <Route path="permissions" element={<Permissions />} />
         <Route path="reports" element={<Reports />} />

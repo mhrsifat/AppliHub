@@ -8,8 +8,11 @@ import {
   deleteEmployee,
   restoreEmployee,
   forceDeleteEmployee,
-  clearError,
+  addSalary,
+  listSalaries,
+  deleteSalary,
   setItem,
+  clearError,
 } from '../slices/employeeSlice';
 
 export default function useEmployees(initialPage = 1, perPage = 15) {
@@ -36,29 +39,21 @@ export default function useEmployees(initialPage = 1, perPage = 15) {
     setSearch(q);
     load(1, q);
   };
+
   const onPage = (p) => {
     load(p, search);
   };
 
-  const onCreate = async (formData) => {
-    return dispatch(createEmployee(formData)).unwrap();
-  };
+  const onCreate = async (formData) => dispatch(createEmployee(formData)).unwrap();
+  const onUpdate = async (id, formData) => dispatch(updateEmployee({ id, formData })).unwrap();
+  const onDelete = async (id) => dispatch(deleteEmployee(id)).unwrap();
+  const onRestore = async (id) => dispatch(restoreEmployee(id)).unwrap();
+  const onForceDelete = async (id) => dispatch(forceDeleteEmployee(id)).unwrap();
 
-  const onUpdate = async (id, formData) => {
-    return dispatch(updateEmployee({ id, formData })).unwrap();
-  };
-
-  const onDelete = async (id) => {
-    return dispatch(deleteEmployee(id)).unwrap();
-  };
-
-  const onRestore = async (id) => {
-    return dispatch(restoreEmployee(id)).unwrap();
-  };
-
-  const onForceDelete = async (id) => {
-    return dispatch(forceDeleteEmployee(id)).unwrap();
-  };
+  // Salary / Promotion
+  const onAddSalary = async (id, payload) => dispatch(addSalary({ id, payload })).unwrap();
+  const onListSalaries = async (id, params) => dispatch(listSalaries({ id, params })).unwrap();
+  const onDeleteSalary = async (id, salaryId) => dispatch(deleteSalary({ id, salaryId })).unwrap();
 
   const setSelectedItem = (payload) => dispatch(setItem(payload));
   const clearErrors = () => dispatch(clearError());
@@ -79,6 +74,9 @@ export default function useEmployees(initialPage = 1, perPage = 15) {
     onDelete,
     onRestore,
     onForceDelete,
+    onAddSalary,
+    onListSalaries,
+    onDeleteSalary,
     setSelectedItem,
     clearErrors,
   };

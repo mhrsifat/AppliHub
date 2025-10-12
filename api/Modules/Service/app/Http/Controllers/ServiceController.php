@@ -9,20 +9,23 @@ use Modules\Service\Http\Requests\StoreServiceRequest;
 use Modules\Service\Http\Requests\UpdateServiceRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 class ServiceController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Service::query()->with(['category','addons']);
+        $query = Service::query()->with(['category', 'addons']);
 
         if ($request->filled('q')) {
             $q = $request->q;
-            $query->where(function($q2) use ($q) {
-                $q2->where('title','like', "%{$q}%")
-                   ->orWhere('sku','like', "%{$q}%")
-                   ->orWhere('slug','like', "%{$q}%");
+            $query->where(function ($q2) use ($q) {
+                $q2->where('title', 'like', "%{$q}%")
+                    ->orWhere('sku', 'like', "%{$q}%")
+                    ->orWhere('slug', 'like', "%{$q}%")
+                    ->orWhere('description', 'like', "%{$q}%")
+                    ->orderBy('date_created', 'desc');
             });
         }
 
@@ -30,12 +33,24 @@ class ServiceController extends Controller
         if ($request->filled('is_active')) $query->where('is_active', (bool)$request->is_active);
 
         $services = $query->orderBy('title')->paginate($request->get('per_page', 15));
+        // icon to full URL
+        foreach ($services as $s) {
+            if ($s->icon && !Str::startsWith($s->icon, ['http://', 'https://'])) {
+                $s->icon = url($s->icon);
+            }
+        }
         return response()->json($services);
     }
 
     public function store(StoreServiceRequest $request)
     {
         $data = $request->validated();
+        // handle icon upload
+        if ($request->hasFile('icon')) {
+            $path = $request->file('icon')->store('services', 'public');
+            // Storage::url returns '/storage/...' — prefix it with the app URL to return a full URL
+            $data['icon'] = url(Storage::url($path));
+        }
         if (empty($data['slug'])) $data['slug'] = Str::slug($data['title']);
         $service = Service::create($data);
 
@@ -51,13 +66,42 @@ class ServiceController extends Controller
 
     public function show(Service $service)
     {
-        $service->load(['category','addons','priceHistories']);
+        $service->load(['category', 'addons', 'priceHistories']);
         return response()->json($service);
     }
 
     public function update(UpdateServiceRequest $request, Service $service)
     {
         $data = $request->validated();
+
+        // handle icon delete
+        if ($request->filled('icon_delete') && $request->boolean('icon_delete')) {
+            // remove existing file if stored in storage path
+            if ($service->icon) {
+                // service->icon may be a full URL (http://.../storage/...), extract the path
+                $iconPath = parse_url($service->icon, PHP_URL_PATH) ?: $service->icon;
+                // remove leading /storage/ to get storage disk path
+                $storagePath = preg_replace('#^/storage/#', '', $iconPath);
+                if ($storagePath && Storage::disk('public')->exists($storagePath)) {
+                    Storage::disk('public')->delete($storagePath);
+                }
+            }
+            $data['icon'] = null;
+        }
+
+        // handle icon upload
+        if ($request->hasFile('icon')) {
+            // delete previous if exists
+            if ($service->icon) {
+                $iconPath = parse_url($service->icon, PHP_URL_PATH) ?: $service->icon;
+                $storagePath = preg_replace('#^/storage/#', '', $iconPath);
+                if ($storagePath && Storage::disk('public')->exists($storagePath)) {
+                    Storage::disk('public')->delete($storagePath);
+                }
+            }
+            $path = $request->file('icon')->store('services', 'public');
+            $data['icon'] = url(Storage::url($path));
+        }
 
         if (array_key_exists('price', $data) && $data['price'] != $service->price) {
             ServicePriceHistory::create([
@@ -99,7 +143,7 @@ class ServiceController extends Controller
     public function import(Request $request)
     {
         $file = $request->file('file');
-        if (!$file) return response()->json(['message'=>'No file'], 422);
+        if (!$file) return response()->json(['message' => 'No file'], 422);
 
         $rows = array_map('str_getcsv', file($file->getRealPath()));
         $header = array_map('strtolower', array_shift($rows));
@@ -127,7 +171,7 @@ class ServiceController extends Controller
         foreach ($services as $s) {
             $csv .= implode(',', [
                 $s->id,
-                '"'.str_replace('"','""',$s->title).'"',
+                '"' . str_replace('"', '""', $s->title) . '"',
                 $s->sku,
                 $s->slug,
                 $s->price,

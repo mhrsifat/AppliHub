@@ -20,7 +20,7 @@ class CreateInvoicePaymentsTable extends Migration
             $table->foreignId('staff_id')->nullable()->constrained('users')->nullOnDelete();
 
             $table->decimal('amount', 12, 2);
-            $table->enum('method', ['cash','card','bank_transfer','online','adjustment','other'])->default('cash');
+            $table->enum('method', ['cash', 'card', 'sslcommerz' , 'bank', 'bkash', 'nagad', 'rocket', 'adjustment', 'other'])->default('cash');
             $table->enum('status', ['pending','completed','failed','refunded'])->default('completed');
 
             $table->text('note')->nullable();

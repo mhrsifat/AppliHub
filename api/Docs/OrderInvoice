@@ -1,0 +1,446 @@
+🧾 Order & Invoice System API Documentation
+
+Version: 1.0
+Modules: Order, Invoice
+Access: Staff / Admin
+Default status:
+
+Order → pending / unpaid
+
+Invoice → issued
+
+
+
+---
+
+🧱 Structure Overview
+
+🔹 Order Flow
+
+1️⃣ Staff/Admin creates order →
+2️⃣ System auto-generates initial invoice →
+3️⃣ Staff can update order, add items, discounts, VAT →
+4️⃣ Each update recalculates totals →
+5️⃣ Staff can send invoice to customer email →
+6️⃣ Customer pays →
+7️⃣ Staff records payment/refund →
+8️⃣ Done ✅
+
+
+---
+
+📦 ROUTES SUMMARY
+
+Method	Endpoint	Description
+
+GET	/orders	List all orders
+POST	/orders	Create new order
+GET	/orders/{id}	Show order details
+PUT	/orders/{id}	Update order
+DELETE	/orders/{id}	Delete order
+POST	/orders/{id}/items	Add item to order
+PUT	/orders/{id}/items/{itemId}	Update order item
+DELETE	/orders/{id}/items/{itemId}	Delete order item
+GET	/invoices	List all invoices
+POST	/invoices	Create invoice manually
+GET	/invoices/{id}	Show invoice details
+PUT	/invoices/{id}	Update invoice
+POST	/invoices/{id}/items	Add item to invoice
+PUT	/invoices/{id}/items/{itemId}	Update invoice item
+DELETE	/invoices/{id}/items/{itemId}	Remove invoice item
+POST	/invoices/{id}/payments	Record payment
+POST	/invoices/{id}/refunds	Record refund
+POST	/invoices/from-order/{orderId}	Create invoice from order
+
+
+
+---
+
+🧩 ORDERS MODULE
+
+1️⃣ GET /orders
+
+Query Params: ?per_page=10&page=1&q=search_term
+
+Response:
+
+{
+  "data": [
+    {
+      "id": 17,
+      "order_number": "000123",
+      "customer_name": "Rafi",
+      "customer_email": "rafi@example.com",
+      "customer_phone": "017XXXXXXXX",
+      "total": "1500.00",
+      "grand_total": "1575.00",
+      "payment_status": "unpaid",
+      "status": "pending",
+      "items": [
+        { "id": 42, "service_name": "Website Maintenance", "unit_price": "500.00", "quantity": 3 }
+      ]
+    }
+  ],
+  "meta": { "current_page": 1, "total": 1 }
+}
+
+
+---
+
+2️⃣ POST /orders
+
+Request:
+
+{
+  "customer_name": "Rahim",
+  "customer_email": "rahim@example.com",
+  "customer_phone": "018XXXXXXXX",
+  "customer_address": "Gulshan, Dhaka",
+  "vat_percent": 5,
+  "coupon_discount": 0,
+  "items": [
+    { "service_name": "Logo Design", "unit_price": 1000, "quantity": 1 },
+    { "service_name": "Extra Revision", "unit_price": 200, "quantity": 2 }
+  ]
+}
+
+Response:
+
+{
+  "order": {
+    "id": 101,
+    "order_number": "000457",
+    "total": "1400.00",
+    "grand_total": "1470.00",
+    "status": "pending"
+  },
+  "invoice": {
+    "id": 55,
+    "invoice_number": "INV-AB12CD34",
+    "status": "issued"
+  }
+}
+
+
+---
+
+3️⃣ GET /orders/{id}
+
+Response:
+
+{
+  "id": 101,
+  "customer_name": "Rahim",
+  "grand_total": "1470.00",
+  "status": "pending",
+  "items": [
+    { "service_name": "Logo Design", "quantity": 1 },
+    { "service_name": "Extra Revision", "quantity": 2 }
+  ]
+}
+
+
+---
+
+4️⃣ PUT /orders/{id}
+
+Request:
+
+{
+  "customer_phone": "019YYYYYYYY",
+  "vat_percent": 10,
+  "coupon_discount": 100
+}
+
+Response:
+
+{
+  "id": 101,
+  "vat_percent": "10.00",
+  "coupon_discount": "100.00",
+  "grand_total": "1540.00"
+}
+
+
+---
+
+5️⃣ DELETE /orders/{id}
+
+Response:
+
+{ "message": "Order deleted." }
+
+
+---
+
+6️⃣ POST /orders/{id}/items
+
+Request:
+
+{ "service_name": "Priority Support", "unit_price": 300, "quantity": 1 }
+
+Response:
+
+{
+  "id": 203,
+  "service_name": "Priority Support",
+  "unit_price": "300.00",
+  "quantity": 1
+}
+
+
+---
+
+7️⃣ PUT /orders/{id}/items/{itemId}
+
+Request:
+
+{ "quantity": 2, "unit_price": 250 }
+
+Response:
+
+{ "id": 203, "service_name": "Priority Support", "total_price": "500.00" }
+
+
+---
+
+8️⃣ DELETE /orders/{id}/items/{itemId}
+
+Response:
+
+{ "message": "Item deleted" }
+
+
+---
+
+🧾 INVOICES MODULE
+
+9️⃣ GET /invoices
+
+{
+  "data": [
+    {
+      "id": 55,
+      "invoice_number": "INV-AB12CD34",
+      "order_id": 101,
+      "subtotal": "1400.00",
+      "grand_total": "1470.00",
+      "status": "issued"
+    }
+  ]
+}
+
+
+---
+
+🔟 POST /invoices
+
+Request:
+
+{
+  "order_id": 101,
+  "vat_percent": 5,
+  "coupon_discount": 0,
+  "items": [
+    { "service_name": "Consultation", "unit_price": 500, "quantity": 1 },
+    { "service_name": "Implementation", "unit_price": 900, "quantity": 1 }
+  ]
+}
+
+Response:
+
+{
+  "id": 56,
+  "invoice_number": "INV-ZX90QW12",
+  "order_id": 101,
+  "grand_total": "1470.00",
+  "status": "issued"
+}
+
+
+---
+
+11️⃣ GET /invoices/{id}
+
+{
+  "id": 55,
+  "invoice_number": "INV-AB12CD34",
+  "order_id": 101,
+  "grand_total": "1470.00",
+  "status": "issued",
+  "items": [...],
+  "payments": [...],
+  "refunds": [...]
+}
+
+
+---
+
+12️⃣ PUT /invoices/{id}
+
+Request:
+
+{ "vat_percent": 10, "coupon_discount": 100 }
+
+Response:
+
+{
+  "id": 55,
+  "vat_percent": "10.00",
+  "grand_total": "1440.00"
+}
+
+
+---
+
+13️⃣ POST /invoices/{id}/items
+
+Request:
+
+{ "service_name": "Extra Hosting", "unit_price": 50, "quantity": 1 }
+
+Response:
+
+{
+  "item": {
+    "id": 410,
+    "service_name": "Extra Hosting",
+    "quantity": 1
+  },
+  "invoice": {
+    "subtotal": "1450.00",
+    "grand_total": "1522.50"
+  }
+}
+
+
+---
+
+14️⃣ PUT /invoices/{id}/items/{itemId}
+
+Request:
+
+{ "quantity": 2 }
+
+Response:
+
+{ "id": 410, "quantity": 2, "line_total": "100.00" }
+
+
+---
+
+15️⃣ DELETE /invoices/{id}/items/{itemId}
+
+Response:
+
+{ "message": "Item removed" }
+
+
+---
+
+16️⃣ POST /invoices/{id}/payments
+
+Request:
+
+{
+  "payment_reference": "TXN1234",
+  "amount": 1470,
+  "method": "bank_transfer",
+  "note": "Paid via bank"
+}
+
+Response:
+
+{
+  "payment": {
+    "id": 77,
+    "payment_reference": "TXN1234",
+    "amount": "1470.00"
+  },
+  "invoice": {
+    "id": 55,
+    "status": "paid"
+  }
+}
+
+
+---
+
+17️⃣ POST /invoices/{id}/refunds
+
+Request:
+
+{
+  "amount": 500,
+  "invoice_payment_id": 77,
+  "reason": "Service not delivered"
+}
+
+Response:
+
+{
+  "refund": { "id": 12, "amount": "500.00" },
+  "invoice": { "status": "partially_paid" }
+}
+
+
+---
+
+18️⃣ POST /invoices/from-order/{orderId}
+
+Response:
+
+{
+  "id": 57,
+  "invoice_number": "INV-NEW1234",
+  "order_id": 101,
+  "grand_total": "1470.00",
+  "status": "issued"
+}
+
+
+---
+
+⚠️ Common Error Responses
+
+Status	Meaning	Example
+
+401	Unauthorized	{ "message": "Unauthenticated." }
+403	Forbidden	{ "message": "Permission denied." }
+404	Not Found	{ "message": "Order not found." }
+422	Validation Error	{ "message": "The customer_name field is required." }
+
+
+
+---
+
+✉️ Email Notifications (auto triggered)
+
+✅ When triggered:
+
+New invoice creation (auto-send to customer)
+
+Payment recorded
+
+Refund processed
+
+
+✅ Email content:
+Invoice details, order summary, and payment status
+(use queue for async sending)
+
+
+---
+
+💡 Developer Notes
+
+Orders auto-generate initial invoice (status = issued, payment_status = unpaid).
+
+Totals auto-update on item add/update/delete.
+
+All calculations (VAT, discount, grand_total) happen server-side.
+
+Invoices can exist multiple per order.
+
+Payment/refund logs attached to invoice.
+

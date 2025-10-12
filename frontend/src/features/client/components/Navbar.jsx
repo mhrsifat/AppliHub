@@ -27,7 +27,7 @@ const Navbar = () => {
 
   const navLinks = [
     { label: "Home", path: "/" },
-    { label: "Services", path: "/services", dropdown: true },
+    { label: "Services", path: "/request-service", dropdown: false },
     { label: "Track Order", path: "/track" },
     { label: "About Us", path: "/about" },
   ];
@@ -153,7 +153,7 @@ const Navbar = () => {
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
               component={NavLink}
-              to="/request"
+              to="/request-service"
               sx={{
                 textTransform: "none",
                 backgroundColor: "var(--color-primary)",

@@ -3,6 +3,7 @@
 namespace Modules\Message\Providers;
 
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\ServiceProvider;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
@@ -27,6 +28,7 @@ class MessageServiceProvider extends ServiceProvider
         $this->registerConfig();
         $this->registerViews();
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
+        $this->registerBroadcastChannels();
     }
 
     /**
@@ -130,6 +132,31 @@ class MessageServiceProvider extends ServiceProvider
         $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), [$sourcePath]), $this->nameLower);
 
         Blade::componentNamespace(config('modules.namespace').'\\' . $this->name . '\\View\\Components', $this->nameLower);
+    }
+
+    /**
+     * Register broadcast channels.
+     */
+    protected function registerBroadcastChannels(): void
+    {
+        Broadcast::channel('conversation.{conversationId}', function ($user, $conversationId) {
+            // If user is logged in and is staff (assumes `is_staff` on users or use roles)
+            if ($user && property_exists($user, 'is_staff') && $user->is_staff) {
+                return true;
+            }
+            
+            // Otherwise anonymous: allow if `contact` query param matches conversation's contact
+            // (client will pass contact when subscribing)
+            $contact = request()->query('contact');
+            if ($contact) {
+                $conversation = \Modules\Message\Models\Conversation::find($conversationId);
+                if ($conversation && $conversation->created_by_contact === $contact) {
+                    return true;
+                }
+            }
+            
+            return false;
+        });
     }
 
     /**

@@ -15,15 +15,17 @@ class StoreEmployeeRequest extends FormRequest
     public function rules()
     {
         return [
-            'first_name' => ['required','string','max:100'],
-            'last_name'  => ['nullable','string','max:100'],
-            'email'      => ['required','email','max:255','unique:employees,email'],
-            'phone'      => ['nullable','string','max:30','unique:employees,phone'],
-            'password'   => ['required','string','min:8','confirmed'],
-            'status'     => ['nullable','in:active,inactive'],
-            'roles'      => ['nullable','array'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name'  => ['nullable', 'string', 'max:100'],
+            'email'      => ['required', 'email', 'max:255', 'unique:employees,email'],
+            'phone'      => ['nullable', 'string', 'max:30', 'unique:employees,phone'],
+            'password'   => ['required', 'string', 'min:8', 'confirmed'],
+            'status'     => ['nullable', 'in:active,inactive'],
+            'location'   => ['nullable', 'string', 'in:Dhaka,Narayanganj', 'max:150'],
+            'full_address' => ['nullable', 'string', 'max:2000'],
+            'roles'      => ['nullable', 'array'],
             'roles.*'    => ['string'],
-            'avatar'     => ['nullable','image','max:2048'],
+            'avatar'     => ['nullable', 'image', 'max:2048'],
         ];
     }
 }

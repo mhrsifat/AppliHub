@@ -2,17 +2,16 @@
 import React, { lazy } from "react";
 import { Route } from "react-router-dom";
 
+// Lazy load pages for performance boost ⚡
 const OrderListPage = lazy(() => import("./pages/OrderListPage"));
 const OrderCreatePage = lazy(() => import("./pages/OrderCreatePage"));
-const OrderDetailsPage = lazy(() => import("./pages/OrderDetailsPage"));
-const NotFound = lazy(() => import("@/components/common/NotFound"));
+const OrderDetailPage = lazy(() => import("./pages/OrderDetailPage"));
 
 const orderRoutes = (
   <>
     <Route path="orders" element={<OrderListPage />} />
     <Route path="orders/create" element={<OrderCreatePage />} />
-    <Route path="orders/:id" element={<OrderDetailsPage />} />
-    <Route path="orders/*" element={<NotFound />} />
+    <Route path="orders/:id" element={<OrderDetailPage />} />
   </>
 );
 

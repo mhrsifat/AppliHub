@@ -19,11 +19,15 @@ class CreateOrdersTable extends Migration
 
             // Customer may be anonymous; still keep customer_id for known customers
             $table->unsignedBigInteger('customer_id')->nullable();
-            $table->string('guest_name')->nullable();
-            $table->string('guest_email')->nullable();
+            $table->string('customer_name')->nullable();
+            $table->string('customer_phone')->nullable();
+            $table->string('customer_address')->nullable();
+            $table->string('customer_email')->nullable();
+            $table->text('customer_note')->nullable();
 
             // Summary amounts
             $table->decimal('total', 14, 2)->default(0); // sum of items before VAT & discounts
+             $table->unsignedBigInteger('assigned_to')->nullable()->index();
             $table->decimal('vat_percent', 5, 2)->default(0);
             $table->decimal('vat_amount', 14, 2)->default(0);
 
@@ -33,10 +37,10 @@ class CreateOrdersTable extends Migration
             $table->decimal('grand_total', 14, 2)->default(0); // final due after vat/discount
 
             // payment_status: pending, partial, paid, refunded
-            $table->enum('payment_status', ['pending', 'partial', 'paid', 'refunded'])->default('pending');
+            $table->enum('payment_status', ['pending', 'unpaid', 'partial', 'partially_paid', 'paid', 'refunded'])->default('pending');
 
             // status: draft, confirmed, completed, cancelled
-            $table->enum('status', ['draft', 'confirmed', 'completed', 'cancelled'])->default('draft');
+            $table->enum('status', ['pending', 'confirmed', 'processing',  'completed', 'cancelled'])->default('pending');
 
             // extra metadata
             $table->unsignedBigInteger('created_by')->nullable(); // staff who created the order
@@ -50,6 +54,7 @@ class CreateOrdersTable extends Migration
 
             // if you have customers table, optionally add foreign key later
             // $table->foreign('customer_id')->references('id')->on('customers')->nullOnDelete();
+            $table->foreign('assigned_to')->references('id')->on('users')->onDelete('set null');
         });
     }
 
