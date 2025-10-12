@@ -11,11 +11,11 @@ import ServiceRoutes from "@/features/service/Routes";
 import BlogRoutes from "@/features/blog/Routes";
 
 const Dashboard = lazy(() => import("../pages/admin/Dashboard"));
-const Employees = lazy(() => import("../features/employee/pages/EmployeesPage"));
+const Employees = lazy(() => import("../features/employee/pages/EmployeeListPage"));
 const Services = lazy(() => import("../features/service/pages/ServicesPage"));
 const Orders = lazy(() => import("../features/order/pages/OrderListPage"));
 const Invoices = lazy(() => import("../features/invoice/pages/InvoiceListPage"));
-const Messages = lazy(() => import("../pages/admin/Messages"));
+const Messages = lazy(() => import("../pages/Messages"));
 const Permissions = lazy(() => import("../pages/admin/Permissions"));
 const Reports = lazy(() => import("../pages/admin/Reports"));
 const Settings = lazy(() => import("../pages/admin/Settings"));

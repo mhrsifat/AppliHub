@@ -1,240 +1,195 @@
 // src/features/employee/components/EmployeeForm.jsx
-import React, { useEffect, useState } from "react";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Button,
-  MenuItem,
-  Box,
-  Avatar,
-  IconButton,
-  FormControl,
-  InputLabel,
-  Select,
-} from "@mui/material";
-import PhotoCamera from "@mui/icons-material/PhotoCamera";
+import React, { useEffect, useState } from 'react';
+import useEmployees from '../hooks/useEmployees';
 
-const defaultValues = {
-  first_name: "",
-  last_name: "",
-  email: "",
-  phone: "",
-  password: "",
-  password_confirmation: "",
-  status: "active",
-  roles: [],
-  location: "",
-  full_address: "",
-};
-
-export default function EmployeeForm({
-  open,
-  onClose,
-  onSubmit,
-  initial = null,
-  rolesOptions = [],
-}) {
-  const [values, setValues] = useState(defaultValues);
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [preview, setPreview] = useState(null);
+/**
+ * EmployeeForm supports both create and update.
+ * Pass `initial` prop to edit an existing employee.
+ * onClose should be passed to close modal and refresh list.
+ */
+export default function EmployeeForm({ initial = null, onClose }) {
+  const { onCreate, onUpdate } = useEmployees();
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    location: '',
+    full_address: '',
+    status: 'active',
+    role: 'staff',
+    password: '',
+    avatar: null,
+  });
+  const [errors, setErrors] = useState(null);
 
   useEffect(() => {
     if (initial) {
-      setValues({
-        ...defaultValues,
-        ...initial,
-        // ensure controlled inputs are never null
-        location: initial.location ?? "",
-        full_address: initial.full_address ?? "",
-        password: "",
-        password_confirmation: "",
+      setForm({
+        first_name: initial.first_name || '',
+        last_name: initial.last_name || '',
+        email: initial.email || '',
+        phone: initial.phone || '',
+        location: initial.location || '',
+        full_address: initial.full_address || '',
+        status: initial.status || 'active',
+        role: (initial.roles && initial.roles[0]) || 'staff',
+        password: '',
+        avatar: null,
       });
-      setPreview(initial.avatar ?? null);
-    } else {
-      setValues(defaultValues);
-      setPreview(null);
     }
-    setAvatarFile(null);
-  }, [initial, open]);
+  }, [initial]);
 
-  function handleChange(e) {
-    const { name, value } = e.target;
-    const safe = value == null ? "" : value;
-    setValues((v) => ({ ...v, [name]: safe }));
-  }
-
-  function handleRoleChange(e) {
-    const raw = e.target.value;
-    const val = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
-    setValues((v) => ({ ...v, roles: val }));
-  }
-
-  function pickFile(e) {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAvatarFile(file);
-      setPreview(URL.createObjectURL(file));
+  const handleChange = (e) => {
+    const { name, value, files } = e.target;
+    if (files) {
+      setForm((s) => ({ ...s, [name]: files[0] }));
+      return;
     }
-  }
+    setForm((s) => ({ ...s, [name]: value }));
+  };
 
-  function submit(e) {
-    e.preventDefault();
-
-    const formData = new FormData();
-    Object.keys(values).forEach((k) => {
-      if ((k === "password" || k === "password_confirmation") && !values[k])
-        return;
-      if (k === "roles") {
-        (values.roles || []).forEach((r) => formData.append("roles[]", r));
-      } else {
-        formData.append(k, values[k] ?? "");
-      }
+  const toFormData = (obj) => {
+    const fd = new FormData();
+    Object.keys(obj).forEach((k) => {
+      if (obj[k] === null || obj[k] === undefined) return;
+      // password should not be sent empty when editing
+      if (k === 'password' && obj[k] === '') return;
+      // file
+      fd.append(k, obj[k]);
     });
+    return fd;
+  };
 
-    if (avatarFile) formData.append("avatar", avatarFile);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setErrors(null);
 
-    onSubmit(formData);
-  }
+    try {
+      const fd = toFormData(form);
+      if (initial && initial.id) {
+        await onUpdate(initial.id, fd);
+      } else {
+        await onCreate(fd);
+      }
+      onClose();
+    } catch (err) {
+      // err likely includes validation errors from backend
+      setErrors(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{initial ? "Edit Employee" : "Create Employee"}</DialogTitle>
-      <form onSubmit={submit} encType="multipart/form-data">
-        <DialogContent dividers>
-          <Box className="flex gap-4 items-center mb-4">
-            <Avatar src={preview} sx={{ width: 64, height: 64 }} />
-            <label htmlFor="avatar-upload">
-              <input
-                accept="image/*"
-                style={{ display: "none" }}
-                id="avatar-upload"
-                type="file"
-                onChange={pickFile}
-              />
-              <IconButton component="span" aria-label="upload" size="small">
-                <PhotoCamera />
-              </IconButton>
-            </label>
-            <div className="text-muted-text text-sm">Max 2MB. JPG/PNG.</div>
-          </Box>
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-6 overflow-auto bg-black/40">
+      <div className="w-full max-w-2xl bg-white rounded shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">{initial ? 'Edit Employee' : 'Create Employee'}</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800">Close</button>
+        </div>
 
-          <Box className="grid grid-cols-2 gap-4">
-            <TextField
-              label="First name"
-              name="first_name"
-              value={values.first_name}
-              onChange={handleChange}
-              required
-            />
-            <TextField
-              label="Last name"
-              name="last_name"
-              value={values.last_name}
-              onChange={handleChange}
-            />
-            <TextField
-              label="Email"
-              name="email"
-              value={values.email}
-              onChange={handleChange}
-              required
-            />
-            <TextField
-              label="Phone"
-              name="phone"
-              value={values.phone}
-              onChange={handleChange}
-            />
-            <TextField
-              label="Password"
+        {errors && (
+          <div className="mb-3 text-red-600">
+            {typeof errors === 'string' ? errors : JSON.stringify(errors)}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+          <input
+            name="first_name"
+            placeholder="First name"
+            value={form.first_name}
+            onChange={handleChange}
+            className="border p-2 rounded"
+            required
+          />
+          <input
+            name="last_name"
+            placeholder="Last name"
+            value={form.last_name}
+            onChange={handleChange}
+            className="border p-2 rounded"
+            required
+          />
+          <input
+            name="email"
+            type="email"
+            placeholder="Email"
+            value={form.email}
+            onChange={handleChange}
+            className="border p-2 rounded col-span-2"
+            required={!initial}
+            disabled={!!initial}
+          />
+          <input
+            name="phone"
+            placeholder="Phone"
+            value={form.phone}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            name="location"
+            placeholder="Location"
+            value={form.location}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            name="full_address"
+            placeholder="Full address"
+            value={form.full_address}
+            onChange={handleChange}
+            className="border p-2 rounded col-span-2"
+          />
+          <select name="status" value={form.status} onChange={handleChange} className="border p-2 rounded">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <select name="role" value={form.role} onChange={handleChange} className="border p-2 rounded">
+            <option value="admin">Admin</option>
+            <option value="manager">Manager</option>
+            <option value="staff">Staff</option>
+          </select>
+
+          {!initial && (
+            <input
               name="password"
-              value={values.password}
-              onChange={handleChange}
               type="password"
-              helperText={initial ? "Leave blank to keep current password" : ""}
-            />
-            <TextField
-              label="Confirm Password"
-              name="password_confirmation"
-              value={values.password_confirmation}
+              placeholder="Password"
+              value={form.password}
               onChange={handleChange}
-              type="password"
+              className="border p-2 rounded col-span-2"
             />
-          </Box>
+          )}
 
-          <Box className="mt-4 grid grid-cols-2 gap-4">
-            <FormControl fullWidth>
-              <InputLabel id="status-label">Status</InputLabel>
-              <Select
-                labelId="status-label"
-                label="Status"
-                name="status"
-                value={values.status}
-                onChange={handleChange}
-              >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
-              </Select>
-            </FormControl>
+          <div className="col-span-2">
+            <label className="block text-sm mb-1">Avatar (optional)</label>
+            <input name="avatar" type="file" accept="image/*" onChange={handleChange} />
+          </div>
 
-            <FormControl fullWidth>
-              <InputLabel id="roles-label">Roles</InputLabel>
-              <Select
-                labelId="roles-label"
-                label="Roles"
-                multiple
-                name="roles"
-                value={values.roles}
-                onChange={handleRoleChange}
-                renderValue={(selected) => selected.join(", ")}
-              >
-                {rolesOptions.map((r) => (
-                  <MenuItem key={r} value={r}>
-                    {r}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-
-          <Box className="mt-4 grid grid-cols-2 gap-4">
-            <FormControl fullWidth>
-              <InputLabel id="location-label">Location</InputLabel>
-              <Select
-                labelId="location-label"
-                label="Location"
-                name="location"
-                value={values.location}
-                onChange={handleChange}
-              >
-                <MenuItem value="">Select location</MenuItem>
-                <MenuItem value="Dhaka">Dhaka</MenuItem>
-                <MenuItem value="Narayanganj">Narayanganj</MenuItem>
-              </Select>
-            </FormControl>
-
-            <TextField
-              label="Full address"
-              name="full_address"
-              value={values.full_address}
-              onChange={handleChange}
-              multiline
-              rows={3}
-              fullWidth
-            />
-          </Box>
-        </DialogContent>
-
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="contained">
-            Save
-          </Button>
-        </DialogActions>
-      </form>
-    </Dialog>
+          <div className="col-span-2 flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded border"
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded bg-blue-600 text-white"
+              disabled={submitting}
+            >
+              {submitting ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

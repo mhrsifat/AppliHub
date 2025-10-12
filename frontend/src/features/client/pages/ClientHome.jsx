@@ -14,6 +14,7 @@ const Testimonials = lazy(() => import('../components/Testimonials'));
 const ProcessSteps = lazy(() => import('../components/ProcessSteps'));
 const BlogSection = lazy(() => import('../components/BlogSection'));
 const ContactForm = lazy(() => import('../components/ContactForm'));
+const Footer = lazy(() => import('../components/Footer'));
 
 const ClientHome = () => {
   return (
@@ -32,6 +33,7 @@ const ClientHome = () => {
         <ProcessSteps />
         <BlogSection />
         <ContactForm />
+        <Footer />
       </Suspense>
     </>
   );

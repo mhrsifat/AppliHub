@@ -307,4 +307,113 @@ public function index(Request $request)
 
         return response()->json(['message' => 'Order unassigned', 'order' => $order], 200);
     }
+    
+    /**
+ * Public: track by order_number OR invoice_number OR customer_email/phone.
+ * Query param: q (required)
+ *
+ * Example:
+ *  GET /api/public/track-order?q=ORD-123456
+ *  GET /api/public/track-order?q=INV-XXXXX
+ *  GET /api/public/track-order?q=customer@example.com
+ */
+public function publicTrack(Request $request)
+{
+    $request->validate(['q' => 'required|string']);
+    $q = trim($request->q);
+
+    // Try find by order_number
+    $order = Order::with(['items', 'invoices' => function($iq){
+        $iq->with(['items','payments']);
+    }])->where('order_number', $q)->first();
+
+    // Fallback: find by invoice_number
+    if (!$order) {
+        $invoice = \Modules\Invoice\Models\Invoice::with(['items','payments','order'])
+            ->where('invoice_number', $q)
+            ->first();
+
+        if ($invoice) {
+            $order = $invoice->order; // may be null
+            // ensure invoice is attached in response even if order null
+            $orderData = $order ? new \Modules\Order\Transformers\OrderResource($order->loadMissing('items')) : null;
+
+            $invoices = [ $invoice->load(['items','payments']) ];
+            $invoicePayload = \Modules\Invoice\Transformers\InvoiceResource::collection(collect($invoices));
+            $summary = $this->buildTrackSummary($order, $invoices);
+
+            return response()->json([
+                'order' => $orderData,
+                'invoices' => $invoicePayload,
+                'summary' => $summary,
+                'pay_options' => [
+                    'sslcommerz' => ['enabled' => true],
+                    'bkash' => ['enabled' => false],
+                    'nagad' => ['enabled' => false],
+                ],
+            ]);
+        }
+    }
+
+    if (!$order) {
+        // Try by customer email or phone
+        $order = Order::with(['items','invoices' => function($iq){
+            $iq->with(['items','payments']);
+        }])->where(function($w) use ($q) {
+            $w->where('customer_email', $q)
+              ->orWhere('customer_phone', $q);
+        })->orderByDesc('id')->first();
+    }
+
+    if (!$order) {
+        return response()->json(['message' => 'Not found. Please check order/invoice number or email/phone.'], 404);
+    }
+
+    // Build invoice payloads and summary
+    $invoices = $order->invoices()->with(['items','payments'])->orderByDesc('created_at')->get();
+
+    $orderResource = new \Modules\Order\Transformers\OrderResource($order);
+    $invoiceResources = \Modules\Invoice\Transformers\InvoiceResource::collection($invoices);
+
+    $summary = $this->buildTrackSummary($order, $invoices);
+
+    return response()->json([
+        'order' => $orderResource,
+        'invoices' => $invoiceResources,
+        'summary' => $summary,
+        'pay_options' => [
+            'sslcommerz' => ['enabled' => true],
+            'bkash' => ['enabled' => false],
+            'nagad' => ['enabled' => false],
+        ],
+    ]);
+}
+
+/**
+ * Helper to build totals: total_payable, total_paid, total_due (simple)
+ */
+protected function buildTrackSummary($order = null, $invoices)
+{
+    $totalPayable = 0.0;
+    $totalPaid = 0.0;
+
+    foreach ($invoices as $inv) {
+        $totalPayable += (float)($inv->grand_total ?? $inv->grand_total ?? 0);
+        // Compute paid via payments relation or accessor
+        $paid = 0.0;
+        if (method_exists($inv, 'paid_amount')) {
+            $paid = (float) $inv->paid_amount;
+        } else if ($inv->payments) {
+            $paid = (float) $inv->payments->where('status','completed')->sum('amount');
+        }
+        $totalPaid += $paid;
+    }
+
+    $totalDue = $totalPayable - $totalPaid;
+    return [
+        'total_payable' => round($totalPayable, 2),
+        'total_paid' => round($totalPaid, 2),
+        'total_due' => round(max(0, $totalDue), 2),
+    ];
+}
 }

@@ -13,11 +13,6 @@ class InvoiceCreated extends Mailable
 
     public Invoice $invoice;
 
-    /**
-     * Create a new message instance.
-     *
-     * @param Invoice $invoice
-     */
     public function __construct(Invoice $invoice)
     {
         $this->invoice = $invoice;
@@ -25,9 +20,17 @@ class InvoiceCreated extends Mailable
 
     public function build()
     {
-        // Use a simple view 'emails.invoice' or customize as needed.
+        $frontend = config('app.frontend_url');
+
+        $payUrl = "{$frontend}/invoices/{$this->invoice->id}/pay";
+        $pdfUrl = url("/api/invoices/{$this->invoice->id}/pdf");
+
         return $this->subject("Invoice #{$this->invoice->invoice_number}")
-                    ->view('invoice::emails.invoice_created')
-                    ->with(['invoice' => $this->invoice]);
+            ->view('invoice::emails.invoice_created')
+            ->with([
+                'invoice' => $this->invoice,
+                'payUrl' => $payUrl,
+                'pdfUrl' => $pdfUrl,
+            ]);
     }
 }

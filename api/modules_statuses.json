@@ -7,5 +7,6 @@
     "Order": true,
     "Permission": true,
     "Report": true,
-    "Invoice": true
+    "Invoice": true,
+    "Payment": true
 }

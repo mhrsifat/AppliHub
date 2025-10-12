@@ -1,0 +1,352 @@
+// src/app/data.js
+const data = {
+  ui: {
+    theme: "dark",
+    motion: "normal",
+    scrollThreshold: 0.7,
+    emptySpaceClickEnabled: true,
+    profileFunFactProbability: 0.4,
+    randomRevealThrottleMs: 1200,
+    suspense: { type: "typing", typingSpeedMs: 35, ellipsisDurationMs: 700 }
+  },
+
+  ocean: {
+    background: { gradientStart: "#07182b", gradientEnd: "#00cfff", volumetricIntensity: 0.6 },
+    wave: { enabled: true, intensity: 0.7, mouseReactive: true },
+    particles: { densityDesktop: 180, densityMobile: 40 },
+    avatar: {
+      id: "avatar_me",
+      name: "Md. Hafizur Rahman Sifat",
+      image: "/avatars/me.png",
+      position: { xPercent: 50, yPercent: 60 },
+      socials: [
+        { name: "email", url: "mailto:mhrsifat@gmail.com", icon: "/icons/email.svg" },
+        { name: "github", url: "https://github.com/mhrsifat", icon: "/icons/github.svg" },
+        { name: "linkedin", url: "https://linkedin.com/in/mhrsifat", icon: "/icons/linkedin.svg" }
+      ]
+    },
+    education: [
+      { id: "edu_1", title: "B.Sc. (Honours) in Botany", institute: "National University, Bangladesh", year: 2021, position: { xPercent: 20, yPercent: 40 }, description: "CGPA: 3.20/4.00. Covered plant biology, ecology, physiology, lab research. Developed analytical, experimental design, data collection, problem-solving, and collaborative skills." },
+      { id: "edu_2", title: "Higher Secondary Certificate (Science)", institute: "Govt. Kabi Nazrul College, Bangladesh", year: 2017, position: { xPercent: 50, yPercent: 35 }, description: "GPA: 3.83 / 5.00" },
+      { id: "edu_3", title: "Secondary School Certificate (Science)", institute: "Bornamala Adarsha High School, Bangladesh", year: 2015, position: { xPercent: 80, yPercent: 30 }, description: "GPA: 4.83 / 5.00" }
+    ],
+    skills: [
+      { id: "skill_1", name: "React", logo: "/icons/react.svg", description: "UI Library", position: { xPercent: 55, yPercent: 42 } },
+      { id: "skill_2", name: "Vue.js", logo: "/icons/vue.svg", description: "UI Library", position: { xPercent: 30, yPercent: 45 } },
+      { id: "skill_3", name: "Tailwind CSS", logo: "/icons/tailwind.svg", description: "Utility-first CSS", position: { xPercent: 40, yPercent: 50 } },
+      { id: "skill_4", name: "Bootstrap 5", logo: "/icons/bootstrap.svg", description: "CSS Framework", position: { xPercent: 60, yPercent: 55 } },
+      { id: "skill_5", name: "Laravel", logo: "/icons/laravel.svg", description: "Backend MVC", position: { xPercent: 35, yPercent: 35 } },
+      { id: "skill_6", name: "PHP", logo: "/icons/php.svg", description: "Backend scripting", position: { xPercent: 25, yPercent: 42 } },
+      { id: "skill_7", name: "JavaScript", logo: "/icons/js.svg", description: "Frontend scripting", position: { xPercent: 50, yPercent: 25 } },
+      { id: "skill_8", name: "MySQL", logo: "/icons/mysql.svg", description: "Database", position: { xPercent: 60, yPercent: 30 } },
+      { id: "skill_9", name: "Docker", logo: "/icons/docker.svg", description: "Containerization", position: { xPercent: 70, yPercent: 28 } }
+    ]
+  },
+
+  randomContent: {
+    quotes: [
+      "সৃষ্টি করার আনন্দই প্রকৃত সুখ।",
+      "প্রতিটি পিক্সেলেই একটি গল্প লুকিয়ে আছে।",
+      "গভীরতায় ভ্রমণ নতুন দিগন্ত খুলে দেয়।",
+      "কোডিং হলো চিন্তার আর্ট।",
+      "ছোট চেষ্টা বড় পরিবর্তন আনতে পারে।",
+      "ডিজাইন হলো সমস্যা সমাধানের সৌন্দর্য।",
+      "নতুন কিছু চেষ্টা করা ভীতি কাটায়।",
+      "গভীর সমুদ্র, গভীর আইডিয়া।",
+      "পরীক্ষা করো, ব্যর্থ হও, আবার করো।",
+      "তুমি যা বানাও, সেটাই তোমার গল্প।"
+    ],
+    funFacts: [
+      "আমি রাতে কাজ করতে বেশি স্বাচ্ছন্দ্য অনুভব করি।",
+      "Three.js দিয়ে ছোট 3D সিন কয়েক লাইনে তৈরি করা যায়।",
+      "SVG morphing খুব কম জায়গা নেয়।",
+      "Lazy-load করলে পেজ দ্রুত লোড হয়।",
+      "প্রতিদিন ৩০ মিনিট কোডিং ধারাবাহিক রাখলে অনেক শিখবে।",
+      "ডার্ক মোড কিছু ডিভাইসে ব্যাটারি বাঁচায়।",
+      "WebGL shaders GPU-তে দ্রুত রান করে।",
+      "প্রজেক্ট থিম আগে ঠিক করলে ডেভ সহজ হয়।",
+      "কোড-রিভিউ তোমার কোডকে উন্নত করে।",
+      "একটি ভালো README প্রজেক্টকে প্রাণ দেয়।"
+    ],
+    smallSays: [
+      "চল শুরু করি!",
+      "একটু ডুব দাও — বৃষ্টি নেই এখানে!",
+      "কল্পনা করো, তারপর তৈরি করো।",
+      "একটি পিক্সেলও গুরুত্ব রাখে।",
+      "আজকের ছোট কাজ ভবিষ্যতের বড় প্রজেক্ট।",
+      "সমুদ্রের মতো, আইডিয়াও বিস্তৃত।",
+      "রিস্পন্সিভই রাজা।",
+      "কমপ্যাক্ট কোড, সুখী ডেভ।",
+      "এখানে আমরা সবকিছু ট্রান্সফর্ম করি।",
+      "ক্রিয়েটিভিটি তোমার অস্ত্র।"
+    ]
+  },
+
+  space: {
+    stars: { density: 400, twinkleRate: 0.06, sizeRange: [1, 4] },
+    blackholes: [
+      { id: "bh_1", xPercent: 40, yPercent: 50, strength: 0.3 },
+      { id: "bh_2", xPercent: 72, yPercent: 28, strength: 0.45 }
+    ],
+    projects: [
+      { id: "proj_1", name: "LogiTrack", techStack: ["React","Laravel","MySQL"], githubStars: 0, demoLink: "https://logitrack.mhrsifat.xyz", thumbnail: "/assets/projects/logitrack.png", filterTags: ["react","laravel"], orbit: { radius:240, speed:0.8 }, seedPosition: { xPercent: 12, yPercent: 28 }, description: "Logistics tracking system." },
+      { id: "proj_2", name: "Halum Shop", techStack: ["React","Laravel","MySQL"], githubStars: 0, demoLink: "https://halum.mhrsifat.xyz", thumbnail: "/assets/projects/halum.png", filterTags: ["react","laravel"], orbit: { radius:180, speed:0.6 }, seedPosition: { xPercent: 45, yPercent: 60 }, description: "Ecommerce system." },
+      { id: "proj_3", name: "Portfolio", techStack: ["React","Laravel","Tailwind"], githubStars: 0, demoLink: "https://mhrsifat.xyz", thumbnail: "/assets/projects/portfolio.png", filterTags: ["react","laravel"], orbit: { radius:210, speed:0.7 }, seedPosition: { xPercent: 68, yPercent: 34 }, description: "Personal portfolio website." },
+      { id: "proj_4", name: "Weather App", techStack: ["JS","API"], githubStars: 0, demoLink: "https://weather.mhrsifat.xyz", thumbnail: "/assets/projects/weather.png", filterTags: ["js"], orbit: { radius:180, speed:0.5 }, seedPosition: { xPercent: 30, yPercent: 50 }, description: "Real-time weather application." },
+      { id: "proj_5", name: "Sanda", techStack: ["PHP","JS","jQuery"], githubStars: 0, demoLink: "https://sanda.mhrsifat.xyz", thumbnail: "/assets/projects/sanda.png", filterTags: ["php","js"], orbit: { radius:200, speed:0.7 }, seedPosition: { xPercent: 50, yPercent: 40 }, description: "Chatting application." },
+      { id: "proj_6", name: "File Manager", techStack: ["PHP","MySQL"], githubStars: 0, demoLink: "https://cdn.mhrsifat.xyz", thumbnail: "/assets/projects/filemanager.png", filterTags: ["php","mysql"], orbit: { radius:220, speed:0.6 }, seedPosition: { xPercent: 65, yPercent: 55 }, description: "Online file manager." }
+    ],
+    testimonials: [
+      { id:"t_1", name:"Amina", role:"PM", avatar:"/avatars/a1.jpg", message:"অসাধারণ কাজ!", rating:5, seedPosition:{xPercent:14,yPercent:54} },
+      { id:"t_2", name:"Rafi", role:"Founder", avatar:"/avatars/r1.jpg", message:"সময়মতো ডেলিভারি!", rating:5, seedPosition:{xPercent:46,yPercent:30} },
+      { id:"t_3", name:"Tanvir", role:"Developer", avatar:"/avatars/a3.jpg", message:"উৎকৃষ্ট কোডিং স্কিল!", rating:4, seedPosition:{xPercent:60,yPercent:40} },
+      { id:"t_4", name:"Sara", role:"Designer", avatar:"/avatars/a4.jpg", message:"সৃজনশীল ডিজাইন!", rating:5, seedPosition:{xPercent:70,yPercent:50} },
+      { id:"t_5", name:"Kamal", role:"Manager", avatar:"/avatars/a5.jpg", message:"পরিচালনা দক্ষ!", rating:4, seedPosition:{xPercent:30,yPercent:60} },
+      { id:"t_6", name:"Nadia", role:"CEO", avatar:"/avatars/a6.jpg", message:"চমৎকার প্রজেক্ট!", rating:5, seedPosition:{xPercent:50,yPercent:70} }
+    ],
+    filterChips: ["laravel","react","vue","php","html"]
+  },
+
+  blog: {
+    posts: [
+      { id:"b_1", title:"Journey with React", cover:"/assets/blog/react.png", author:"Md. Hafizur Rahman Sifat", snippet:"React দিয়ে 3D ইন্টারঅ্যাকটিভ UI তৈরি করা।", seedPosition:{xPercent:20,yPercent:30} },
+      { id:"b_2", title:"Vue.js Insights", cover:"/assets/blog/vue.png", author:"Md. Hafizur Rahman Sifat", snippet:"Vue.js দিয়ে SPA উন্নয়ন।", seedPosition:{xPercent:45,yPercent:50} },
+      { id:"b_3", title:"Tailwind Tricks", cover:"/assets/blog/tailwind.png", author:"Md. Hafizur Rahman Sifat", snippet:"Tailwind CSS দিয়ে দ্রুত UI তৈরি।", seedPosition:{xPercent:65,yPercent:35} },
+      { id:"b_4", title:"Laravel APIs", cover:"/assets/blog/laravel.png", author:"Md. Hafizur Rahman Sifat", snippet:"Laravel দিয়ে REST API তৈরি।", seedPosition:{xPercent:30,yPercent:55} },
+      { id:"b_5", title:"Weather App Guide", cover:"/assets/blog/weather.png", author:"Md. Hafizur Rahman Sifat", snippet:"জাভাস্ক্রিপ্ট দিয়ে রিয়েল-টাইম ওয়েদার অ্যাপ।", seedPosition:{xPercent:50,yPercent:40} },
+      { id:"b_6", title:"File Manager Tips", cover:"/assets/blog/filemanager.png", author:"Md. Hafizur Rahman Sifat", snippet:"PHP + MySQL দিয়ে অনলাইন ফাইল ম্যানেজার।", seedPosition:{xPercent:70,yPercent:60} }
+    ]
+  },
+
+  contact: {
+    gradient: ["#00cfff","#2c007e"],
+    confirmationText: "Signal received from the deep",
+    sendEffect: { shake: true, beam: true }
+  }
+};
+
+export default data;
+import { personalInfo } from "./personalInfo";
+import { projects } from "./projects";
+import { blogs } from "./blogs";
+import { testimonials } from "./testimonials";
+import { quotesSayAndFunFact } from "./quotesSayAndFunFact";
+import { others } from "./others";
+
+const themes = [
+  { name: "Ocean → Space", weight: 0.6 },
+  { name: "Deep Forest → Space", weight: 0.2 },
+  { name: "Only Space", weight: 0.1 },
+  { name: "Fire → Space", weight: 0.1 }
+];
+
+function weightedRandom(items) {
+  const total = items.reduce((acc, i) => acc + i.weight, 0);
+  const rand = Math.random() * total;
+  let cumulative = 0;
+  for (const item of items) {
+    cumulative += item.weight;
+    if (rand <= cumulative) return item.name;
+  }
+}
+
+export const data = {
+  theme: weightedRandom(themes),
+  personalInfo,
+  projects,
+  blogs,
+  testimonials,
+  quotesSayAndFunFact,
+  others
+};
+export const others = {
+  resumeURL: "/assets/docs/resume.pdf",
+  siteVersion: "v1.2.5",
+  musicTrack: "/assets/audio/ambient-space.mp3",
+  themeOptions: ["Ocean", "Forest", "Space", "Fire"],
+  preferredTransition: "Ocean → Space"
+};
+export const quotesSayAndFunFact = {
+  quotes: [
+    "Code is my brush; pixels are my canvas.",
+    "If it feels alive, it’s because it’s crafted with empathy.",
+    "সৃষ্টি করার আনন্দই প্রকৃত সুখ।",
+    "গভীরতায় ভ্রমণ নতুন দিগন্ত খুলে দেয়।",
+    "কোডিং হলো চিন্তার আর্ট।"
+  ],
+  funFacts: [
+    "Can design and deploy a full-stack app from mobile hotspot.",
+    "Believes every pixel has purpose.",
+    "আমি রাতে কাজ করতে বেশি স্বাচ্ছন্দ্য অনুভব করি।",
+    "WebGL shaders GPU-তে দ্রুত রান করে।",
+    "একটি ভালো README প্রজেক্টকে প্রাণ দেয়।"
+  ],
+  say: "Depth to Infinity."
+};
+export const testimonials = [
+  {
+    id: "t1",
+    name: "Dr. A Rahman",
+    role: "AI Researcher",
+    message: "Sifat’s projects are technically deep yet visually poetic. A rare blend of logic and art.",
+    rating: 5,
+    glowColor: "#00ffff"
+  },
+  {
+    id: "t2",
+    name: "Sarah Lee",
+    role: "UI/UX Designer",
+    message: "Every transition in his portfolio feels alive — seamless, responsive, and keyboard-friendly.",
+    rating: 4.8,
+    glowColor: "#ff66cc"
+  },
+  {
+    id: "t3",
+    name: "Tanvir",
+    role: "Developer",
+    message: "উৎকৃষ্ট কোডিং স্কিল এবং বিস্তারিত মনোযোগের দারুণ উদাহরণ।",
+    rating: 4.9,
+    glowColor: "#00cc99"
+  }
+];
+export const blogs = [
+  {
+    id: "b1",
+    title: "Designing Motion in React 3D",
+    excerpt: "How physics-based transitions make UI feel alive.",
+    image: "/assets/blogs/3d-react.jpg",
+    votes: 42,
+    comments: 5,
+    url: "/blog/designing-motion-in-react-3d",
+    description: `
+      In this post, I break down how to synchronize Three.js animations
+      with React state transitions for natural movement and fluid depth transitions.
+      We explore easing functions, framer-motion tricks, and GPU-optimized rendering.
+    `
+  },
+  {
+    id: "b2",
+    title: "Building a JWT Auth System Without Sessions",
+    excerpt: "Secure cookies, refresh tokens, and Laravel 12.",
+    image: "/assets/blogs/jwt-laravel.jpg",
+    votes: 58,
+    comments: 9,
+    url: "/blog/jwt-auth-laravel",
+    description: `
+      JWT authentication in Laravel 12 made easy — multi-device login, IP tracking,
+      refresh tokens, and secure HTTP-only cookies, fully session-free.
+    `
+  },
+  {
+    id: "b3",
+    title: "Tailwind Tricks",
+    excerpt: "Tailwind CSS দিয়ে দ্রুত UI তৈরি।",
+    image: "/assets/blog/tailwind.png",
+    votes: 33,
+    comments: 3,
+    url: "/blog/tailwind-tricks",
+    description: `
+      Tailwind CSS shortcuts and tips to build fast, responsive layouts.
+      Includes dark mode and animation utilities for smoother UX.
+    `
+  }
+];
+export const projects = [
+  {
+    id: "p1",
+    name: "SmartAgro",
+    category: "AI / Laravel",
+    description: "Crop disease scanner powered by AI diagnosis and Laravel 12 backend.",
+    tech: ["Laravel", "Tailwind", "Pusher", "AI API"],
+    thumbnail: "/assets/projects/agro.jpg",
+    github: "https://github.com/mhrsifat/smartagro",
+    live: "https://smartagro.mhrsifat.xyz",
+    orbitSize: 180,
+    glowColor: "#00ffcc",
+    starRating: 4.9
+  },
+  {
+    id: "p2",
+    name: "Bagisto Store",
+    category: "E-commerce / PHP",
+    description: "A fully featured multi-vendor store built with Bagisto and Laravel.",
+    tech: ["Bagisto", "PHP", "MySQL", "Blade"],
+    thumbnail: "/assets/projects/bagisto.jpg",
+    github: "https://github.com/mhrsifat/bagisto-store",
+    live: "https://store.mhrsifat.xyz",
+    orbitSize: 220,
+    glowColor: "#ffcc00",
+    starRating: 4.8
+  },
+  {
+    id: "p3",
+    name: "LogiTrack",
+    category: "React / Laravel",
+    description: "Logistics tracking system built using React and Laravel.",
+    tech: ["React", "Laravel", "MySQL"],
+    thumbnail: "/assets/projects/logitrack.png",
+    live: "https://logitrack.mhrsifat.xyz",
+    orbitSize: 200,
+    glowColor: "#00cfff",
+    starRating: 4.7
+  },
+  {
+    id: "p4",
+    name: "Halum Shop",
+    category: "React / Laravel",
+    description: "E-commerce system with modern UI and Laravel backend.",
+    tech: ["React", "Laravel", "MySQL"],
+    thumbnail: "/assets/projects/halum.png",
+    live: "https://halum.mhrsifat.xyz",
+    orbitSize: 210,
+    glowColor: "#ff9966",
+    starRating: 4.6
+  },
+  {
+    id: "p5",
+    name: "File Manager",
+    category: "PHP / MySQL",
+    description: "Online file manager for managing uploads and sharing securely.",
+    tech: ["PHP", "MySQL"],
+    thumbnail: "/assets/projects/filemanager.png",
+    live: "https://cdn.mhrsifat.xyz",
+    orbitSize: 190,
+    glowColor: "#00ccff",
+    starRating: 4.5
+  }
+];
+export const personalInfo = {
+  name: "Md. Hafizur Rahman Sifat",
+  tagline: "Depth to Infinity",
+  role: "Full Stack Developer & Creative Technologist",
+  about: `I build immersive, fast, and visually expressive web experiences using React, Three.js, and Laravel. Each project is designed to tell a story — fast, elegant, and alive.`,
+  location: "Bangladesh",
+  email: "hello@mhrsifat.xyz",
+  phone: "+8801XXXXXXXXX",
+  avatar: "/avatars/me.png",
+  social: {
+    github: "https://github.com/mhrsifat",
+    linkedin: "https://linkedin.com/in/mhrsifat",
+    twitter: "https://twitter.com/mhrsifat",
+    dribbble: "https://dribbble.com/mhrsifat"
+  },
+  keywords: ["Developer", "Designer", "Creator", "AI Dreamer"]
+};
+
+
+
+⚡ Accessibility + Speed Notes
+
+Keyboard shortcuts:
+
+Tab for navigation, Enter to open modals, ← → for slides, Esc to close.
+
+Lazy load images/videos.
+
+GPU-accelerated animations via Framer Motion + Three.js.
+
+ARIA labels for all interactive elements.
+
+Preload personal info and theme before render.
+
+Static JSON imports ensure minimal API requests.

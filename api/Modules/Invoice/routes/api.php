@@ -3,6 +3,9 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Invoice\Http\Controllers\InvoiceController;
 
+
+Route::get('/invoices/{invoice}/pdf', [\Modules\Invoice\Http\Controllers\InvoiceController::class, 'downloadPdf']);
+
 Route::prefix('invoices')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/', [InvoiceController::class, 'index'])->name('invoices.index');
     Route::get('/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');

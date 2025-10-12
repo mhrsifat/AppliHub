@@ -13,6 +13,9 @@
         .items th, .items td { padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; }
         .total { text-align: right; font-weight: bold; font-size: 18px; }
         .footer { font-size: 12px; color: #6b7280; text-align: center; margin-top: 20px; }
+        .btn { display: inline-block; margin: 10px 5px 0 0; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+        .btn-pay { background-color: #0b74de; color: #fff; }
+        .btn-pdf { background-color: #10b981; color: #fff; }
     </style>
 </head>
 <body>
@@ -39,17 +42,22 @@
             <tbody>
                 @foreach($invoice->items as $item)
                 <tr>
-                    <td>{{ $item->name }}</td>
+                    <td>{{ $item->service_name }}</td>
                     <td>{{ $item->quantity }}</td>
-                    <td>{{ number_format($item->price, 2) }}</td>
-                    <td>{{ number_format($item->quantity * $item->price, 2) }}</td>
+                    <td>{{ number_format($item->unit_price, 2) }}</td>
+                    <td>{{ number_format($item->line_total, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
         </table>
 
         <div class="total">
-            Total: ${{ number_format($invoice->total_amount, 2) }}
+            Total: {{ number_format($invoice->grand_total, 2) }} BDT
+        </div>
+
+        <div>
+            <a href="{{ $payUrl }}" class="btn btn-pay">Pay Now</a>
+            <a href="{{ $pdfUrl }}" class="btn btn-pdf">Download PDF</a>
         </div>
 
         <div class="footer">

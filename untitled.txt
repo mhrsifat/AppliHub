@@ -1,0 +1,8 @@
+I want to add payment gateway.
+
+
+I will send a invoice in email also invoice list again order in client page. On invoice there will be a link pay now , clicking that will pop up select sslcommerz, bkash, nagad etc. bkash, nagad will be dissable to click. 
+
+https://github.com/sslcommerz/SSLCommerz-Laravel.git
+
+I already setup sslcommerz. Now how to handle payment.

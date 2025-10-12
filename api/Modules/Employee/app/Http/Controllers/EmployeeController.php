@@ -1,206 +1,314 @@
 <?php
+// Filepath: Modules/Employee/Http/Controllers/EmployeeController.php
 
 namespace Modules\Employee\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Validation\Rule;
+use App\Http\Controllers\Controller;
 use Modules\Employee\Models\Employee;
-use Modules\Employee\Http\Requests\StoreEmployeeRequest;
-use Modules\Employee\Http\Requests\UpdateEmployeeRequest;
-use Modules\Employee\Transformers\EmployeeResource;
-use Spatie\Permission\Models\Permission;
+use Modules\Employee\Models\EmployeeSalary;
 use Spatie\Permission\Models\Role;
 
 class EmployeeController extends Controller
 {
     /**
-     * Display a listing of the resource with search, filters, sorting and pagination.
+     * List employees with filters.
      */
     public function index(Request $request)
     {
-        $perPage = (int) $request->input('per_page', 15);
+        $user = auth()->user();
 
-        $query = Employee::query()->with('roles');
+        if (! $user->hasAnyRole(['admin', 'manager'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
 
-        // full-text-ish search across name/email/phone
+        $query = Employee::query();
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('location')) {
+            $query->where('location', 'like', '%' . $request->location . '%');
+        }
+
         if ($request->filled('search')) {
-            $s = $request->input('search');
+            $s = $request->search;
             $query->where(function ($q) use ($s) {
-                $q->where('first_name', 'like', "%{$s}%")
-                    ->orWhere('last_name', 'like', "%{$s}%")
-                    ->orWhere('email', 'like', "%{$s}%")
-                    ->orWhere('phone', 'like', "%{$s}%");
+                $q->where('first_name', 'like', "%$s%")
+                  ->orWhere('last_name', 'like', "%$s%")
+                  ->orWhere('email', 'like', "%$s%");
             });
         }
 
-        // filter by status (active/inactive)
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        // filter by role name
-        if ($request->filled('role')) {
-            $role = $request->input('role');
-            $query->whereHas('roles', fn($q) => $q->where('name', $role));
-        }
-
-        // sorting
-        $sortBy = $request->input('sort_by', 'created_at');
-        $sortDir = $request->input('sort_dir', 'desc');
-        $query->orderBy($sortBy, $sortDir);
-
-        $employees = $query->paginate($perPage)->appends($request->query());
-
-        return EmployeeResource::collection($employees);
+        $employees = $query->latest()->paginate($request->get('per_page', 12));
+        return response()->json($employees);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store new employee.
+     * Admin can create any role.
+     * Manager can create only staff/employee.
      */
-    public function store(StoreEmployeeRequest $request)
+    public function store(Request $request)
     {
-        $data = $request->validated();
+        $user = auth()->user();
 
-        // normalize empty strings to null for nullable DB columns
-        $data['location'] = array_key_exists('location', $data) && $data['location'] !== '' ? $data['location'] : null;
-        $data['full_address'] = array_key_exists('full_address', $data) && $data['full_address'] !== '' ? $data['full_address'] : null;
-
-        DB::beginTransaction();
-        try {
-            if (isset($data['password'])) {
-                $data['password'] = Hash::make($data['password']);
-            }
-
-            $employee = Employee::create($data);
-
-            // avatar upload
-            if ($request->hasFile('avatar')) {
-                $path = $request->file('avatar')->store("employees/avatars", 'public');
-                $employee->avatar = $path;
-                $employee->save();
-            }
-
-            // sync roles (expects roles as array of role names or ids)
-            if (!empty($data['roles'])) {
-                $employee->syncRoles($data['roles']);
-            }
-
-            DB::commit();
-
-            return new EmployeeResource($employee->fresh('roles'));
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            report($e);
-            return response()->json([
-                'message' => 'Failed to create employee',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if (! $user->hasAnyRole(['admin', 'manager'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
+
+        $validated = $request->validate([
+            'first_name'   => 'required|string|max:100',
+            'last_name'    => 'nullable|string|max:100',
+            'email'        => 'required|email|unique:employees,email',
+            'phone'        => 'nullable|string|max:30|unique:employees,phone',
+            'password'     => 'required|min:6',
+            'location'     => 'nullable|string|max:255',
+            'full_address' => 'nullable|string',
+            'avatar'       => 'nullable|image|max:2048',
+            'status'       => ['nullable', Rule::in(['active', 'inactive'])],
+            'role'         => ['nullable', 'string'], // admin/manager/staff/employee
+        ]);
+
+        // default role aligns with existing UserSeeder: 'employee'
+        $role = $validated['role'] ?? 'employee';
+
+        // Manager cannot create manager/admin
+        if ($user->hasRole('manager') && in_array($role, ['manager', 'admin'])) {
+            return response()->json(['message' => 'Manager cannot create manager or admin'], 403);
+        }
+
+        // Acceptable roles
+        $validRoles = ['admin', 'manager', 'staff', 'employee'];
+        if (! in_array($role, $validRoles)) {
+            return response()->json(['message' => 'Invalid role provided'], 422);
+        }
+
+        // Ensure role exists (if seeder didn't create it)
+        Role::firstOrCreate(['name' => $role]);
+
+        if ($request->hasFile('avatar')) {
+            $validated['avatar'] = $request->file('avatar')->store('avatars', 'public');
+        }
+
+        $validated['password'] = Hash::make($validated['password']);
+        $validated['created_by'] = auth()->id();
+
+        $employee = Employee::create($validated);
+
+        // Assign role using Spatie HasRoles on Employee model
+        $employee->assignRole($role);
+
+        return response()->json([
+            'message'  => 'Employee created successfully',
+            'employee' => $employee->fresh()
+        ], 201);
     }
 
     /**
-     * Show the specified resource.
+     * Show single employee.
      */
     public function show($id)
     {
-        $employee = Employee::with('roles')->findOrFail($id);
-        return new EmployeeResource($employee);
-    }
+        $user = auth()->user();
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UpdateEmployeeRequest $request, $id)
-    {
-        $data = $request->validated();
-        $employee = Employee::findOrFail($id);
-
-        DB::beginTransaction();
-        try {
-            if (!empty($data['password'])) {
-                $data['password'] = Hash::make($data['password']);
-            } else {
-                unset($data['password']); // don't overwrite with null
-            }
-
-            // normalize empty strings to null for nullable DB columns
-            if (array_key_exists('location', $data)) {
-                $data['location'] = $data['location'] !== '' ? $data['location'] : null;
-            }
-            if (array_key_exists('full_address', $data)) {
-                $data['full_address'] = $data['full_address'] !== '' ? $data['full_address'] : null;
-            }
-
-            // handle avatar replacement
-            if ($request->hasFile('avatar')) {
-                // delete old avatar if exists
-                if ($employee->avatar) {
-                    Storage::disk('public')->delete($employee->avatar);
-                }
-                $data['avatar'] = $request->file('avatar')->store("employees/avatars", 'public');
-            }
-
-            $employee->update($data);
-
-            if (array_key_exists('roles', $data)) {
-                $employee->syncRoles($data['roles'] ?? []);
-            }
-
-            DB::commit();
-
-            return new EmployeeResource($employee->fresh('roles'));
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            report($e);
-            return response()->json([
-                'message' => 'Failed to update employee',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if (! $user->hasAnyRole(['admin', 'manager'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
+
+        $employee = Employee::withTrashed()->findOrFail($id);
+        return response()->json($employee);
     }
 
     /**
-     * Soft-delete the specified resource.
+     * Update employee.
+     * Manager cannot escalate roles.
+     */
+    public function update(Request $request, $id)
+    {
+        $user = auth()->user();
+
+        if (! $user->hasAnyRole(['admin', 'manager'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $employee = Employee::withTrashed()->findOrFail($id);
+
+        $validated = $request->validate([
+            'first_name'   => 'sometimes|required|string|max:100',
+            'last_name'    => 'nullable|string|max:100',
+            'email'        => ['sometimes','required','email', Rule::unique('employees')->ignore($employee->id)],
+            'phone'        => ['nullable', 'string', 'max:30', Rule::unique('employees')->ignore($employee->id)],
+            'location'     => 'nullable|string|max:255',
+            'full_address' => 'nullable|string',
+            'status'       => ['nullable', Rule::in(['active', 'inactive'])],
+            'avatar'       => 'nullable|image|max:2048',
+            'password'     => 'nullable|min:6',
+            'role'         => ['nullable', 'string'],
+        ]);
+
+        if (isset($validated['role'])) {
+            $role = $validated['role'];
+
+            // Accept employee role as well
+            $validRoles = ['admin', 'manager', 'staff', 'employee'];
+            if (! in_array($role, $validRoles)) {
+                return response()->json(['message' => 'Invalid role provided'], 422);
+            }
+
+            // Manager cannot upgrade to manager/admin
+            if ($user->hasRole('manager') && in_array($role, ['manager', 'admin'])) {
+                return response()->json(['message' => 'Manager cannot assign manager or admin role'], 403);
+            }
+
+            // Ensure role exists
+            Role::firstOrCreate(['name' => $role]);
+        }
+
+        if ($request->hasFile('avatar')) {
+            if ($employee->avatar) {
+                Storage::disk('public')->delete($employee->avatar);
+            }
+            $validated['avatar'] = $request->file('avatar')->store('avatars', 'public');
+        }
+
+        if (! empty($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
+        } else {
+            unset($validated['password']);
+        }
+
+        $validated['updated_by'] = auth()->id();
+        $employee->update($validated);
+
+        if (isset($role)) {
+            $employee->syncRoles([$role]);
+        }
+
+        return response()->json([
+            'message'  => 'Employee updated successfully',
+            'employee' => $employee->fresh()
+        ]);
+    }
+
+    /**
+     * Soft delete employee.
      */
     public function destroy($id)
     {
+        $user = auth()->user();
+
+        if (! $user->hasAnyRole(['admin', 'manager'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
         $employee = Employee::findOrFail($id);
         $employee->delete();
 
-        return response()->json(['message' => 'Employee deleted'], Response::HTTP_OK);
+        return response()->json(['message' => 'Employee deleted (soft)']);
     }
 
     /**
-     * Restore a soft-deleted employee.
+     * Restore soft-deleted employee.
      */
     public function restore($id)
     {
-        $employee = Employee::withTrashed()->findOrFail($id);
-        if (!$employee->trashed()) {
-            return response()->json(['message' => 'Employee is not deleted'], Response::HTTP_BAD_REQUEST);
+        $user = auth()->user();
+
+        if (! $user->hasAnyRole(['admin', 'manager'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
+
+        $employee = Employee::onlyTrashed()->findOrFail($id);
         $employee->restore();
 
-        return new EmployeeResource($employee->fresh('roles'));
+        return response()->json(['message' => 'Employee restored']);
     }
 
     /**
-     * Permanently delete the specified resource.
+     * Add salary / promotion record for employee.
+     * Only admin can manage promotion (promotion = true)
      */
-    public function forceDestroy($id)
+    public function addSalary(Request $request, $id)
     {
-        $employee = Employee::withTrashed()->findOrFail($id);
+        $user = auth()->user();
 
-        // cleanup avatar file if exists
-        if ($employee->avatar) {
-            Storage::disk('public')->delete($employee->avatar);
+        if (! $user->hasAnyRole(['admin', 'manager'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $employee->forceDelete();
-        return response()->json(null, Response::HTTP_NO_CONTENT);
+        $employee = Employee::findOrFail($id);
+
+        $validated = $request->validate([
+            'base_salary'     => 'required|numeric|min:0',
+            'bonus'           => 'nullable|numeric|min:0',
+            'promotion_title' => 'nullable|string|max:255',
+            'effective_from'  => 'nullable|date',
+            'paid_month'      => 'nullable|string|max:50', // e.g. "October 2025"
+            'remarks'         => 'nullable|string',
+            'is_promotion'    => 'nullable|boolean',
+        ]);
+
+        // if it's a promotion action, only admin can do it
+        if (! empty($validated['is_promotion']) && $validated['is_promotion']) {
+            if (! $user->hasRole('admin')) {
+                return response()->json(['message' => 'Only admin can perform promotion'], 403);
+            }
+        }
+
+        $salary = EmployeeSalary::create(array_merge($validated, [
+            'employee_id' => $employee->id,
+            'created_by'  => $user->id,
+        ]));
+
+        return response()->json([
+            'message' => 'Salary record added',
+            'salary'  => $salary
+        ], 201);
+    }
+
+    /**
+     * List salary history for an employee.
+     */
+    public function salaries(Request $request, $id)
+    {
+        $user = auth()->user();
+
+        if (! $user->hasAnyRole(['admin', 'manager'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $employee = Employee::findOrFail($id);
+
+        $query = EmployeeSalary::where('employee_id', $employee->id);
+
+        if ($request->filled('paid_month')) {
+            $query->where('paid_month', $request->paid_month);
+        }
+
+        $salaries = $query->orderBy('effective_from', 'desc')->get();
+
+        return response()->json($salaries);
+    }
+
+    /**
+     * Delete a salary record.
+     */
+    public function deleteSalary($id, $salaryId)
+    {
+        $user = auth()->user();
+
+        if (! $user->hasAnyRole(['admin', 'manager'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $salary = EmployeeSalary::where('employee_id', $id)->findOrFail($salaryId);
+        $salary->delete();
+
+        return response()->json(['message' => 'Salary record deleted']);
     }
 }

@@ -2,10 +2,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import employeeService from '../services/employeeService';
 
-// Thunks
+// --- Async Thunks ---
+
+// 1️⃣ Fetch employees with optional filters
 export const fetchEmployees = createAsyncThunk(
-  'employee/fetchList',
-  async (params = {}, { rejectWithValue }) => {
+  'employee/fetchEmployees',
+  async (params, { rejectWithValue }) => {
     try {
       const res = await employeeService.list(params);
       return res.data;
@@ -15,8 +17,9 @@ export const fetchEmployees = createAsyncThunk(
   }
 );
 
+// 2️⃣ Create employee
 export const createEmployee = createAsyncThunk(
-  'employee/create',
+  'employee/createEmployee',
   async (formData, { rejectWithValue }) => {
     try {
       const res = await employeeService.create(formData);
@@ -27,8 +30,9 @@ export const createEmployee = createAsyncThunk(
   }
 );
 
+// 3️⃣ Update employee
 export const updateEmployee = createAsyncThunk(
-  'employee/update',
+  'employee/updateEmployee',
   async ({ id, formData }, { rejectWithValue }) => {
     try {
       const res = await employeeService.update(id, formData);
@@ -39,23 +43,51 @@ export const updateEmployee = createAsyncThunk(
   }
 );
 
+// 4️⃣ Delete employee (soft)
 export const deleteEmployee = createAsyncThunk(
-  'employee/delete',
+  'employee/deleteEmployee',
   async (id, { rejectWithValue }) => {
     try {
-      await employeeService.remove(id);
-      return id;
+      const res = await employeeService.remove(id);
+      return { id, ...res.data };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
   }
 );
 
+// 5️⃣ Restore employee
 export const restoreEmployee = createAsyncThunk(
-  'employee/restore',
+  'employee/restoreEmployee',
   async (id, { rejectWithValue }) => {
     try {
       const res = await employeeService.restore(id);
+      return { id, ...res.data };
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
+// 6️⃣ Force delete employee (hard delete)
+export const forceDeleteEmployee = createAsyncThunk(
+  'employee/forceDeleteEmployee',
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await employeeService.forceDelete(id);
+      return { id, ...res.data };
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
+// 7️⃣ Add salary / promotion
+export const addSalary = createAsyncThunk(
+  'employee/addSalary',
+  async ({ id, payload }, { rejectWithValue }) => {
+    try {
+      const res = await employeeService.addSalary(id, payload);
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
@@ -63,127 +95,131 @@ export const restoreEmployee = createAsyncThunk(
   }
 );
 
-export const forceDeleteEmployee = createAsyncThunk(
-  'employee/forceDelete',
-  async (id, { rejectWithValue }) => {
+// 8️⃣ List salary history
+export const listSalaries = createAsyncThunk(
+  'employee/listSalaries',
+  async ({ id, params }, { rejectWithValue }) => {
     try {
-      await employeeService.forceDelete(id);
-      return id;
+      const res = await employeeService.listSalaries(id, params);
+      return { employeeId: id, data: res.data };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
   }
 );
 
-// Slice
+// 9️⃣ Delete salary record
+export const deleteSalary = createAsyncThunk(
+  'employee/deleteSalary',
+  async ({ id, salaryId }, { rejectWithValue }) => {
+    try {
+      const res = await employeeService.removeSalary(id, salaryId);
+      return { id, salaryId, ...res.data };
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
+// --- Slice ---
 const employeeSlice = createSlice({
   name: 'employee',
   initialState: {
     list: [],
-    meta: { current_page: 1, last_page: 1, total: 0 },
+    meta: {},
+    item: null,
+    salaries: {},
     loading: false,
     error: null,
-    item: null,
   },
   reducers: {
-    clearError(state) {
-      state.error = null;
-    },
     setItem(state, action) {
       state.item = action.payload;
     },
+    clearError(state) {
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
+    // Fetch employees
     builder
-      // fetchEmployees
-      .addCase(fetchEmployees.pending, (s) => {
-        s.loading = true;
-        s.error = null;
+      .addCase(fetchEmployees.pending, (state) => {
+        state.loading = true;
+        state.error = null;
       })
-      .addCase(fetchEmployees.fulfilled, (s, a) => {
-        s.loading = false;
-        const payload = a.payload;
-        if (payload?.data) {
-          s.list = payload.data;
-          s.meta = payload.meta || {
-            current_page: payload.current_page,
-            last_page: payload.last_page,
-            total: payload.total,
-          };
-        } else {
-          s.list = Array.isArray(payload) ? payload : [];
-          s.meta = { current_page: 1, last_page: 1, total: s.list.length };
-        }
+      .addCase(fetchEmployees.fulfilled, (state, action) => {
+        state.loading = false;
+        state.list = action.payload.data || [];
+        state.meta = {
+          current_page: action.payload.current_page,
+          last_page: action.payload.last_page,
+          per_page: action.payload.per_page,
+          total: action.payload.total,
+        };
       })
-      .addCase(fetchEmployees.rejected, (s, a) => {
-        s.loading = false;
-        s.error = a.payload || a.error.message;
-      })
+      .addCase(fetchEmployees.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
 
-      // createEmployee
-      .addCase(createEmployee.pending, (s) => {
-        s.loading = true;
-        s.error = null;
+    // Create employee
+    builder
+      .addCase(createEmployee.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(createEmployee.fulfilled, (state, action) => {
+        state.loading = false;
+        state.list.unshift(action.payload.employee);
       })
-      .addCase(createEmployee.fulfilled, (s, a) => {
-        s.loading = false;
-        // backend may return created resource; ensure shape
-        if (a.payload?.id) {
-          s.list.unshift(a.payload);
-        }
-      })
-      .addCase(createEmployee.rejected, (s, a) => {
-        s.loading = false;
-        s.error = a.payload || a.error.message;
-      })
+      .addCase(createEmployee.rejected, (state, action) => { state.loading = false; state.error = action.payload; });
 
-      // updateEmployee
-      .addCase(updateEmployee.pending, (s) => {
-        s.loading = true;
-        s.error = null;
+    // Update employee
+    builder
+      .addCase(updateEmployee.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(updateEmployee.fulfilled, (state, action) => {
+        state.loading = false;
+        state.list = state.list.map((e) => (e.id === action.payload.employee.id ? action.payload.employee : e));
       })
-      .addCase(updateEmployee.fulfilled, (s, a) => {
-        s.loading = false;
-        const idx = s.list.findIndex((i) => i.id === a.payload.id);
-        if (idx >= 0) s.list[idx] = a.payload;
-      })
-      .addCase(updateEmployee.rejected, (s, a) => {
-        s.loading = false;
-        s.error = a.payload || a.error.message;
-      })
+      .addCase(updateEmployee.rejected, (state, action) => { state.loading = false; state.error = action.payload; });
 
-      // deleteEmployee
-      .addCase(deleteEmployee.pending, (s) => {
-        s.loading = true;
-        s.error = null;
-      })
-      .addCase(deleteEmployee.fulfilled, (s, a) => {
-        s.loading = false;
-        const idx = s.list.findIndex((i) => i.id === a.payload);
-        if (idx >= 0) s.list.splice(idx, 1);
-      })
-      .addCase(deleteEmployee.rejected, (s, a) => {
-        s.loading = false;
-        s.error = a.payload || a.error.message;
-      })
+    // Delete employee
+    builder
+      .addCase(deleteEmployee.fulfilled, (state, action) => {
+        state.list = state.list.map((e) => (e.id === action.payload.id ? { ...e, status: 'inactive' } : e));
+      });
 
-      // restoreEmployee
-      .addCase(restoreEmployee.fulfilled, (s, a) => {
-        const returned = a.payload;
-        if (returned?.id) {
-          const idx = s.list.findIndex((i) => i.id === returned.id);
-          if (idx >= 0) s.list[idx] = returned;
-          else s.list.unshift(returned);
-        }
-      })
+    // Restore employee
+    builder
+      .addCase(restoreEmployee.fulfilled, (state, action) => {
+        state.list = state.list.map((e) => (e.id === action.payload.id ? { ...e, status: 'active' } : e));
+      });
 
-      // forceDeleteEmployee
-      .addCase(forceDeleteEmployee.fulfilled, (s, a) => {
-        const idx = s.list.findIndex((i) => i.id === a.payload);
-        if (idx >= 0) s.list.splice(idx, 1);
+    // Force delete employee
+    builder
+      .addCase(forceDeleteEmployee.fulfilled, (state, action) => {
+        state.list = state.list.filter((e) => e.id !== action.payload.id);
+      });
+
+    // Add salary
+    builder
+      .addCase(addSalary.fulfilled, (state, action) => {
+        const empId = action.payload.salary.employee_id;
+        if (!state.salaries[empId]) state.salaries[empId] = [];
+        state.salaries[empId].push(action.payload.salary);
+      });
+
+    // List salaries
+    builder
+      .addCase(listSalaries.fulfilled, (state, action) => {
+        state.salaries[action.payload.employeeId] = action.payload.data;
+      });
+
+    // Delete salary
+    builder
+      .addCase(deleteSalary.fulfilled, (state, action) => {
+        const empSalaries = state.salaries[action.payload.id] || [];
+        state.salaries[action.payload.id] = empSalaries.filter(s => s.id !== action.payload.salaryId);
       });
   },
 });
 
-export const { clearError, setItem } = employeeSlice.actions;
+export const { setItem, clearError } = employeeSlice.actions;
 export default employeeSlice.reducer;

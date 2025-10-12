@@ -3,10 +3,14 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Order\Http\Controllers\OrderController;
 
+// Public endpoint for anonymous order/invoice tracking
+Route::get('/public/track-order', [OrderController::class, 'publicTrack']);
+
+Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
+
 Route::prefix('orders')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/', [OrderController::class, 'index'])->name('orders.index');
     Route::get('/{id}', [OrderController::class, 'show'])->name('orders.show');
-    Route::post('/', [OrderController::class, 'store'])->name('orders.store');
     Route::put('/{id}', [OrderController::class, 'update'])->name('orders.update');
     Route::delete('/{id}', [OrderController::class, 'destroy'])->name('orders.destroy');
 

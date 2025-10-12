@@ -12,6 +12,8 @@ use Modules\Invoice\Transformers\InvoiceResource;
 use Modules\Invoice\Services\InvoiceService;
 use Modules\Invoice\Http\Requests\StoreInvoiceRequest;
 use Modules\Order\Models\Order;
+use Barryvdh\DomPDF\Facade\Pdf;
+
 
 class InvoiceController extends Controller
 {
@@ -405,4 +407,12 @@ public function createFromInvoice(Request $request, $invoiceId)
     return response()->json(['invoice' => $newInvoice], 201);
 }
     
+public function downloadPdf(Invoice $invoice)
+{
+    $invoice->load(['items', 'order']);
+
+    $pdf = Pdf::loadView('invoice::pdf.invoice', ['invoice' => $invoice]);
+
+    return $pdf->download("Invoice-{$invoice->invoice_number}.pdf");
+}
 }
