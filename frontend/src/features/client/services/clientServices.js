@@ -1,5 +1,5 @@
 // src/features/client/services/clientServices.js
-import axios from "axios";
+import api from "@/services/api";
 
 export const clientServices = {
   /**
@@ -8,7 +8,8 @@ export const clientServices = {
    */
   create: async (payload = {}) => {
     try {
-      const response = await axios.post(`/api/orders`, payload);
+      // `api` has baseURL set to VITE_API_BASE (e.g. http://localhost:8000/api)
+      const response = await api.post(`/orders`, payload);
       return response.data;
     } catch (error) {
       console.error("Error creating order.", error);

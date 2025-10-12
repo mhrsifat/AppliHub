@@ -13,7 +13,7 @@ import ServiceRoutes from "@/features/service/Routes";
 const Dashboard = lazy(() => import("../pages/employee/Dashboard"));
 const Orders = lazy(() => import("../features/order/pages/OrderListPage"));
 const Invoices = lazy(() => import("../features/invoice/pages/InvoiceListPage"));
-const Messages = lazy(() => import("../Messages"));
+const Messages = lazy(() => import("../pages/AdminConversations"));
 const Reports = lazy(() => import("../pages/employee/Reports"));
 const Settings = lazy(() => import("../pages/employee/Settings"));
 

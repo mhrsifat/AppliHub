@@ -3,7 +3,7 @@ import React, { lazy, Suspense } from "react";
 import Loader from "../components/common/Loader";
 
 const ClientHome = lazy(() => import("../features/client/pages/ClientHome"));
-const ClientHome = lazy(() => import("../features/client/pages/RequestService"));
+const RequestService = lazy(() => import("../features/client/pages/RequestService"));
 const BlogListPage = lazy(() => import("../features/client/pages/BlogListPage"));
 const BlogDetailsPage = lazy(() => import("../features/client/pages/BlogDetailsPage"));
 const TrackOrder = lazy(() => import("../features/client/pages/TrackOrder"));

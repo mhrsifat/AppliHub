@@ -35,7 +35,9 @@ export const fetchOrder = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const res = await fetchOrderApi(id);
-      return res.data;
+      // normalize common API shapes: { order: {...} } or { data: {...} } or raw
+      const payload = res.data;
+      return payload?.order ?? payload?.data ?? payload;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
@@ -107,7 +109,9 @@ export const createInvoiceFromOrder = createAsyncThunk(
   async ({ orderId, payload = {} }, { rejectWithValue }) => {
     try {
       const res = await createInvoiceFromOrderApi(orderId, payload);
-      return res.data;
+      // normalize response: backend may return { invoice, order } or wrapped { data: { ... } }
+      const p = res.data;
+      return p?.invoice ?? p?.data ?? p;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }

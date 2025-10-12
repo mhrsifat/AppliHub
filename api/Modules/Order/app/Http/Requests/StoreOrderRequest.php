@@ -19,6 +19,7 @@ class StoreOrderRequest extends FormRequest
             'customer_email' => 'nullable|email|max:191',
             'customer_phone' => 'nullable|string|max:50',
             'customer_address' => 'nullable|string|max:1000',
+            'customer_note' => 'nullable|string|max:2000',
             'vat_percent' => 'nullable|numeric|min:0',
             'coupon_code' => 'nullable|string|max:100',
             'coupon_discount' => 'nullable|numeric|min:0',

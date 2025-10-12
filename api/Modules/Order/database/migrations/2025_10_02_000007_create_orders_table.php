@@ -23,6 +23,7 @@ class CreateOrdersTable extends Migration
             $table->string('customer_phone')->nullable();
             $table->string('customer_address')->nullable();
             $table->string('customer_email')->nullable();
+            $table->text('customer_note')->nullable();
 
             // Summary amounts
             $table->decimal('total', 14, 2)->default(0); // sum of items before VAT & discounts

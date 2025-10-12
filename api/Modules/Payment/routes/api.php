@@ -3,8 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Payment\Http\Controllers\PaymentController;
 
-// Authenticated route for starting payment
-Route::middleware(['auth:sanctum'])->post('/payments/initiate', [PaymentController::class, 'initiate']);
+
+Route::post('/payments/initiate', [PaymentController::class, 'initiate']);
 
 // Public callbacks
 Route::post('/payments/ssl/success', [PaymentController::class, 'sslSuccess'])->name('payments.ssl.success');

@@ -24,6 +24,7 @@ class Order extends Model
         'customer_email',
         'customer_phone',
         'customer_address',
+        'customer_note',
         'total',
         'vat_percent',
         'vat_amount',

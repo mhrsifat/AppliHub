@@ -1,326 +1,136 @@
-Depth to Infinity – Portfolio App Prompt
+Flow:
+Ocean → Transition → Space → Project → Blog → Contact
 
-1. Multi-Scene Transition Logic
+Ocean zone এ সব Floating elements (sea creatures, skill bubbles, profile) interactive এবং parallax motion সহ।
 
-On launch, randomly select one intro sequence with weighted probability:
+Transition cinematic, scroll-triggered; Ocean → nebula burst → blackholes + nebula dust → subtle floating animations।
 
-Ocean → Space (60%), Deep Forest → Space (20%), Fire → Space (15%), Space-only (5%).
+Space zone: starfield, planets (projects), testimonials, occasional lightning streaks।
 
+3D Blog zone: floating blog cards, hover expand, comment & vote system।
 
-Animations: Fade out the first scene (~200–300ms, per Material guidelines), then fade/scale in the space scene. For example, scale elements from 80%→100% to avoid abrupt starts. Particle systems (water, leaves, flames) should smoothly transition (e.g. fade out or accelerate).
+Contact zone: gradient background, glowing beam on message send, confirmation text।
 
-After transition, clean up WebGL: call renderer.forceContextLoss() and null out the context/DOM to prevent leaks. Use seeded randomness so the same probabilities yield reproducible behavior.
 
+Conclusion: আপনার envision করা cinematic, interactive, bioluminescent flow পুরোপুরি ম্যাচ করছে।
 
-{
-  "SceneTransition": {
-    "introPaths": [
-      {"from":"Ocean", "to":"Space", "prob":0.60},
-      {"from":"DeepForest", "to":"Space", "prob":0.20},
-      {"from":"Fire", "to":"Space", "prob":0.15},
-      {"from":"Space", "to":"Space", "prob":0.05}
-    ],
-    "animations": {
-      "fade": {"duration": 250, "easing": "ease-in-out"},
-      "scale": {"from":0.8, "to":1.0, "duration": 250},
-      "particleFade": {"duration": 200}
-    },
-    "cleanup": {"method": "renderer.forceContextLoss()", "target": "prevGLScene"}
-  }
-}
+২. Ocean Zone – Memory & Info
 
-2. Main App Structure
+Background: deep-blue → cyan gradient, soft volumetric rays, floating particles ✅
 
-Flow: Intro (e.g. Ocean) → transition → Space (Hub) → Projects (Planets) → Blog → Testimonials → Contact. Navigation can be scroll-linked or via a fixed navbar.
+Education: floating sea creatures, tooltip info, transition → blackholes ✅
 
-Place the user avatar at the center of the space hub. Clicking the avatar opens social media links. Clicking empty space may trigger random events (see section 8).
+Skills: glowing bubbles with logos, hover → expand + spark trail, transition → nebula dust ✅
 
-Transitions: Use smooth fades/slides (~250ms) between sections. Maintain context (e.g. keep avatar visible across space-related sections).
+Experience: floating sea monster → transition → glowing star ✅
 
+Starfish: mouse follow animation, click → particle burst ✅
 
-{
-  "AppStructure": {
-    "sections": ["SpaceHub", "Projects", "Blog", "Testimonials", "Contact"],
-    "navigation": {"type": "scrollSpy", "sectionsAnchorIds": [true,true,true,true,true]},
-    "avatar": {"position": "center", "interactions": ["openLinks", "maybeFunFact"]}
-  }
-}
+Avatar/Profile Picture: floating bobbing, hover halo, click → fun fact ✅
 
-3. Blog Section – Floating 3D BlogCards
+Hobbies Bubbles: interactive, floating ✅
 
-Design: Each BlogCard floats in 3D space with a soft glow. On hover, apply a subtle 3D tilt (e.g. rotateX/Y by ~±5°) and intensify the glow.
+Conclusion: Ocean zone এর visual & interactive elements আপনার imagination এর সাথে পুরোপুরি মিলে যাচ্ছে।
 
-Content: Show title, image (lazy-loaded), excerpt. Include Vote buttons and a Comment count. Below the cards, a comment form with a “verify-human” orb that must be long-pressed to post.
+৩. Transition Zone – Magic Reveal
 
-Interactions: Hover = tilt + glow. Click title/image = open BlogDetail. Upvote/downvote buttons (keyboard-focusable) adjust counts.
+Scroll-triggered cinematic fade: Ocean fades → nebula burst + volumetric beams + dust particles ✅
 
-Responsiveness: Use a grid (1 column on mobile, up to 3 on desktop).
+Objects morph: sea creatures → blackholes, skill bubbles → nebula dust, sea monster → glowing star ✅
 
-Accessibility: Mark each card as an article (role="article" or <article>) since it’s standalone content. Use aria-live="polite" on dynamic elements (e.g. updating counts) so screen readers announce changes.
+Floating animations & optional sound cues: enhance magical feel ✅
 
+Conclusion: Transition zone আপনার vision অনুযায়ী “magical reveal” effect তৈরি করছে।
 
-{
-  "BlogCard": {
-    "layout": {"floatInSpace": true, "gridColumns": [1,2,3]},
-    "styleTokens": {"bgColor": "surface", "textColor": "onSurface", "glow": "highlight"},
-    "animations": {
-      "enter": {"opacity": 0, "opacityEnd": 1, "duration": 250},
-      "hoverTilt": {"rotateX":5, "rotateY":-5, "duration": 150}
-    },
-    "actions": ["openDetail", "voteUp", "voteDown"],
-    "content": ["title","image","excerpt","commentCount"],
-    "accessibility": {"role": "article", "ariaLive": "polite"}
-  }
-}
+৪. Space Zone – Projects & Testimonials
 
-4. BlogDetail View
+Starfield: hundreds of stars, twinkle, soft glow, parallax scroll, occasional blackholes ✅
 
-Hero: Large header image with title text overlaid.
+3D Planets (Projects): orbiting motion, hover → glow + preview, click → modal with details + tech stack + live/demo links ✅
 
-Reading Progress: A fixed progress bar at top showing scroll percentage.
+Filter chips: dynamic rearrangement ✅
 
-Layout: Main content in an <article>; a sidebar (<aside>) for table of contents or author info.
+Testimonials: floating cards, subtle parallax ✅
 
-Related Posts: Display a set of related BlogCards at end; lazy-load these for performance.
+Lightning streaks & optional cosmic sounds ✅
 
-Lazy Loading: Only load heavy content (images, videos) when in view.
+Conclusion: Space zone এর cinematic interactive feel এবং project/testimonial integration আপনার কল্পনার সাথে পুরোপুরি মিলে।
 
-Accessibility: Use semantic headings (<h1>, <h2>, etc.) and landmarks. Mark related posts region with role="region" and an accessible name.
+৫. Project Zone – Enhanced Interaction
 
+Planets respond to mouse movement, hover → glow/modal preview ✅
 
-{
-  "BlogDetail": {
-    "hero": {"image": "url", "title": "String"},
-    "progressBar": {"position": "top", "color": "accent"},
-    "sidebar": {"position": "right", "contents": ["toc","authorInfo"]},
-    "related": {"cards": 3, "lazyLoad": true},
-    "accessibility": {"role": "article", "mainContent": true}
-  }
-}
-5. Projects / Planets Section
+Lightning streaks, subtle blackhole pull effects ✅
 
-Display each project as an orbiting planet in 3D space.
-Each planet shows the project image or icon at its core, with small tech badges orbiting around it (e.g. React, JS, laravel, vuejs).
+Conclusion: Enhanced interactivity & cosmic visual effects আপনার vision match করছে।
 
-Filter Chips (Top Bar)
-Include clickable Material-style filter chips: JavaScript, React, UI/UX, Backend.
-These act as toggles — when one or more are active, only matching planets stay visible.
-Filter transitions fade or scale smoothly when projects appear/disappear.
+৬. 3D Blog Zone
 
-Interaction & Accessibility
-On hover or keyboard focus, show a tooltip with the project’s name and a short description.
-Tooltips must be keyboard-accessible and linked with aria-describedby.
-Each planet acts as an accessible figure (role="figure", aria-label="Project Title").
+Randomly floating 3D blog cards, hover expand, embedded cover images ✅
 
-Animation
-Planets and orbiting badges rotate continuously at varying speeds and radii (orbitCenter: spaceHub, orbitRadius: variable).
-The motion is calm and persistent, never distracting.
+Markdown-based content, comment/reply, upvote/downvote ✅
 
-Modal on Click
-When a planet is clicked, open a mostly transparent modal:
+Occasionally blackholes subtly pull cards ✅
 
-Project title at the top
+Conclusion: Blog section এর cinematic 3D floating card & interaction idea ঠিক আপনার কল্পনার মতো।
 
-Main picture centered
+৭. Contact Zone
 
-Description near the bottom
+Gradient: Ocean cyan → deep-space purple ✅
 
-Live / GitHub / Vercel / Other links shown neatly in a corner
-The modal background randomly shifts color each time it opens (soft hue variation).
+Send message → UI shake + glowing beam animation, profile integrated ✅
 
+Confirmation text: “Signal received from the deep” ✅
 
-JSON Spec
+Optional sound cue ✅
 
-{
-  "ProjectPlanet": {
-    "layout": { "orbitCenter": "spaceHub", "orbitRadius": "variable" },
-    "filters": { "chips": ["JavaScript","React","UI/UX","Backend"], "type": "toggle" },
-    "tooltip": { "trigger": "hover/focus", "ariaDescribedBy": true },
-    "animations": { "orbit": "continuous", "fadeIn": 300 },
-    "accessibility": { "role": "figure", "ariaLabel": "Project Title" },
-    "modal": { "style": "transparent", "colorMode": "random" }
-  }
-}
+Conclusion: Contact zone cinematic + interactive experience ঠিক আপনার vision অনুযায়ী।
 
+৮. Admin Panel
 
-6. Testimonials Section
+CRUD for blogs, skills, projects, personal info ✅
 
-Floating TestimonialCards positioned randomly (but seeded for consistency). Each card shows an avatar, person’s name/role, message, and rating (e.g. stars).
+Dashboard, analytics cards, modals ✅
 
-Animations: Cards fade/scale into place on load.
+Dark/light mode ✅
 
-Accessibility: Use <blockquote> or role="complementary". Each card should have an accessible name (e.g. “Testimonial by [name]”).
+Conclusion: Admin panel সম্পূর্ণ functional এবং cinematic feel বজায় রাখছে।
 
+৯. Performance & Responsiveness
 
-{
-  "TestimonialCard": {
-    "layout": {"float": true, "positionsSeed": 42},
-    "styleTokens": {"avatarSize": 48, "bgColor": "surfaceVariant"},
-    "animations": {"enter": {"opacity":0, "opacityEnd":1, "duration": 300}},
-    "content": ["avatar","name","role","rating","message"],
-    "accessibility": {"role": "complementary", "ariaLabel": "Testimonial from [name]"}
-  }
-}
+GPU optimized, lazy-load, responsive (Desktop/Tablet/Mobile) ✅
 
-7. Avatar Interaction
+Mobile: simplified 3D, reduced particles, slower planets ✅
 
-The central avatar (user’s profile) is clickable. On click: open social links (GitHub, LinkedIn, etc.). Also, with a set probability (profileFunFactProbability, e.g. 20%), display a fun fact in a speech-bubble overlay.
+Desktop: full cinematic experience ✅
 
-Animation: Slight idle animation (e.g. slow breathing or gentle float). On click, a quick scale or flip.
+Conclusion: Performance & responsiveness section আপনার কল্পনার সাথে পুরোপুরি মিলে।
 
-Accessibility: Treat avatar as a button (role="button", tabindex=0) if not using <button>. Provide aria-label="Profile Avatar - click for links or fun fact".
+১০. Personal Info Integration
 
+Profile photo floating in Ocean & Contact ✅
 
-{
-  "AvatarFloating": {
-    "size": 150,
-    "actions": {"onClick": ["openSocialLinks","maybeShowFunFact"]},
-    "tokens": {"outlineColor": "primary", "hoverScale": 1.1},
-    "animations": {"idle": "breathing", "click": {"scale": 0.9, "duration": 100}},
-    "accessibility": {"role": "button", "tabIndex": 0, "ariaLabel": "User avatar"}
-  }
-}
+Skills with logos in bubbles ✅
 
-8. Random Event Reveal
+Education & experience floating elements ✅
 
-Clicking empty space in the space scene has an 8% chance to reveal a random event card. This can be a quote, fun fact, or brief phrase.
+Hobbies as interactive bubbles ✅
 
-Display: The card appears with a pulse animation, and text types out character-by-character. If user has prefers-reduced-motion, skip the typing and show text immediately.
+Blog posts, projects → images, hover interactions ✅
 
-Card positions itself to avoid covering UI (e.g. bottom corner). It should be dismissible (click or auto-hide).
+Conclusion: Personal info representation cinematic, interactive এবং আপনার imagination অনুযায়ী।
 
-Use aria-live="polite" on the card so screen readers announce it.
+চূড়ান্ত Verdict (বাংলা)
 
+আপনার কল্পনা এবং এই prompt এর মিল:
+✅ পুরোপুরি ম্যাচ করছে।
 
-{
-  "RandomEventCard": {
-    "triggerChance": 0.08,
-    "types": ["quote","fact","message"],
-    "animation": {"pulse": true, "typingEffect": true},
-    "accessibility": {"role": "status", "ariaLive": "polite"}
-  }
-}
+Cinematic, bioluminescent, 3D interactive effects।
 
-9. Stars & Visuals
+Ocean → Transition → Space → Project → 3D Blog → Contact flow ঠিক যেমন আপনি ভাবছেন।
 
-Starfield: Multi-layer starfield background with parallax movement. Layers move at different speeds to add depth.
+Floating bubbles, starfield, blackholes, skill animations, hover/interaction effects সব আছে।
 
-Nebula: Animated color clouds or gradients behind stars.
+Performance, responsiveness, accessibility সব covered।
 
-Twinkling: Random small flickers on some stars.
-
-Performance: Render stars and nebula with GPU shaders or a WebGL particle system for efficiency. Shaders can draw millions of points with minimal impact.
-
-On mobile, reduce star count and disable heavy effects.
-
-
-{
-  "StarfieldBackground": {
-    "layers": 3,
-    "shaderBased": true,
-    "parallaxSpeeds": [0.3, 0.6, 1.0],
-    "animations": {"twinkle": "random", "nebulaColor": "slowCycle"},
-    "accessibility": {"ariaHidden": true}
-  }
-}
-
-10. Performance & Responsiveness
-
-Lazy Load: Use loading="lazy" on offscreen images to defer loading. Split code and assets by route if possible.
-
-Defer Animations: Pause or simplify non-critical animations (e.g. skip background animations if not visible).
-
-Unmount GL Scenes: After transitions, destroy previous scenes (forceContextLoss) to free GPU memory.
-
-Seeded Layout: Use deterministic random seeds for star positions and card placements so each load is consistent.
-
-Mobile Considerations: On small screens or low-power devices, reduce particle counts, disable 3D tilt (use flat cards), and simplify shaders. Use media queries (e.g. @media (max-width: 600px)) to adjust settings.
-
-
-{
-  "Performance": {
-    "lazyLoadImages": true,
-    "deferNonCritical": true,
-    "cleanupGL": true,
-    "mediaQueries": {
-      "maxWidth600": {"starCount": 1000, "tiltEffect": false, "particles": 50}
-    }
-  }
-}
-
-11. Keyboard & Accessibility
-
-Focus & Activation: All interactive elements (buttons, cards, avatar, chips) must be keyboard-focusable and activate on Enter/Space. Prefer native <button> or <a> where possible.
-
-Skip Link: Include a “Skip to main content” link as the first focusable item to let users bypass navigation.
-
-ARIA Roles: Use semantic roles (e.g. role="main", role="article", role="dialog" for any popups). For instance, blog posts and testimonials can use role="article".
-
-Live Regions: Use aria-live="polite" for dynamically injected content (random quotes, new comments) so screen readers announce updates.
-
-Landmarks: Mark page regions (e.g. <main>, <nav>, <header>, <footer>) to improve navigation.
-
-Color & Contrast: Ensure all text meets WCAG contrast (≥4.5:1). Provide visible focus outlines for keyboard users.
-
-
-{
-  "Accessibility": {
-    "keyboardSupport": true,
-    "ariaRoles": ["article","region","button","status"],
-    "skipLink": true,
-    "liveRegions": ["randomEvent","comments"]
-  }
-}
-
-12. Modular Data Structure
-
-Store all content/data in separate JSON/JS modules for clarity:
-
-blogs.js: Array of {id, title, excerpt, content, image}.
-
-projects.js: Array of {id, name, description, tags, image}.
-
-testimonials.js: Array of {id, name, role, message, rating, avatar}.
-
-quotessayandfunfact.js: Lists of quotes, sayings, and fun facts.
-
-personalinfo.js: Profile details (name, avatar, social links, fun facts).
-
-others.js: Configuration (animation durations, probabilities, GL settings).
-
-
-In each component’s description, include a token block listing relevant design tokens (colors, spacing, fonts) for traceability. For example, reference colorPrimary, spacingLg, etc. This ensures every visual decision links back to a design token.
-
-
-{
-  "DataFiles": ["blogs.js","projects.js","testimonials.js","quotessayandfunfact.js","personalinfo.js","others.js"]
-}
-
-13. Figma Component Descriptions
-
-For each component (BlogCard, ProjectPlanet, AvatarFloating, RandomEventCard, BlogDetail), provide a JSON-like spec plus bullet notes:
-
-Keys: Layout (size, alignment), tokens (colors, typography, shadows), animations, interactions, accessibility.
-
-Example (BlogCard):
-
-{
-  "component": "BlogCard",
-  "layout": {"width": "280px", "margin": "16px"},
-  "tokens": {"bgColor": "surface", "textColor": "onSurface", "fontSize": "lg"},
-  "animations": {"hoverTilt": true, "fadeIn": 250},
-  "interactions": {"onClick": "openDetail", "onHover": "tilt3D"},
-  "accessibility": {"role": "article", "tabIndex": 0}
-}
-
-Explain each property in bullets (e.g. “hoverTilt: enable 3D rotation on hover”).
-
-
-
-Include visual and motion annotations (e.g. “glow intensity”, “ease-in-out curve”).
-
-Use markdown headers and lists for clarity. Focus on performance, responsiveness, and accessibility as primary concerns.
-
-
-Sources: We apply best practices from design and web standards to ensure smooth animations, efficient rendering, and full accessibility.
-
+Ambient sound & motion detailsও বিবেচনা করা হয়েছে।
