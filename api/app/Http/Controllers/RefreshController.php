@@ -58,20 +58,8 @@ class RefreshController extends Controller
                     // Delete old refresh token
                     $refresh->delete();
 
-                    // Prepare secure cookie
-                    $minutes = 60 * 24 * 30; // 30 days
-                    $isProduction = app()->environment('production');
-                    $cookie = cookie(
-                        'refresh_token',
-                        $newRefreshToken,
-                        $minutes,
-                        '/',
-                        null,
-                        $isProduction,
-                        true,
-                        false,
-                        $isProduction ? 'None' : 'Lax'
-                    );
+                    // Prepare secure cookie using helper to keep behavior consistent
+                    $cookie = $this->cookieForRefresh($newRefreshToken, true);
 
                     return response()->json([
                         'access_token' => $accessToken,

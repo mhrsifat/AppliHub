@@ -21,16 +21,23 @@ class FortifyController extends Controller
     protected function cookieForRefresh(string $plainToken, bool $remember): \Symfony\Component\HttpFoundation\Cookie
     {
         $minutes = $remember ? 60 * 24 * 30 : 0;
-        $isProduction = app()->environment('production');
-        $sameSite = $isProduction ? 'None' : 'Lax';
-        $secure = $isProduction;
+
+        // Allow configuring the cookie domain via .env (e.g. ".mhrsifat.xyz")
+        $domain = env('COOKIE_DOMAIN', null);
+
+        // Secure when running over HTTPS or in production
+        $secure = request()->isSecure() || app()->environment('production');
+
+        // For cross-site requests we must use SameSite=None so the browser will
+        // include the cookie when the frontend is on a different origin.
+        $sameSite = 'None';
 
         return cookie(
             'refresh_token',
             $plainToken,
             $minutes,
             '/',
-            null,
+            $domain,
             $secure,
             true,   // HttpOnly
             false,
@@ -63,83 +70,83 @@ class FortifyController extends Controller
     // ----------------------------
     // Register
     // ----------------------------
-   public function register(Request $request)
-{
-    // 1️⃣ Validate request
-    $data = $request->validate([
-        'name' => 'required|string|max:191',
-        'email' => 'required|email|unique:users,email',
-        'password' => 'required|string|min:8|confirmed',
-        'remember' => 'sometimes|boolean',
-    ]);
+    public function register(Request $request)
+    {
+        // 1️⃣ Validate request
+        $data = $request->validate([
+            'name' => 'required|string|max:191',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8|confirmed',
+            'remember' => 'sometimes|boolean',
+        ]);
 
-    $remember = $request->boolean('remember', false);
+        $remember = $request->boolean('remember', false);
 
-    $user = app(CreatesNewUsers::class)->create([
-        'name' => $data['name'],
-        'email' => $data['email'],
-        'password' => $data['password'],
-        "password_confirmation" => $data['password'],
-    ]);
-    
-    $user->assignRole('user');
+        $user = app(CreatesNewUsers::class)->create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => $data['password'],
+            "password_confirmation" => $data['password'],
+        ]);
 
-    $accessToken = $user->createToken('auth_token')->plainTextToken;
-    $refreshToken = $this->createRefreshToken($user, $request->userAgent());
+        $user->assignRole('user');
 
-    return response()->json([
-        'message' => 'User registered successfully',
-        'user' => $user,
-        'access_token' => $accessToken,
-        'token_type' => 'Bearer',
-    ])->withCookie($this->cookieForRefresh($refreshToken, $remember));
-}
+        $accessToken = $user->createToken('auth_token')->plainTextToken;
+        $refreshToken = $this->createRefreshToken($user, $request->userAgent());
+
+        return response()->json([
+            'message' => 'User registered successfully',
+            'user' => $user,
+            'access_token' => $accessToken,
+            'token_type' => 'Bearer',
+        ])->withCookie($this->cookieForRefresh($refreshToken, $remember));
+    }
 
     // ----------------------------
     // Login
     // ----------------------------
-    
+
     public function login(Request $request)
-{
-    $data = $request->validate([
-        'email' => 'required|email',
-        'password' => 'required|string',
-        'remember' => 'sometimes|boolean',
-    ]);
+    {
+        $data = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+            'remember' => 'sometimes|boolean',
+        ]);
 
-    $remember = $request->boolean('remember', false);
+        $remember = $request->boolean('remember', false);
 
-    $user = User::where('email', $data['email'])->first();
+        $user = User::where('email', $data['email'])->first();
 
-    if (!$user || !Hash::check($data['password'], $user->password)) {
-        return response()->json(['message' => 'Invalid credentials'], 401);
+        if (!$user || !Hash::check($data['password'], $user->password)) {
+            return response()->json(['message' => 'Invalid credentials'], 401);
+        }
+
+        $accessToken = $user->createToken('auth_token')->plainTextToken;
+        $refreshToken = $this->createRefreshToken($user, $request->userAgent());
+
+        // Get all roles
+        $roles = $user->getRoleNames(); // ["user"], ["admin"], ["employee"], etc.
+
+        // Build response dynamically
+        $responseData = [
+            'message' => 'Login successful',
+            'access_token' => $accessToken,
+            'token_type' => 'Bearer',
+        ];
+
+        // Assign role based key for frontend hook
+        if ($roles->contains('admin')) {
+            $responseData['admin'] = $user;
+        } elseif ($roles->contains('employee')) {
+            $responseData['employee'] = $user;
+        } elseif ($roles->contains('user')) {
+            $responseData['user'] = $user;
+        }
+
+        return response()->json($responseData)
+            ->withCookie($this->cookieForRefresh($refreshToken, $remember));
     }
-
-    $accessToken = $user->createToken('auth_token')->plainTextToken;
-    $refreshToken = $this->createRefreshToken($user, $request->userAgent());
-
-    // Get all roles
-    $roles = $user->getRoleNames(); // ["user"], ["admin"], ["employee"], etc.
-
-    // Build response dynamically
-    $responseData = [
-        'message' => 'Login successful',
-        'access_token' => $accessToken,
-        'token_type' => 'Bearer',
-    ];
-
-    // Assign role based key for frontend hook
-    if ($roles->contains('admin')) {
-        $responseData['admin'] = $user;
-    } elseif ($roles->contains('employee')) {
-        $responseData['employee'] = $user;
-    } elseif ($roles->contains('user')) {
-        $responseData['user'] = $user;
-    }
-
-    return response()->json($responseData)
-        ->withCookie($this->cookieForRefresh($refreshToken, $remember));
-}
 
     // ----------------------------
     // Logout current device
@@ -264,12 +271,12 @@ class FortifyController extends Controller
             'token_type' => 'Bearer',
         ];
         if ($roles->contains('admin')) {
-        $responseData['admin'] = $user;
-    } elseif ($roles->contains('employee')) {
-        $responseData['employee'] = $user;
-    } elseif ($roles->contains('user')) {
-        $responseData['user'] = $user;
-    }
+            $responseData['admin'] = $user;
+        } elseif ($roles->contains('employee')) {
+            $responseData['employee'] = $user;
+        } elseif ($roles->contains('user')) {
+            $responseData['user'] = $user;
+        }
 
         return response()->json($responseData)
             ->withCookie($this->cookieForRefresh($newRefreshToken, true));
