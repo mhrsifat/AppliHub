@@ -91,4 +91,31 @@ class RefreshController extends Controller
         // ------------------------
         return response()->json(['message' => 'Unauthorized'], 401);
     }
+
+    protected function cookieForRefresh(string $plainToken, bool $remember): \Symfony\Component\HttpFoundation\Cookie
+    {
+        $minutes = $remember ? 60 * 24 * 30 : 0;
+
+        // Put the top-level domain for cookies into .env:
+        // COOKIE_DOMAIN=.mhrsifat.xyz
+        $domain = env('COOKIE_DOMAIN', null); // e.g. ".mhrsifat.xyz"
+
+        // Ensure cookie is Secure when using SameSite=None (required by browsers)
+        $secure = request()->isSecure() || app()->environment('production');
+
+        // Cross-site refresh cookie must be SameSite=None
+        $sameSite = 'None';
+
+        return cookie(
+            'refresh_token',
+            $plainToken,
+            $minutes,
+            '/',       // path
+            $domain,   // domain
+            $secure,   // secure
+            true,      // httpOnly
+            false,     // raw
+            $sameSite  // sameSite
+        );
+    }
 }
