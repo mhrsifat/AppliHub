@@ -20,8 +20,6 @@ $table->morphs('tokenable');
             $table->timestamp('expires_at');
             $table->timestamp('revoked_at')->nullable(); 
             $table->timestamps();
-
-            $table->index(['user_id', 'expires_at']);
         });
     }
 
