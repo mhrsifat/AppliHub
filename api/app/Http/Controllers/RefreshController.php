@@ -11,6 +11,8 @@ use App\Models\RefreshToken;
 
 class RefreshController extends Controller
 {
+    // filepath: app/Http/Controllers/RefreshController.php
+
     public function me(Request $request)
     {
         // ------------------------
@@ -29,86 +31,74 @@ class RefreshController extends Controller
         // 2) Check refresh_token cookie
         // ------------------------
         $refreshToken = $request->cookie('refresh_token');
-        if ($refreshToken) {
-            $hashedToken = hash('sha256', $refreshToken);
+        if (!$refreshToken) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
 
-            $refresh = RefreshToken::where('token', $hashedToken)
-                ->valid()
-                ->first();
+        $hashedToken = hash('sha256', $refreshToken);
+        $refresh = RefreshToken::where('token', $hashedToken)->valid()->first();
 
-            if ($refresh) {
-                return DB::transaction(function () use ($refresh, $request) {
-                    $user = $refresh->user;
-
-                    // Issue new access token
-                    $accessToken = $user->createToken('auth_token')->plainTextToken;
-
-                    // Generate new refresh token
-                    $newRefreshToken = Str::random(60);
-                    $newHashed = hash('sha256', $newRefreshToken);
-
-                    // Store new refresh token
-                    RefreshToken::create([
-                        'user_id' => $user->id,
-                        'token' => $newHashed,
-                        'device_name' => $request->userAgent() ?? 'unknown',
-                        'expires_at' => now()->addDays(30),
-                    ]);
-
-                    // Delete old refresh token
-                    $refresh->delete();
-
-                    // ------------------------
-                    // Prepare secure cookie using helper to keep behavior consistent
-                    // ------------------------
-                    $usePartitioned = filter_var(env('PARTITIONED_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
-
-                    if ($usePartitioned) {
-                        // For Partitioned cookies we must NOT send Domain; include Partitioned attr.
-                        $maxAge = 60 * 60 * 24 * 30; // seconds
-                        $cookieValue = rawurlencode($newRefreshToken);
-
-                        $cookieHeader = sprintf(
-                            'refresh_token=%s; Path=/; Max-Age=%d; HttpOnly; Secure; SameSite=None; Partitioned',
-                            $cookieValue,
-                            $maxAge
-                        );
-
-                        return response()->json([
-                            'access_token' => $accessToken,
-                            'token_type' => 'Bearer',
-                            'user' => $user,
-                        ])->header('Set-Cookie', $cookieHeader);
-                    }
-
-                    // Default: use cookie helper which respects COOKIE_DOMAIN and SameSite=None
-                    $cookie = $this->cookieForRefresh($newRefreshToken, true);
-
-                    return response()->json([
-                        'access_token' => $accessToken,
-                        'token_type' => 'Bearer',
-                        'user' => $user,
-                    ])->withCookie($cookie);
-                });
-            }
-
-            // Invalid or expired refresh token -> clear cookie
-            // Clear both partitioned (host-only) and domain cookies. Cookie::forget
-            // clears the host cookie; some browsers require Path/Domain variations.
-            Cookie::queue(Cookie::forget('refresh_token'));
-            // If domain-based cookie was used, also attempt to clear with domain from env
+        if (!$refresh) {
+            // Invalid or expired refresh token → clear cookie
             $domain = env('COOKIE_DOMAIN', null);
+            Cookie::queue(Cookie::forget('refresh_token'));
             if ($domain) {
                 Cookie::queue(cookie('refresh_token', '', -2628000, '/', $domain));
             }
             return response()->json(['message' => 'Invalid or expired refresh token'], 401);
         }
 
-        // ------------------------
-        // 3) No valid auth found
-        // ------------------------
-        return response()->json(['message' => 'Unauthorized'], 401);
+        return DB::transaction(function () use ($refresh, $request) {
+            $user = $refresh->user;
+
+            // Create new tokens
+            $accessToken = $user->createToken('auth_token')->plainTextToken;
+            $newRefreshToken = Str::random(60);
+            $newHashed = hash('sha256', $newRefreshToken);
+
+            // Store and delete
+            RefreshToken::create([
+                'user_id' => $user->id,
+                'token' => $newHashed,
+                'device_name' => $request->userAgent() ?? 'unknown',
+                'expires_at' => now()->addDays(30),
+            ]);
+            $refresh->delete();
+
+            // ------------------------
+            // Handle Partitioned or Standard cookie
+            // ------------------------
+            $usePartitioned = filter_var(env('PARTITIONED_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
+            $maxAge = 60 * 60 * 24 * 30;
+            $cookieValue = rawurlencode($newRefreshToken);
+
+            $responseData = [
+                'access_token' => $accessToken,
+                'token_type' => 'Bearer',
+                'user' => $user,
+            ];
+
+            if ($usePartitioned) {
+                // Chrome 118+ partitioned cookie
+                $cookieHeader = sprintf(
+                    'refresh_token=%s; Path=/; Max-Age=%d; HttpOnly; Secure; SameSite=None; Partitioned',
+                    $cookieValue,
+                    $maxAge
+                );
+
+                return response()
+                    ->json($responseData)
+                    ->header('Set-Cookie', $cookieHeader);
+            }
+
+            // Fallback: domain-based cookie (legacy browsers)
+            $cookie = $this->cookieForRefresh($newRefreshToken, true);
+            return response()
+                ->json($responseData)
+                ->withCookie($cookie);
+        });
     }
+
 
     protected function cookieForRefresh(string $plainToken, bool $remember): \Symfony\Component\HttpFoundation\Cookie
     {
