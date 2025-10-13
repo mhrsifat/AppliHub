@@ -63,7 +63,6 @@ class RefreshController extends Controller
         }
     }
 
-    
 
 public function me(Request $request)
 {
@@ -128,53 +127,6 @@ public function me(Request $request)
         return response()->json($payload)->withCookie($cookie);
     });
 }
-
-        // 2) Cookie path
-        $refreshToken = $request->cookie('refresh_token');
-        if (!$refreshToken) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        $hashedToken = hash('sha256', $refreshToken);
-        $refresh = RefreshToken::where('token', $hashedToken)->valid()->first();
-
-        if (!$refresh) {
-            $this->clearRefreshCookie();
-            return response()->json(['message' => 'Invalid or expired refresh token'], 401);
-        }
-
-        return DB::transaction(function () use ($refresh, $request) {
-            $entity = $refresh->tokenable;
-            if (! $entity) {
-                $refresh->delete();
-                $this->clearRefreshCookie();
-                return response()->json(['message' => 'Invalid token owner'], 401);
-            }
-
-            // rotate access + refresh
-            $accessToken = $entity->createToken('auth_token')->plainTextToken;
-            $newPlain = bin2hex(random_bytes(40));
-
-            RefreshToken::create([
-                'tokenable_id' => $entity->id,
-                'tokenable_type' => get_class($entity),
-                'token' => hash('sha256', $newPlain),
-                'device_name' => $request->userAgent() ?? 'unknown',
-                'expires_at' => now()->addDays(30),
-            ]);
-
-            // remove old one
-            $refresh->delete();
-
-            $cookie = $this->cookieForRefresh($newPlain, true);
-
-            return response()->json([
-                'access_token' => $accessToken,
-                'token_type' => 'Bearer',
-                'user' => $this->mapUserResponse($entity),
-            ])->withCookie($cookie);
-        });
-    }
 
     protected function mapUserResponse($entity)
     {
