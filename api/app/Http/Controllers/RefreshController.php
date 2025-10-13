@@ -58,14 +58,27 @@ class RefreshController extends Controller
                     // Delete old refresh token
                     $refresh->delete();
 
+                    // ------------------------
                     // Prepare secure cookie using helper to keep behavior consistent
-                    $cookie = $this->cookieForRefresh($newRefreshToken, true);
+                    // ------------------------
+                    $domain = env('COOKIE_DOMAIN', '.mhrsifat.xyz'); // or null if you want host-only
+                    $maxAge = 60 * 60 * 24 * 30; // seconds
+                    $cookieValue = rawurlencode($newRefreshToken);
 
+                    // Build raw Set-Cookie header with Partitioned
+                    $cookieHeader = sprintf(
+                        'refresh_token=%s; Path=/; Domain=%s; Max-Age=%d; HttpOnly; Secure; SameSite=None; Partitioned',
+                        $cookieValue,
+                        $domain,
+                        $maxAge
+                    );
+
+                    // Return response with the header (do NOT also call withCookie, to avoid duplicate Set-Cookie)
                     return response()->json([
                         'access_token' => $accessToken,
                         'token_type' => 'Bearer',
                         'user' => $user,
-                    ])->withCookie($cookie);
+                    ])->header('Set-Cookie', $cookieHeader);
                 });
             }
 

@@ -383,3 +383,24 @@ export const blogSeed = [
   { id: "b1", title: "Seed Post 1", excerpt: "...", details: "",  reads: 102, upvote: 12, downvote: 1 , comments: {}, meta:{} },
 ];
 
+<?php
+// Example: RefreshController::me() after creating $newRefreshToken
+$domain = env('COOKIE_DOMAIN', '.mhrsifat.xyz'); // or null if you want host-only
+$maxAge = 60 * 60 * 24 * 30; // seconds
+$cookieValue = rawurlencode($newRefreshToken);
+
+// Build raw Set-Cookie header with Partitioned
+$cookieHeader = sprintf(
+    'refresh_token=%s; Path=/; Domain=%s; Max-Age=%d; HttpOnly; Secure; SameSite=None; Partitioned',
+    $cookieValue,
+    $domain,
+    $maxAge
+);
+
+// Return response with the header (do NOT also call withCookie, to avoid duplicate Set-Cookie)
+return response()->json([
+    'access_token' => $accessToken,
+    'token_type' => 'Bearer',
+    'user' => $user,
+])->header('Set-Cookie', $cookieHeader);
+
