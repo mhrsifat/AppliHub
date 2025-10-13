@@ -80,10 +80,19 @@ class RefreshController extends Controller
 
             if ($usePartitioned) {
                 // Chrome 118+ partitioned cookie
+                $secure = request()->isSecure() || app()->environment('production');
+                $forceSecure = filter_var(env('FORCE_SECURE_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
+                if ($forceSecure) $secure = true;
+                // SameSite=None requires Secure
+                $secure = true;
+
+                $securePart = $secure ? 'Secure; ' : '';
+
                 $cookieHeader = sprintf(
-                    'refresh_token=%s; Path=/; Max-Age=%d; HttpOnly; Secure; SameSite=None; Partitioned',
+                    'refresh_token=%s; Path=/; Max-Age=%d; HttpOnly; %sSameSite=None; Partitioned',
                     $cookieValue,
-                    $maxAge
+                    $maxAge,
+                    $securePart
                 );
 
                 return response()
@@ -110,9 +119,16 @@ class RefreshController extends Controller
 
         // Ensure cookie is Secure when using SameSite=None (required by browsers)
         $secure = request()->isSecure() || app()->environment('production');
+        $forceSecure = filter_var(env('FORCE_SECURE_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
+        if ($forceSecure) {
+            $secure = true;
+        }
 
         // Cross-site refresh cookie must be SameSite=None
         $sameSite = 'None';
+        if ($sameSite === 'None') {
+            $secure = true;
+        }
 
         return cookie(
             'refresh_token',

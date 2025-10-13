@@ -17,11 +17,11 @@ import {
 
 const navItems = [
   { name: "Dashboard", path: "/employee", icon: HomeIcon },
-  { name: "Orders", path: "/admin/orders", icon: ShoppingCartIcon },
-  { name: "Invoices", path: "/admin/invoices", icon: DocumentTextIcon },
-  { name: "Messages", path: "/admin/messages", icon: BellIcon },
-  { name: "Reports", path: "/admin/reports", icon: ChartBarIcon },
-  { name: "Settings", path: "/admin/settings", icon: CogIcon },
+  { name: "Orders", path: "/employee/orders", icon: ShoppingCartIcon },
+  { name: "Invoices", path: "/employee/invoices", icon: DocumentTextIcon },
+  { name: "Messages", path: "/employee/messages", icon: BellIcon },
+  { name: "Reports", path: "/employee/reports", icon: ChartBarIcon },
+  { name: "Settings", path: "/employee/settings", icon: CogIcon },
 ];
 
 export default function EmployeeSidebar() {

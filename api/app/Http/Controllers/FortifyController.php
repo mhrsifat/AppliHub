@@ -31,6 +31,16 @@ class FortifyController extends Controller
 
         // Secure when running over HTTPS or in production
         $secure = request()->isSecure() || app()->environment('production');
+        // Allow forcing Secure cookies via env for edge cases (e.g. testing).
+        $forceSecure = filter_var(env('FORCE_SECURE_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
+        if ($forceSecure) {
+            $secure = true;
+        }
+
+        // Browsers require cookies that use SameSite=None to also be Secure.
+        if ($sameSite === 'None') {
+            $secure = true;
+        }
 
         if ($usePartitioned) {
             // Return a Symfony cookie WITHOUT a Domain so it can be marked Partitioned.
