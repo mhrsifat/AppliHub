@@ -19,7 +19,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 class OrderController extends Controller
 {
     use AuthorizesRequests;
-    
+
     protected InvoiceService $invoiceService;
 
     public function __construct(InvoiceService $invoiceService)
@@ -32,32 +32,41 @@ class OrderController extends Controller
      * Admin/manager: sees all
      * Employee: sees only assigned orders
      */
-    public function index(Request $request)
-    {
-        $query = Order::with('items')->orderByDesc('id');
-        $user = Auth::user();
 
-        // Use Spatie hasRole() to check role properly
-        if ($user && method_exists($user, 'hasRole') && $user->hasRole('employee')) {
-            $query->where('assigned_to', $user->id);
-        }
+public function index(Request $request)
+{
+    $query = Order::with('items')->orderByDesc('id');
+    $user = Auth::user();
 
-        // Search
-        if ($request->filled('q')) {
-            $q = $request->get('q');
-            $query->where(function ($qry) use ($q) {
-                $qry->where('order_number', 'like', "%{$q}%")
-                    ->orWhere('customer_name', 'like', "%{$q}%")
-                    ->orWhere('customer_email', 'like', "%{$q}%")
-                    ->orWhere('customer_phone', 'like', "%{$q}%")
-                    ->orWhere('customer_address', 'like', "%{$q}%")
-                    ->orWhere('coupon_code', 'like', "%{$q}%");
-            });
-        }
-
-        $perPage = (int) $request->get('per_page', 15);
-        return OrderResource::collection($query->paginate($perPage));
+    // 🧠 Role-based filtering
+    if ($user instanceof \Modules\Employee\Models\Employee) {
+        // Employee: Only their assigned orders
+        $query->where('assigned_to', $user->id);
+    } elseif (method_exists($user, 'hasRole') && $user->hasRole('admin')) {
+        // Admin: can see all orders
+        // no filter needed
+    } else {
+        // Other users: see nothing (or only their own, if you want)
+        $query->whereNull('id'); // returns empty
     }
+
+    // 🔍 Search filter
+    if ($request->filled('q')) {
+        $q = $request->get('q');
+        $query->where(function ($qry) use ($q) {
+            $qry->where('order_number', 'like', "%{$q}%")
+                ->orWhere('customer_name', 'like', "%{$q}%")
+                ->orWhere('customer_email', 'like', "%{$q}%")
+                ->orWhere('customer_phone', 'like', "%{$q}%")
+                ->orWhere('customer_address', 'like', "%{$q}%")
+                ->orWhere('coupon_code', 'like', "%{$q}%");
+        });
+    }
+
+    // 📄 Pagination
+    $perPage = (int) $request->get('per_page', 15);
+    return OrderResource::collection($query->paginate($perPage));
+}
 
     /**
      * Show single order
@@ -66,6 +75,8 @@ class OrderController extends Controller
     {
         $order = Order::with(['items', 'invoices.payments'])->findOrFail($id);
         $user = Auth::user();
+       logger(Auth::user());
+
 
         if ($user && method_exists($user, 'hasRole') && $user->hasRole('employee')) {
             // Employee cannot access unassigned or others' orders
@@ -235,13 +246,13 @@ class OrderController extends Controller
     public function addItem(OrderItemRequest $request, $orderId)
     {
         $order = Order::with('items')->findOrFail($orderId);
-        
+
         $item = $order->items()->create(array_merge($request->validated(), [
             'added_by' => Auth::id(),
         ]));
 
         $this->recalculateOrder($order);
-        
+
         return new OrderItemResource($item);
     }
 
@@ -268,7 +279,7 @@ class OrderController extends Controller
         $order->items()->findOrFail($itemId)->delete();
 
         $this->recalculateOrder($order);
-        
+
         return response()->json(['message' => 'Item deleted']);
     }
 
@@ -278,7 +289,7 @@ class OrderController extends Controller
     protected function recalculateOrder(Order $order)
     {
         $order->load('items', 'invoices.payments');
-        
+
         // Recalculate order totals from items
         $order->total = $order->items->sum('total_price');
         $order->vat_amount = round(($order->vat_percent / 100) * $order->total, 2);
@@ -312,7 +323,7 @@ class OrderController extends Controller
             $paidAmount = (float) $invoice->payments()
                 ->where('status', 'completed')
                 ->sum('amount');
-            
+
             $grandTotal = (float) $invoice->grand_total;
 
             if ($grandTotal > 0) {

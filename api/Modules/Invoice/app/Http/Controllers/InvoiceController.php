@@ -34,6 +34,15 @@ class InvoiceController extends Controller
             $q->where('order_id', $request->order_id);
         }
 
+        // If the authenticated user is an employee, restrict invoices to only
+        // those whose orders are assigned to that employee.
+        $user = Auth::user();
+        if ($user && $user->roles()->where('name', 'employee')->exists()) {
+            $q->whereHas('order', function ($oq) use ($user) {
+                $oq->where('assigned_to', $user->id);
+            });
+        }
+
         return InvoiceResource::collection($q->paginate(25));
     }
 

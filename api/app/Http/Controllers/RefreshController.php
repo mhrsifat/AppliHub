@@ -14,100 +14,110 @@ class RefreshController extends Controller
     // filepath: app/Http/Controllers/RefreshController.php
 
     public function me(Request $request)
-    {
-        // ------------------------
-        // 1) Check Authorization header (Bearer token)
-        // ------------------------
-        $authHeader = $request->header('Authorization');
-        if ($authHeader && Str::startsWith($authHeader, 'Bearer ')) {
-            $token = Str::substr($authHeader, 7);
-            $pat = PersonalAccessToken::findToken($token);
-            if ($pat && $pat->tokenable) {
-                return response()->json(['user' => $pat->tokenable]);
-            }
-        }
+{
+    // ------------------------
+    // 1) Check Authorization header (Bearer token)
+    // ------------------------
+    $authHeader = $request->header('Authorization');
+    if ($authHeader && Str::startsWith($authHeader, 'Bearer ')) {
+        $token = Str::substr($authHeader, 7);
+        $pat = PersonalAccessToken::findToken($token);
 
-        // ------------------------
-        // 2) Check refresh_token cookie
-        // ------------------------
-        $refreshToken = $request->cookie('refresh_token');
-        if (!$refreshToken) {
+        if ($pat && $pat->tokenable) {
+            $entity = $pat->tokenable;
+
+            $responseData = [];
+            if ($entity instanceof \Modules\Employee\Models\Employee) {
+                $responseData['employee'] = $entity;
+            } elseif ($entity instanceof \App\Models\User) {
+                $responseData['admin'] = $entity;
+            } else {
+                return response()->json(['message' => 'Unauthorized'], 401);
+            }
+
+            return response()->json(['user' => $responseData]);
+        }
+    }
+
+    // ------------------------
+    // 2) Check refresh_token cookie
+    // ------------------------
+    $refreshToken = $request->cookie('refresh_token');
+    if (!$refreshToken) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    $hashedToken = hash('sha256', $refreshToken);
+    $refresh = RefreshToken::where('token', $hashedToken)->valid()->first();
+
+    if (!$refresh) {
+        $domain = env('COOKIE_DOMAIN', null);
+        Cookie::queue(Cookie::forget('refresh_token'));
+        if ($domain) {
+            Cookie::queue(cookie('refresh_token', '', -2628000, '/', $domain));
+        }
+        return response()->json(['message' => 'Invalid or expired refresh token'], 401);
+    }
+
+    return DB::transaction(function () use ($refresh, $request) {
+        $userEntity = $refresh->user;
+
+        $accessToken = $userEntity->createToken('auth_token')->plainTextToken;
+        $newRefreshToken = Str::random(60);
+        $newHashed = hash('sha256', $newRefreshToken);
+
+        RefreshToken::create([
+            'user_id' => $userEntity->id,
+            'token' => $newHashed,
+            'device_name' => $request->userAgent() ?? 'unknown',
+            'expires_at' => now()->addDays(30),
+        ]);
+        $refresh->delete();
+
+        $responseData = [];
+        if ($userEntity instanceof \Modules\Employee\Models\Employee) {
+            $responseData['employee'] = $userEntity;
+        } elseif ($userEntity instanceof \App\Models\User) {
+            $responseData['admin'] = $userEntity;
+        } else {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        $hashedToken = hash('sha256', $refreshToken);
-        $refresh = RefreshToken::where('token', $hashedToken)->valid()->first();
+        $usePartitioned = filter_var(env('PARTITIONED_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
+        $maxAge = 60 * 60 * 24 * 30;
+        $cookieValue = rawurlencode($newRefreshToken);
 
-        if (!$refresh) {
-            // Invalid or expired refresh token → clear cookie
-            $domain = env('COOKIE_DOMAIN', null);
-            Cookie::queue(Cookie::forget('refresh_token'));
-            if ($domain) {
-                Cookie::queue(cookie('refresh_token', '', -2628000, '/', $domain));
-            }
-            return response()->json(['message' => 'Invalid or expired refresh token'], 401);
-        }
+        if ($usePartitioned) {
+            $secure = request()->isSecure() || app()->environment('production');
+            $forceSecure = filter_var(env('FORCE_SECURE_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
+            if ($forceSecure) $secure = true;
+            $secure = true;
 
-        return DB::transaction(function () use ($refresh, $request) {
-            $user = $refresh->user;
+            $securePart = $secure ? 'Secure; ' : '';
 
-            // Create new tokens
-            $accessToken = $user->createToken('auth_token')->plainTextToken;
-            $newRefreshToken = Str::random(60);
-            $newHashed = hash('sha256', $newRefreshToken);
+            $cookieHeader = sprintf(
+                'refresh_token=%s; Path=/; Max-Age=%d; HttpOnly; %sSameSite=None; Partitioned',
+                $cookieValue,
+                $maxAge,
+                $securePart
+            );
 
-            // Store and delete
-            RefreshToken::create([
-                'user_id' => $user->id,
-                'token' => $newHashed,
-                'device_name' => $request->userAgent() ?? 'unknown',
-                'expires_at' => now()->addDays(30),
-            ]);
-            $refresh->delete();
-
-            // ------------------------
-            // Handle Partitioned or Standard cookie
-            // ------------------------
-            $usePartitioned = filter_var(env('PARTITIONED_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
-            $maxAge = 60 * 60 * 24 * 30;
-            $cookieValue = rawurlencode($newRefreshToken);
-
-            $responseData = [
+            return response()->json([
                 'access_token' => $accessToken,
                 'token_type' => 'Bearer',
-                'user' => $user,
-            ];
+                'user' => $responseData,
+            ])->header('Set-Cookie', $cookieHeader);
+        }
 
-            if ($usePartitioned) {
-                // Chrome 118+ partitioned cookie
-                $secure = request()->isSecure() || app()->environment('production');
-                $forceSecure = filter_var(env('FORCE_SECURE_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
-                if ($forceSecure) $secure = true;
-                // SameSite=None requires Secure
-                $secure = true;
+        $cookie = $this->cookieForRefresh($newRefreshToken, true);
 
-                $securePart = $secure ? 'Secure; ' : '';
-
-                $cookieHeader = sprintf(
-                    'refresh_token=%s; Path=/; Max-Age=%d; HttpOnly; %sSameSite=None; Partitioned',
-                    $cookieValue,
-                    $maxAge,
-                    $securePart
-                );
-
-                return response()
-                    ->json($responseData)
-                    ->header('Set-Cookie', $cookieHeader);
-            }
-
-            // Fallback: domain-based cookie (legacy browsers)
-            $cookie = $this->cookieForRefresh($newRefreshToken, true);
-            return response()
-                ->json($responseData)
-                ->withCookie($cookie);
-        });
-    }
-
+        return response()->json([
+            'access_token' => $accessToken,
+            'token_type' => 'Bearer',
+            'user' => $responseData,
+        ])->withCookie($cookie);
+    });
+}
 
     protected function cookieForRefresh(string $plainToken, bool $remember): \Symfony\Component\HttpFoundation\Cookie
     {

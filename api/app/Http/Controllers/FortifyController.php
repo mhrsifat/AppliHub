@@ -78,24 +78,24 @@ class FortifyController extends Controller
     // ----------------------------
     // Helper: create refresh token
     // ----------------------------
-    protected function createRefreshToken(User $user, ?string $deviceName): string
-    {
-        $plainToken = Str::random(60);
+    protected function createRefreshToken($user, ?string $deviceName): string
+{
+    $plainToken = Str::random(60);
 
-        // Remove previous token for the same device (best-effort)
-        RefreshToken::where('user_id', $user->id)
-            ->where('device_name', $deviceName ?? 'unknown')
-            ->delete();
+    RefreshToken::where('user_id', $user->id)
+        ->where('device_name', $deviceName ?? 'unknown')
+        ->delete();
 
-        RefreshToken::create([
-            'user_id' => $user->id,
-            'token' => hash('sha256', $plainToken),
-            'device_name' => $deviceName ?? 'unknown',
-            'expires_at' => now()->addDays(30),
-        ]);
+    RefreshToken::create([
+        'user_id' => $user->id,
+        'token' => hash('sha256', $plainToken),
+        'device_name' => $deviceName ?? 'unknown',
+        'expires_at' => now()->addDays(30),
+    ]);
 
-        return $plainToken;
-    }
+    return $plainToken;
+}
+
 
     // ----------------------------
     // Register
@@ -137,46 +137,46 @@ class FortifyController extends Controller
     // ----------------------------
 
     public function login(Request $request)
-    {
-        $data = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-            'remember' => 'sometimes|boolean',
-        ]);
+{
+    $data = $request->validate([
+        'email' => 'required|email',
+        'password' => 'required|string',
+        'remember' => 'sometimes|boolean',
+    ]);
 
-        $remember = $request->boolean('remember', false);
+    $remember = $request->boolean('remember', false);
 
-        $user = User::where('email', $data['email'])->first();
+    // 1️⃣ Try employee first
+    $employee = \Modules\Employee\Models\Employee::where('email', $data['email'])->first();
+    if ($employee && \Illuminate\Support\Facades\Hash::check($data['password'], $employee->password)) {
+        $accessToken = $employee->createToken('employee_token')->plainTextToken;
+        $refreshToken = $this->createRefreshToken($employee, $request->userAgent());
 
-        if (!$user || !Hash::check($data['password'], $user->password)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
-        }
-
-        $accessToken = $user->createToken('auth_token')->plainTextToken;
-        $refreshToken = $this->createRefreshToken($user, $request->userAgent());
-
-        // Get all roles
-        $roles = $user->getRoleNames(); // ["user"], ["admin"], ["employee"], etc.
-
-        // Build response dynamically
-        $responseData = [
+        return response()->json([
             'message' => 'Login successful',
             'access_token' => $accessToken,
             'token_type' => 'Bearer',
-        ];
-
-        // Assign role based key for frontend hook
-        if ($roles->contains('admin')) {
-            $responseData['admin'] = $user;
-        } elseif ($roles->contains('employee')) {
-            $responseData['employee'] = $user;
-        } elseif ($roles->contains('user')) {
-            $responseData['user'] = $user;
-        }
-
-        return response()->json($responseData)
-            ->withCookie($this->cookieForRefresh($refreshToken, $remember));
+            'employee' => $employee,
+        ])->withCookie($this->cookieForRefresh($refreshToken, $remember));
     }
+
+    // 2️⃣ Try admin (users table)
+    $user = \App\Models\User::where('email', $data['email'])->first();
+    if ($user && \Illuminate\Support\Facades\Hash::check($data['password'], $user->password)) {
+        $accessToken = $user->createToken('admin_token')->plainTextToken;
+        $refreshToken = $this->createRefreshToken($user, $request->userAgent());
+
+        return response()->json([
+            'message' => 'Login successful',
+            'access_token' => $accessToken,
+            'token_type' => 'Bearer',
+            'admin' => $user,
+        ])->withCookie($this->cookieForRefresh($refreshToken, $remember));
+    }
+
+    // 3️⃣ Not found anywhere
+    return response()->json(['message' => 'Invalid credentials'], 401);
+}
 
     // ----------------------------
     // Logout current device
@@ -279,48 +279,49 @@ class FortifyController extends Controller
     // ----------------------------
     // Refresh token (rotation)
     // ----------------------------
+   
     public function refreshToken(Request $request)
-    {
-        $plain = $request->cookie('refresh_token');
+{
+    $plain = $request->cookie('refresh_token');
 
-        if (!$plain) {
-            return response()->json(['message' => 'Refresh token required'], 401);
-        }
-
-        $hashed = hash('sha256', $plain);
-
-        $refresh = RefreshToken::where('token', $hashed)
-            ->valid()
-            ->first();
-
-        if (!$refresh || !hash_equals($refresh->token, $hashed)) {
-            Cookie::queue(Cookie::forget('refresh_token'));
-            return response()->json(['message' => 'Invalid or expired refresh token'], 401);
-        }
-
-        $user = $refresh->user;
-
-        // Rotate refresh token
-        $refresh->delete();
-        $accessToken = $user->createToken('auth_token')->plainTextToken;
-        $newRefreshToken = $this->createRefreshToken($user, $request->userAgent());
-
-        $roles = $user->getRoleNames();
-        $responseData = [
-            'access_token' => $accessToken,
-            'token_type' => 'Bearer',
-        ];
-        if ($roles->contains('admin')) {
-            $responseData['admin'] = $user;
-        } elseif ($roles->contains('employee')) {
-            $responseData['employee'] = $user;
-        } elseif ($roles->contains('user')) {
-            $responseData['user'] = $user;
-        }
-
-        return response()->json($responseData)
-            ->withCookie($this->cookieForRefresh($newRefreshToken, true));
+    if (!$plain) {
+        return response()->json(['message' => 'Refresh token required'], 401);
     }
+
+    $hashed = hash('sha256', $plain);
+
+    $refresh = RefreshToken::where('token', $hashed)
+        ->valid()
+        ->first();
+
+    if (!$refresh || !hash_equals($refresh->token, $hashed)) {
+        Cookie::queue(Cookie::forget('refresh_token'));
+        return response()->json(['message' => 'Invalid or expired refresh token'], 401);
+    }
+
+    $entity = $refresh->user; // could be employee or admin
+
+    // Rotate refresh token
+    $refresh->delete();
+    $accessToken = $entity->createToken('auth_token')->plainTextToken;
+    $newRefreshToken = $this->createRefreshToken($entity, $request->userAgent());
+
+    // Distinguish by table
+    $responseData = [
+        'access_token' => $accessToken,
+        'token_type' => 'Bearer',
+    ];
+
+    if ($entity instanceof \Modules\Employee\Models\Employee) {
+        $responseData['employee'] = $entity;
+    } elseif ($entity instanceof \App\Models\User) {
+        $responseData['admin'] = $entity;
+    }
+
+    return response()->json($responseData)
+        ->withCookie($this->cookieForRefresh($newRefreshToken, true));
+}
+
 
     // ----------------------------
     // Forgot password
