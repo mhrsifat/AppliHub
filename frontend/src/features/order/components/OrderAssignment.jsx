@@ -7,7 +7,7 @@
  * Designed to be used inside a Dialog (like in OrderList.jsx).
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -21,33 +21,31 @@ import {
   CircularProgress,
   Divider,
   Stack,
-} from '@mui/material';
-import { UserIcon } from '@heroicons/react/24/outline';
-import useEmployees from '@/features/employee/hooks/useEmployees';
-import useOrders from '../hooks/useOrders';
+} from "@mui/material";
+import { UserIcon } from "@heroicons/react/24/outline";
+import useEmployees from "@/features/employee/hooks/useEmployees";
+import useOrders from "../hooks/useOrders";
+import { Select, MenuItem, InputLabel, FormControl, Chip } from "@mui/material";
 
 export default function OrderAssignment({ order, onClose }) {
   const { assign, unassign } = useOrders();
-  const {
-    list: employees,
-    loading,
-    onSearch,
-    load,
-  } = useEmployees(1, 10);
+  const { list: employees, loading, onSearch, load } = useEmployees(1, 50);
 
   const [selected, setSelected] = useState(order?.assigned_to ?? null);
   const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
 
   useEffect(() => {
-    load(1, '');
-  }, [load]);
+    load(1, "", locationFilter ? { location: locationFilter } : {});
+  }, [load, locationFilter]);
 
   const handleAssign = async () => {
     if (!selected) return;
     setSaving(true);
     try {
-      await assign({ id: order.id, employee_id: selected });
+      // useOrders.assign expects (orderId, employeeId)
+      await assign(order.id, selected);
       onClose?.();
     } finally {
       setSaving(false);
@@ -58,27 +56,40 @@ export default function OrderAssignment({ order, onClose }) {
     setSaving(true);
     try {
       await unassign(order.id);
-      onClose?.();
+      onClose?.(); 
     } finally {
       setSaving(false);
     }
   };
 
+  // derive unique locations from the employee list for the filter dropdown
+  const locations = useMemo(() => {
+    const set = new Set();
+    (employees || []).forEach((e) => {
+      if (e.location) set.add(e.location);
+    });
+    return Array.from(set).sort();
+  }, [employees]);
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return employees;
-    return employees.filter((e) =>
-      e.name?.toLowerCase().includes(search.toLowerCase()) ||
-      e.email?.toLowerCase().includes(search.toLowerCase()) ||
-      e.phone?.toLowerCase().includes(search.toLowerCase())
-    );
+    let base = employees || [];
+    if (search.trim()) {
+      base = base.filter(
+        (e) =>
+          (e.name || "").toLowerCase().includes(search.toLowerCase()) ||
+          (e.email || "").toLowerCase().includes(search.toLowerCase()) ||
+          (e.phone || "").toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    return base;
   }, [employees, search]);
 
   return (
     <Box>
       <Typography variant="subtitle1" gutterBottom>
         {order?.assigned_to
-          ? `Currently assigned to: ${order.assigned_to_name ?? 'Unknown'}`
-          : 'This order is not assigned'}
+          ? `Currently assigned to: ${order.assigned_to_name ?? "Unknown"}`
+          : "This order is not assigned"}
       </Typography>
 
       <TextField
@@ -93,9 +104,35 @@ export default function OrderAssignment({ order, onClose }) {
         sx={{ mb: 2 }}
       />
 
-      <Box sx={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
+      <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+        <InputLabel id="loc-label">Filter by location</InputLabel>
+        <Select
+          labelId="loc-label"
+          value={locationFilter}
+          label="Filter by location"
+          onChange={(e) => setLocationFilter(e.target.value)}
+        >
+          <MenuItem value="">All locations</MenuItem>
+          {locations.map((loc) => (
+            <MenuItem key={loc} value={loc}>
+              {loc}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <Box
+        sx={{
+          maxHeight: 300,
+          overflowY: "auto",
+          border: "1px solid #eee",
+          borderRadius: 1,
+        }}
+      >
         {loading ? (
-          <Box p={3} textAlign="center"><CircularProgress size={24} /></Box>
+          <Box p={3} textAlign="center">
+            <CircularProgress size={24} />
+          </Box>
         ) : (
           <List dense disablePadding>
             {filtered.map((e) => (
@@ -113,7 +150,24 @@ export default function OrderAssignment({ order, onClose }) {
 
                   <ListItemText
                     primary={e.name}
-                    secondary={`${e.email ?? ''} ${e.phone ? '• ' + e.phone : ''}`}
+                    secondary={
+                      <>
+                        <Typography
+                          component="span"
+                          variant="body2"
+                          color="textSecondary"
+                        >
+                          {e.email ?? ""} {e.phone ? "• " + e.phone : ""}
+                        </Typography>
+                        {e.location && (
+                          <span
+                            style={{ display: "inline-block", marginLeft: 8 }}
+                          >
+                            <Chip size="small" label={e.location} />
+                          </span>
+                        )}
+                      </>
+                    }
                   />
                 </ListItem>
                 <Divider component="li" />
@@ -139,7 +193,7 @@ export default function OrderAssignment({ order, onClose }) {
             disabled={saving}
             onClick={handleUnassign}
           >
-            {saving ? 'Unassigning...' : 'Unassign'}
+            {saving ? "Unassigning..." : "Unassign"}
           </Button>
         )}
         <Button
@@ -147,7 +201,7 @@ export default function OrderAssignment({ order, onClose }) {
           disabled={!selected || saving}
           onClick={handleAssign}
         >
-          {saving ? 'Assigning...' : 'Assign'}
+          {saving ? "Assigning..." : "Assign"}
         </Button>
       </Stack>
     </Box>
