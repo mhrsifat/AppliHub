@@ -21,16 +21,36 @@ class FortifyController extends Controller
     protected function cookieForRefresh(string $plainToken, bool $remember): \Symfony\Component\HttpFoundation\Cookie
     {
         $minutes = $remember ? 60 * 24 * 30 : 0;
+        // Optionally support partitioned cookies (Chromium experimental).
+        // When PARTITIONED_COOKIES=true we must NOT send a Domain attribute and
+        // must include the Partitioned attribute. Browsers require SameSite=None
+        // and Secure for Partitioned cookies.
+        $usePartitioned = filter_var(env('PARTITIONED_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
 
-        // Allow configuring the cookie domain via .env (e.g. ".mhrsifat.xyz")
-        $domain = env('COOKIE_DOMAIN', null);
+        $sameSite = 'None';
 
         // Secure when running over HTTPS or in production
         $secure = request()->isSecure() || app()->environment('production');
 
-        // For cross-site requests we must use SameSite=None so the browser will
-        // include the cookie when the frontend is on a different origin.
-        $sameSite = 'None';
+        if ($usePartitioned) {
+            // Return a Symfony cookie WITHOUT a Domain so it can be marked Partitioned.
+            // We'll craft a raw header for Partitioned in places that need it.
+            return cookie(
+                'refresh_token',
+                $plainToken,
+                $minutes,
+                '/',
+                null,   // no domain for partitioned
+                $secure,
+                true,   // HttpOnly
+                false,
+                $sameSite
+            );
+        }
+
+        // Default behavior: domain-based SameSite=None cookie. Put the top-level
+        // domain for cookies into .env: COOKIE_DOMAIN=.example.com
+        $domain = env('COOKIE_DOMAIN', null);
 
         return cookie(
             'refresh_token',
@@ -169,7 +189,12 @@ class FortifyController extends Controller
                 ->delete();
         }
 
+        // Clear both host (partitioned) and domain cookies
         Cookie::queue(Cookie::forget('refresh_token'));
+        $domain = env('COOKIE_DOMAIN', null);
+        if ($domain) {
+            Cookie::queue(cookie('refresh_token', '', -2628000, '/', $domain));
+        }
 
         return response()->json(['message' => 'Logged out']);
     }
@@ -184,7 +209,12 @@ class FortifyController extends Controller
             RefreshToken::where('user_id', $request->user()->id)->delete();
         }
 
+        // Clear both host (partitioned) and domain cookies
         Cookie::queue(Cookie::forget('refresh_token'));
+        $domain = env('COOKIE_DOMAIN', null);
+        if ($domain) {
+            Cookie::queue(cookie('refresh_token', '', -2628000, '/', $domain));
+        }
 
         return response()->json(['message' => 'Logged out from all devices']);
     }

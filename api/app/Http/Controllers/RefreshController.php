@@ -61,29 +61,46 @@ class RefreshController extends Controller
                     // ------------------------
                     // Prepare secure cookie using helper to keep behavior consistent
                     // ------------------------
-                    $domain = env('COOKIE_DOMAIN', '.mhrsifat.xyz'); // or null if you want host-only
-                    $maxAge = 60 * 60 * 24 * 30; // seconds
-                    $cookieValue = rawurlencode($newRefreshToken);
+                    $usePartitioned = filter_var(env('PARTITIONED_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
 
-                    // Partitioned cookie (Chromium); SameSite=None and Secure required
-                    $cookieHeader = sprintf(
-                        'refresh_token=%s; Path=/; Domain=%s; Max-Age=%d; HttpOnly; Secure; SameSite=None; Partitioned',
-                        $cookieValue,
-                        $domain,
-                        $maxAge
-                    );
+                    if ($usePartitioned) {
+                        // For Partitioned cookies we must NOT send Domain; include Partitioned attr.
+                        $maxAge = 60 * 60 * 24 * 30; // seconds
+                        $cookieValue = rawurlencode($newRefreshToken);
 
-                    // return response WITHOUT withCookie()
+                        $cookieHeader = sprintf(
+                            'refresh_token=%s; Path=/; Max-Age=%d; HttpOnly; Secure; SameSite=None; Partitioned',
+                            $cookieValue,
+                            $maxAge
+                        );
+
+                        return response()->json([
+                            'access_token' => $accessToken,
+                            'token_type' => 'Bearer',
+                            'user' => $user,
+                        ])->header('Set-Cookie', $cookieHeader);
+                    }
+
+                    // Default: use cookie helper which respects COOKIE_DOMAIN and SameSite=None
+                    $cookie = $this->cookieForRefresh($newRefreshToken, true);
+
                     return response()->json([
                         'access_token' => $accessToken,
                         'token_type' => 'Bearer',
                         'user' => $user,
-                    ])->header('Set-Cookie', $cookieHeader);
+                    ])->withCookie($cookie);
                 });
             }
 
             // Invalid or expired refresh token -> clear cookie
+            // Clear both partitioned (host-only) and domain cookies. Cookie::forget
+            // clears the host cookie; some browsers require Path/Domain variations.
             Cookie::queue(Cookie::forget('refresh_token'));
+            // If domain-based cookie was used, also attempt to clear with domain from env
+            $domain = env('COOKIE_DOMAIN', null);
+            if ($domain) {
+                Cookie::queue(cookie('refresh_token', '', -2628000, '/', $domain));
+            }
             return response()->json(['message' => 'Invalid or expired refresh token'], 401);
         }
 
