@@ -65,7 +65,7 @@ class RefreshController extends Controller
                     $maxAge = 60 * 60 * 24 * 30; // seconds
                     $cookieValue = rawurlencode($newRefreshToken);
 
-                    // Build raw Set-Cookie header with Partitioned
+                    // Partitioned cookie (Chromium); SameSite=None and Secure required
                     $cookieHeader = sprintf(
                         'refresh_token=%s; Path=/; Domain=%s; Max-Age=%d; HttpOnly; Secure; SameSite=None; Partitioned',
                         $cookieValue,
@@ -73,7 +73,7 @@ class RefreshController extends Controller
                         $maxAge
                     );
 
-                    // Return response with the header (do NOT also call withCookie, to avoid duplicate Set-Cookie)
+                    // return response WITHOUT withCookie()
                     return response()->json([
                         'access_token' => $accessToken,
                         'token_type' => 'Bearer',
