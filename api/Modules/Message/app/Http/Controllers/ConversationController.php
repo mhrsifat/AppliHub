@@ -29,6 +29,8 @@ class ConversationController extends Controller
     public function store(StoreConversationRequest $request)
     {
         $data = $request->validated();
+        
+        $data['name'] = $data['name'] ?? "Anonimus User";
 
         $conversation = Conversation::create([
             'uuid' => (string) Str::uuid(),

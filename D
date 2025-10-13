@@ -334,19 +334,33 @@ export const personalInfo = {
 };
 
 
+---
 
-⚡ Accessibility + Speed Notes
+🎬 Prompt Title: Depth to Infinity — 3D Cinematic Portfolio
 
-Keyboard shortcuts:
+Core Identity:
 
-Tab for navigation, Enter to open modals, ← → for slides, Esc to close.
+> A GPU-optimized, cinematic, and interactive 3D portfolio that flows from ocean to space — projects as living planets, blog as glowing stars, and contact as an orbiting signal composer. Built for modern browsers, optimized for performance, and responsive across all devices.
 
-Lazy load images/videos.
 
-GPU-accelerated animations via Framer Motion + Three.js.
 
-ARIA labels for all interactive elements.
 
-Preload personal info and theme before render.
+---
 
-Static JSON imports ensure minimal API requests.
+⚙️ Tech Stack & Setup
+
+Frontend: React + Three.js (via React Three Fiber) + Framer Motion + Tailwind CSS + MUI
+
+Backend: Laravel API (for blog, contact, and admin)
+
+Renderer: WebGL2 with post-processing (bloom, godrays, chromatic aberration)
+
+Performance: GPU instancing, lazy loading, LOD models, shader compression, async texture load
+
+Accessibility: ARIA labels, reduced motion toggle, keyboard nav
+
+Modes: Light/Dark palette (user-defined)
+
+Audio: Toggle top-right corner; subtle ambient + reactive sounds
+
+

@@ -1,8 +1,385 @@
-I want to add payment gateway.
+---
+
+🎨 “Depth to Infinity” (Full 3D Portfolio)
+
+Title: Depth to Infinity
+Core Idea: A cinematic, GPU-optimized 3D portfolio that flows from an ocean of light into infinite space. Calm yet alive, blending bioluminescence, cosmic motion, and smooth interactivity.
+Tone: Mystical, introspective, futuristic.
+Camera Motion: Seamless, slow cinematic transitions — continuous flow between all scenes without hard cuts.
 
 
-I will send a invoice in email also invoice list again order in client page. On invoice there will be a link pay now , clicking that will pop up select sslcommerz, bkash, nagad etc. bkash, nagad will be dissable to click. 
+---
 
-https://github.com/sslcommerz/SSLCommerz-Laravel.git
+🌊 1. Ocean Scene (Hero Section)
 
-I already setup sslcommerz. Now how to handle payment.
+Environment:
+A living bioluminescent ocean at twilight — deep, reflective, alive.
+Soft rippling waves shimmer with blue-green glow.
+Depth fog rolls over the surface; caustic lights ripple underneath.
+
+Shader & Lighting:
+
+Normal-map-driven shader for wave displacement.
+
+Radial distortion when mouse/touch drag occurs.
+
+Audio-reactive brightness — glow pulses to amplitude.
+
+Caustic overlay texture projected from below.
+
+Depth gradient: turquoise → teal → navy.
+
+Dynamic reflections on cards and floating icons.
+
+
+Elements:
+
+Floating skill icons: placed randomly each load, glowing asynchronously.
+
+Hover → skill name appears in soft neon text.
+
+Education cards: semi-transparent, 3D tilt hover, glowing borders, responsive lighting.
+
+Main CTA button: floats gently on wave surface; shadow and glow ripple in sync.
+
+
+Camera / Motion:
+
+Subtle free-float camera drift.
+
+Refraction and reflection move with motion parallax.
+
+Water reacts dynamically to pointer input.
+
+
+Audio Behavior:
+
+Low ambient ocean hum.
+
+Glow pulse follows frequency spectrum.
+
+
+
+---
+
+🚀 2. Transition (Ocean → Space)
+
+Concept:
+The ocean surface dissolves upward into nebula clouds — a shader morph that feels infinite and alive.
+
+Visuals:
+
+Noise-based GPU morph: ocean mesh → starfield mesh.
+
+Particle trails rise upward like evaporating mist.
+
+Scroll input slightly influences morph rate.
+
+Dynamic light flashes simulate cosmic lightning.
+
+
+Animation Sequence:
+
+1. Water ripples stretch upward.
+
+
+2. Glow intensifies → peaks fade into clouds.
+
+
+3. Stars begin forming mid-air.
+
+
+4. Scene flips into orbit mode; ocean disappears fully.
+
+
+
+Resulting Scene:
+
+Layered stars of varied scale, brightness, and parallax speed.
+
+Wisps of nebula fog behind them.
+
+Project planets slowly orbit into frame as transition completes.
+
+
+
+---
+
+🌌 3. Projects (Space Scene)
+
+Concept:
+Each project is an interactive planet, surrounded by atmospheric glow, rotating randomly within a nebula skybox.
+
+Scene Design:
+
+Multi-layer parallax starfield (GPU instanced).
+
+Nebula volumetric fog — faint purple, cyan, indigo tones.
+
+Planets hover at various distances with lens flare halos.
+
+
+Interactions:
+
+Hover → planet rotation + glow halo intensifies.
+
+Click → cinematic zoom-in → open project card.
+
+Filter Chips: 3D floating chips with tilt animation, React/Laravel connected.
+
+
+Project Card:
+
+3D GLTF model viewer embedded.
+
+Case study section, image/video carousel, lazy-loaded models.
+
+Back button returns camera to planet orbit view.
+
+
+Camera Behavior:
+
+Smooth orbital drift.
+
+Subtle parallax on mouse move.
+
+Auto-focus when a planet is selected.
+
+
+
+---
+
+🌠 4. Blog (3D Space Blog Zone)
+
+Concept:
+Floating blog cards orbit in low gravity. Each emits a unique hue and mild glow. sometimes A sudden streak of lightning cracks across the scene — bright, electric, and gone in an instant.
+
+Dynamic Layout:
+
+Responsive grid arrangement:
+
+Desktop: 5–6 cards
+
+Tablet: 3–4
+
+Mobile: 2–3
+
+
+Cards rearrange smoothly on resize.
+
+Loading delay → “blackhole” vortex animation per card.
+
+
+Card Design:
+
+Title, feature image, category label.
+
+Upvote / downvote icons.
+
+Comment + reply counts.
+
+Read count indicator.
+
+Subtle bloom edges on hover.
+
+
+User Interactions:
+
+Hover → glow increases and rotation slows.
+
+“See All Blog” → zoom-out transition; cards reflow into grid.
+
+Stars twinkle asynchronously in background.
+
+
+Voting & Comments Logic:
+
+Comment/reply button requires 7-second hold.
+
+On release → “comment sent” confirmation toast.
+
+One-time vote rule:
+
+Upvote → both buttons vanish.
+
+Downvote → only downvote vanishes; upvote begins random color flicker + shaking loop.
+
+
+
+Testimonial Subsection:
+
+Random position on each load.
+
+Background: deep black starfield with multiple subtle blackholes.
+
+Card contents: image, name, profession, testimonial, star rating.
+
+Border colors vary; gentle pulse animation.
+
+
+
+---
+
+✉️ 5. Contact Scene (Message Orbit Composer)
+
+Concept:
+Messages orbit around the user like cosmic particles, representing interstellar communication.
+
+Visual & Behavior:
+
+Floating message spheres orbit cursor path.
+
+Typing intensity causes orbits to pulse faster.
+
+Sometimes A sudden streak of lightning cracks across the scene — bright, electric, and gone in an instant.
+
+
+
+“Send Signal” button = press & hold 7 seconds.
+
+During hold → circular glow expands, camera shake, vertical color pulse (bottom → top).
+
+On release → ripple effect; message sent outward in glowing pulse.
+
+
+Audio & Feedback:
+
+Space tone rises during hold.
+
+Subtle shockwave sound after send.
+
+
+
+---
+
+🔊 6. Micro Interactions & Audio
+
+System-Wide Behavior:
+
+Hover & click sounds for all icons and objects.
+
+Audio amplitude directly affects glow and motion intensity.
+
+Particle trails shimmer when user moves or types.
+
+Reduced Audio Mode toggle to disable sound and glow amplification.
+
+
+
+---
+
+♿ 7. Accessibility & Performance
+
+Accessibility:
+
+Keyboard navigation and visible focus outlines.
+
+ARIA roles for all interactive 3D components.
+
+“Reduce Motion” → disables parallax and replaces with soft fades.
+
+
+Performance Techniques:
+
+GPU instancing for large particle counts (stars, icons).
+
+Level of Detail (LOD) + lazy loading for heavy 3D models.
+
+Dynamic FPS scaling when on low battery or thermal throttle.
+
+Mobile fallback → static parallax backgrounds with 2D projection layers.
+
+
+
+---
+
+🌈 8. Lighting, Glow & Mood
+
+Dynamic Environment:
+
+Day/night color shifts across the portfolio — over time.
+
+Stars twinkle asynchronously, each at random intervals.
+
+Nebula hue cycle: blue → purple → cyan → teal → loop.
+
+Glow flicker follows asynchronous sine wave functions for realism.
+
+
+Easter Egg Interaction:
+
+Clicking empty space has a 20% chance to trigger the event.
+
+A small blackhole forms at a random point in the scene.
+
+It pulls nearby particles inward, bending light around its core.
+
+At its center, a floating quote appears — calm, introspective, glowing faintly.
+
+The blackhole shimmers and pulses for about 5 seconds.
+
+Then it collapses silently, dispersing into tiny sparks of light.
+
+Quotes are fetched from a object of reflective lines.
+
+Animation stays subtle and fluid, no sound, just motion and glow.
+
+One blackhole at a time — a quiet, rare moment in the scene.
+
+---
+
+🧠 9. Developer Notes
+
+Core Stack: React + Three.js (R3F) + GLSL + Framer Motion + Tailwind
+Post-processing: Bloom, Chromatic Aberration, Color Correction.
+Physics: cannon-es for floating behaviors.
+Cameras: adaptive aspect scaling via resize watcher.
+Naming Convention: Scene_*, Effect_*, Entity_*.
+
+---
+
+💫 10. Creative Vibe
+
+Theme: “Infinity between depth and void.”
+Atmosphere: Calm, cosmic, and meditative — yet responsive and interactive.
+Experience Flow: No reloads. No cuts. One continuous cinematic experience from ocean floor to outer cosmos.
+Style Tags:
+#3D #Cinematic #ShaderArt #Bioluminescent #Nebula #ReactThreeFiber #Portfolio #Interactive #Depth #Glow #Cosmos #SpaceJourney #WebGL
+
+
+---
+
+// data.js
+example data structure:
+
+export const settings = {  }
+
+export const site = {
+  name: "Depth to Infinity",
+  tagline: "From oceanic waves to infinite depth",
+  author: {
+    name: "Md. Hafizur Rahman Sifat",
+    role: "Junior Web Developer",
+    location: "Dhaka",
+    email: "mhrsifat@gmail.com",
+  },
+};
+
+export const projects = [
+  {
+    id: "p-001",
+    title: "Project One",
+    summary: "3D interactive UI demo",
+    tags: ["react", "threejs"],
+    thumbnail: "/assets/projects/p1-thumb.jpg",
+    year: 2025,
+    link: {},
+    meta:{},
+  },
+  // ...
+];
+
+export const blogSeed = [
+  { id: "b1", title: "Seed Post 1", excerpt: "...", details: "",  reads: 102, upvote: 12, downvote: 1 , comments: {}, meta:{} },
+];
+

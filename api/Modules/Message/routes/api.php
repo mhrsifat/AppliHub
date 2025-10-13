@@ -5,7 +5,7 @@ use Modules\Message\Http\Controllers\ConversationController;
 use Modules\Message\Http\Controllers\MessageController;
 use Modules\Message\Http\Controllers\AttachmentController;
 
-Route::prefix('api/message')->group(function () {
+Route::prefix('message')->group(function () {
     // Public - client
     Route::post('/conversations', [ConversationController::class, 'store']); // create conversation + first message
     Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']); // list messages (public)
