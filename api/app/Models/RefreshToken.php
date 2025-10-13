@@ -3,35 +3,39 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 
 class RefreshToken extends Model
 {
-    use HasFactory;
-
-    protected $fillable = ['user_id', 'token', 'device_name', 'expires_at', 'revoked_at'];
+    protected $fillable = [
+        'tokenable_id', 'tokenable_type', 'token', 'device_name', 'expires_at', 'revoked_at'
+    ];
 
     protected $casts = [
         'expires_at' => 'datetime',
         'revoked_at' => 'datetime',
     ];
 
-    // ----------------------------
-    // Relationships
-    // ----------------------------
-    public function user(): BelongsTo
+    public $timestamps = true;
+
+    // polymorphic relation (morphTo)
+    public function tokenable()
     {
-        return $this->belongsTo(User::class);
+        return $this->morphTo();
     }
 
-    // ----------------------------
-    // Helpers
-    // ----------------------------
+    // backwards helper if needed
+    public function user()
+    {
+        if ($this->tokenable_type === \App\Models\User::class) {
+            return $this->belongsTo(\App\Models\User::class, 'tokenable_id');
+        }
+        return null;
+    }
+
     public function isExpired(): bool
     {
-        return $this->expires_at->isPast();
+        return $this->expires_at ? $this->expires_at->isPast() : false;
     }
 
     public function isRevoked(): bool
@@ -44,13 +48,10 @@ class RefreshToken extends Model
         $this->update(['revoked_at' => now()]);
     }
 
-    // ----------------------------
-    // Scopes
-    // ----------------------------
-    public function scopeValid($query)
+    public function scopeValid(Builder $query)
     {
-        return $query
-            ->where('expires_at', '>', now())
-            ->whereNull('revoked_at');
+        return $query->where(function ($q) {
+            $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+        })->whereNull('revoked_at');
     }
 }
