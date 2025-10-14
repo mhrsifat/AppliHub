@@ -6,7 +6,7 @@ import orderReducer from "../features/order/slices/orderSlice";
 import serviceReducer from "../features/service/slices/serviceSlice";
 import blogsReducer from "../features/blog/slices/blogSlice";
 import clientBlogsReducer from "../features/client/slices/clientBlogSlice";
-import dashboardReducer from "../features/dashboard/slices/dashboardReducer";
+import dashboardReducer from "../features/dashboard/dashboardReducer";
 
 // Create store instance
 export const store = configureStore({
