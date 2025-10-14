@@ -558,17 +558,19 @@ public function unassign(Request $request, $id)
     }
     
     
-    public function getFullOrderDetails(Request $request, $orderId)
+   
+   // Filepath: Modules/Order/Http/Controllers/OrderController.php
+
+public function getFullOrderDetails(Request $request, $orderId)
 {
+    // Load items and invoices.items only. We'll query payments/refunds explicitly to avoid stale collection issues.
     $order = Order::with([
         'items',
         'assignedTo:id,first_name,last_name,email,phone,avatar,location,full_address,status',
         'invoices.items',
-        'invoices.payments',
-        'invoices.refunds',
     ])->findOrFail($orderId);
 
-    // Build assigned employee info
+    // Assigned employee payload
     $assignedEmployee = null;
     if ($order->assignedTo) {
         $assignedEmployee = [
@@ -583,43 +585,41 @@ public function unassign(Request $request, $id)
         ];
     }
 
-    // Prepare invoice items index (by service_id if present, otherwise by normalized service_name).
-    $invoiceItemsIndex = collect(); // key => ['service_name'=>..., 'quantity'=>float, 'unit_price'=>float, 'line_total'=>float]
+    // Build invoice-items index (by service_id if present, otherwise normalized name)
+    $invoiceItemsIndex = collect();
     foreach ($order->invoices as $inv) {
         foreach ($inv->items as $iit) {
-            $serviceIdKey = $iit->service_id ? 'id_' . $iit->service_id : null;
-            $nameKey = 'name_' . mb_strtolower(trim((string) $iit->service_name));
+            $serviceKey = $iit->service_id ? 'id_' . $iit->service_id : null;
+            $nameKey = 'name_' . mb_strtolower(trim((string)$iit->service_name));
 
             $entry = [
                 'service_name' => $iit->service_name,
-                'quantity' => (float) $iit->quantity,
-                'unit_price' => (float) $iit->unit_price,
-                'line_total' => (float) $iit->line_total,
+                'quantity' => (float)$iit->quantity,
+                'unit_price' => (float)$iit->unit_price,
+                'line_total' => (float)($iit->line_total ?? round(((float)$iit->unit_price * (float)$iit->quantity), 2)),
             ];
 
-            // merge into index (sum quantities & line_totals if same key repeats)
-            if ($serviceIdKey) {
-                if ($invoiceItemsIndex->has($serviceIdKey)) {
-                    $existing = $invoiceItemsIndex->get($serviceIdKey);
-                    $invoiceItemsIndex->put($serviceIdKey, [
-                        'service_name' => $existing['service_name'],
-                        'quantity' => $existing['quantity'] + $entry['quantity'],
-                        'unit_price' => $entry['unit_price'] ?: $existing['unit_price'],
-                        'line_total' => $existing['line_total'] + $entry['line_total'],
+            if ($serviceKey) {
+                if ($invoiceItemsIndex->has($serviceKey)) {
+                    $ex = $invoiceItemsIndex->get($serviceKey);
+                    $invoiceItemsIndex->put($serviceKey, [
+                        'service_name' => $ex['service_name'],
+                        'quantity' => $ex['quantity'] + $entry['quantity'],
+                        'unit_price' => $entry['unit_price'] ?: $ex['unit_price'],
+                        'line_total' => $ex['line_total'] + $entry['line_total'],
                     ]);
                 } else {
-                    $invoiceItemsIndex->put($serviceIdKey, $entry);
+                    $invoiceItemsIndex->put($serviceKey, $entry);
                 }
             }
 
-            // always index by name as fallback
             if ($invoiceItemsIndex->has($nameKey)) {
-                $existing = $invoiceItemsIndex->get($nameKey);
+                $ex = $invoiceItemsIndex->get($nameKey);
                 $invoiceItemsIndex->put($nameKey, [
-                    'service_name' => $existing['service_name'],
-                    'quantity' => $existing['quantity'] + $entry['quantity'],
-                    'unit_price' => $entry['unit_price'] ?: $existing['unit_price'],
-                    'line_total' => $existing['line_total'] + $entry['line_total'],
+                    'service_name' => $ex['service_name'],
+                    'quantity' => $ex['quantity'] + $entry['quantity'],
+                    'unit_price' => $entry['unit_price'] ?: $ex['unit_price'],
+                    'line_total' => $ex['line_total'] + $entry['line_total'],
                 ]);
             } else {
                 $invoiceItemsIndex->put($nameKey, $entry);
@@ -627,7 +627,7 @@ public function unassign(Request $request, $id)
         }
     }
 
-    // Build invoices array and invoice summary
+    // Build invoices + compute invoice summary (use DB queries for payments/refunds to ensure correctness)
     $invoiceSummary = [
         'total_invoice_amount' => 0.0,
         'total_paid' => 0.0,
@@ -636,38 +636,44 @@ public function unassign(Request $request, $id)
     ];
 
     $invoices = $order->invoices->map(function ($inv) use (&$invoiceSummary) {
-        $paid = $inv->payments->where('status', 'completed')->sum('amount');
-        $refunded = $inv->refunds->sum('amount');
-        $netPaid = max(0, $paid - $refunded);
-        $due = max(0, (float)$inv->grand_total - $netPaid);
+        // Prefer accessor if available (it queries payments), but still safe to query payments table directly
+        // Use payments()->where('status','completed') to get committed payments
+        $paid = (float) $inv->payments()->where('status', 'completed')->sum('amount');
 
-        $invoiceSummary['total_invoice_amount'] += (float)$inv->grand_total;
-        $invoiceSummary['total_paid'] += (float)$paid;
-        $invoiceSummary['total_refunded'] += (float)$refunded;
-        $invoiceSummary['total_due'] += (float)$due;
+        // Refunds: consider only completed refunds (status = 'completed' or relevant status)
+        $refunded = (float) $inv->refunds()->where('status', 'completed')->sum('amount');
+
+        $netPaid = max(0.0, $paid - $refunded);
+        $grandTotal = (float) ($inv->grand_total ?? 0.0);
+        $due = max(0.0, $grandTotal - $netPaid);
+
+        $invoiceSummary['total_invoice_amount'] += $grandTotal;
+        $invoiceSummary['total_paid'] += $paid;
+        $invoiceSummary['total_refunded'] += $refunded;
+        $invoiceSummary['total_due'] += $due;
 
         return [
             'id' => $inv->id,
             'invoice_number' => $inv->invoice_number,
             'status' => $inv->status,
-            'grand_total' => (float) $inv->grand_total,
-            'paid' => (float) $paid,
-            'refunded' => (float) $refunded,
-            'due' => (float) $due,
+            'grand_total' => $grandTotal,
+            'paid' => round($paid, 2),
+            'refunded' => round($refunded, 2),
+            'due' => round($due, 2),
             'items' => $inv->items->map(function ($it) {
                 $computed = round(((float)$it->unit_price * (float)$it->quantity), 2);
                 return [
                     'id' => $it->id,
                     'service_name' => $it->service_name,
-                    'quantity' => (float)$it->quantity,
+                    'quantity' => is_numeric($it->quantity) ? (float)$it->quantity : (float)$it->quantity,
                     'unit_price' => (float)$it->unit_price,
                     'line_total' => (float) ($it->line_total ?? $computed),
                 ];
-            }),
+            })->values(),
         ];
-    });
+    })->values();
 
-    // Build order items output: prefer item's own line_total, else try to use invoice data by service_id/name, else compute unit_price * quantity
+    // Build order items output — prioritize invoice-derived line_total, then item's own line_total, then compute
     $itemsOut = $order->items->map(function ($it) use ($invoiceItemsIndex) {
         $computed = round(((float)$it->unit_price * (float)$it->quantity), 2);
 
@@ -686,9 +692,16 @@ public function unassign(Request $request, $id)
             }
         }
 
-        $lineTotal = null;
         if ($match) {
-            $lineTotal = (float)$match['line_total'];
+            // If invoice index exists, try to compute proportional line_total for this order item:
+            // If invoice aggregated quantity > 0, compute per-unit from invoice index and multiply by this item's quantity.
+            if (!empty($match['quantity']) && (float)$match['quantity'] > 0) {
+                $perUnit = $match['line_total'] / $match['quantity'];
+                $lineTotal = round($perUnit * (float)$it->quantity, 2);
+            } else {
+                // fallback to invoice's unit_price * qty or computed
+                $lineTotal = (float) ($match['unit_price'] ? round((float)$match['unit_price'] * (float)$it->quantity, 2) : $computed);
+            }
         } elseif (!empty($it->line_total) && (float)$it->line_total > 0) {
             $lineTotal = (float)$it->line_total;
         } else {
@@ -704,9 +717,9 @@ public function unassign(Request $request, $id)
             'quantity' => (float) $it->quantity,
             'line_total' => (float) $lineTotal,
         ];
-    });
+    })->values();
 
-    // Recompute order totals from itemsOut to ensure consistency with returned items/invoices
+    // Recompute order totals from itemsOut (so front-end sees consistent totals)
     $calculatedTotal = $itemsOut->sum(function ($it) {
         return (float) ($it['line_total'] ?? 0);
     });
@@ -714,7 +727,7 @@ public function unassign(Request $request, $id)
     $vatAmount = round(($order->vat_percent / 100) * $calculatedTotal, 2);
     $grandTotalCalc = round($calculatedTotal + $vatAmount - (float)$order->coupon_discount, 2);
 
-    // Return payload with same shape as before, but corrected/calculated numbers
+    // Final response: keep same shape but with corrected/calculated numbers
     return response()->json([
         'order' => [
             'id' => $order->id,
@@ -725,7 +738,6 @@ public function unassign(Request $request, $id)
             'customer_address' => $order->customer_address,
             'status' => $order->status,
             'payment_status' => $order->payment_status,
-            // use recalculated totals to avoid zero/mismatch
             'total' => (float) $calculatedTotal,
             'vat_percent' => (float) $order->vat_percent,
             'vat_amount' => (float) $vatAmount,
@@ -737,7 +749,6 @@ public function unassign(Request $request, $id)
         'assigned_employee' => $assignedEmployee,
         'invoices' => $invoices,
         'summary' => [
-            // ensure rounding & consistent keys
             'total_invoice_amount' => round($invoiceSummary['total_invoice_amount'], 2),
             'total_paid' => round($invoiceSummary['total_paid'], 2),
             'total_refunded' => round($invoiceSummary['total_refunded'], 2),
