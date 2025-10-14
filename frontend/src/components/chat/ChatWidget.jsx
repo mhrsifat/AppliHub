@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Fab, Modal, Box, Typography, IconButton } from '@mui/material';
-import 'tailwindcss/tailwind.css';
 
 // Heroicons
 import { ChatBubbleLeftEllipsisIcon, XMarkIcon } from '@heroicons/react/24/outline';
