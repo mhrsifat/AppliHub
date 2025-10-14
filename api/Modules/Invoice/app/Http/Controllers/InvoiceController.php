@@ -511,7 +511,7 @@ class InvoiceController extends Controller
     
     
      
-/** public function createFromOrder(Request $request, $orderId)
+ public function createFromOrder(Request $request, $orderId)
 {
     $order = Order::with(['items'])->findOrFail($orderId);
 
@@ -631,15 +631,9 @@ class InvoiceController extends Controller
             ],
         ], 201);
     });
-} */
+} 
 
-
- /**
-     * Create invoice from order with automatic carryover
-     */
-     // filepath: Modules/Invoice/Http/Controllers/InvoiceController.php
-
-public function createFromOrder(Request $request, $orderId)
+/** public function createFromOrder(Request $request, $orderId)
 {
     $order = Order::with(['items', 'invoices.payments'])->findOrFail($orderId);
 
@@ -743,5 +737,5 @@ public function createFromOrder(Request $request, $orderId)
             ],
         ], 201);
     });
-} 
+} */
 }
