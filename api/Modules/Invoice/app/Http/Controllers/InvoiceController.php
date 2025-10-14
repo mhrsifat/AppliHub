@@ -283,25 +283,31 @@ class InvoiceController extends Controller
     /**
      * Create invoice from order with automatic carryover
      */
+     
+     // filepath: Modules/Invoice/Http/Controllers/InvoiceController.php
 
-/** public function createFromOrder(Request $request, $orderId)
+public function createFromOrder(Request $request, $orderId)
 {
+    // load order items (we will include ALL order items by default)
     $order = Order::with(['items', 'invoices.payments'])->findOrFail($orderId);
 
-    $items = $request->input('items');
-
-    // === CHANGED: default to ALL order items (not only items after last invoice) ===
-    if (!is_array($items) || empty($items)) {
-        // include all order items as invoice line items
+    // If caller provided explicit items, use them (override)
+    $itemsInput = $request->input('items');
+    if (is_array($itemsInput) && !empty($itemsInput)) {
+        $items = $itemsInput;
+    } else {
+        // DEFAULT: include ALL order items in the invoice
         $order->load('items');
-        $items = $order->items->map(fn($it) => [
-            'service_id' => $it->service_id,
-            'service_name' => $it->service_name,
-            'description' => $it->service_description ?? $it->description ?? null,
-            'unit_price' => $it->unit_price,
-            'quantity' => $it->quantity,
-            'meta' => $it->meta ?? null,
-        ])->toArray();
+        $items = $order->items->map(function ($it) {
+            return [
+                'service_id' => $it->service_id,
+                'service_name' => $it->service_name,
+                'description' => $it->service_description ?? $it->description ?? null,
+                'unit_price' => $it->unit_price,
+                'quantity' => $it->quantity,
+                'meta' => $it->meta ?? null,
+            ];
+        })->toArray();
     }
 
     return DB::transaction(function () use ($request, $order, $items) {
@@ -314,10 +320,12 @@ class InvoiceController extends Controller
             'items' => $items,
         ];
 
+        // create invoice (this will compute grand_total based on items)
         $invoice = $this->invoiceService->createFromPayload($payload);
 
-        // use service-level carryover logic
-        $carryoverAmount = $this->invoiceService->calculateCarryoverPayment($order, $invoice->id);
+        // recalc carryover using current order invoices/payments
+        $orderForCarry = Order::with(['invoices.payments'])->find($order->id);
+        $carryoverAmount = $this->invoiceService->calculateCarryoverPayment($orderForCarry, $invoice->id);
 
         if ($carryoverAmount > 0) {
             $applyAmount = min($carryoverAmount, (float) $invoice->grand_total);
@@ -332,33 +340,30 @@ class InvoiceController extends Controller
                 'note' => 'Auto-applied carryover from previous payments',
             ]);
 
+            // refresh invoice totals after applying carryover payment
             $invoice = $this->invoiceService->recalcAndRefresh($invoice);
         }
 
         $this->syncOrderPaymentStatus($invoice);
 
-        // Compute totals for response (clear labels)
+        // response summary
         $totalBill = (float) ($invoice->grand_total ?? 0.0);
-        // sum completed payments on this invoice
         $totalPaid = (float) $invoice->payments()->where('status', 'completed')->sum('amount');
         $totalDue = max(0.0, $totalBill - $totalPaid);
-        // payable: amount customer needs to pay now (same as totalDue)
-        $payable = $totalDue;
 
         return response()->json([
             'invoice' => $invoice->fresh(['items', 'payments', 'order']),
-            'carryover_applied' => $carryoverAmount > 0 ? $applyAmount : 0,
+            'carryover_applied' => $carryoverAmount > 0 ? ($applyAmount ?? 0) : 0,
             'summary' => [
                 'total_bill' => round($totalBill, 2),
                 'total_paid' => round($totalPaid, 2),
                 'total_due' => round($totalDue, 2),
-                'payable' => round($payable, 2),
             ],
         ], 201);
     });
-} */
+}
      
-public function createFromOrder(Request $request, $orderId)
+/** public function createFromOrder(Request $request, $orderId)
 {
     $order = Order::with(['items'])->findOrFail($orderId);
 
@@ -478,7 +483,7 @@ public function createFromOrder(Request $request, $orderId)
             ],
         ], 201);
     });
-}
+} */
 
     /**
      * Create invoice from another invoice (clone)
