@@ -10,7 +10,7 @@ import OrderRoutes from "@/features/order/Routes";
 import InvoiceRoutes from "@/features/invoice/Routes";
 import ServiceRoutes from "@/features/service/Routes";
 
-const Dashboard = lazy(() => import("../pages/employee/Dashboard"));
+const Dashboard = lazy(() => import("@/features/dashboard/DashboardRouter"));
 const Orders = lazy(() => import("../features/order/pages/OrderListPage"));
 const Invoices = lazy(() => import("../features/invoice/pages/InvoiceListPage"));
 const Messages = lazy(() => import("../pages/AdminConversations"));

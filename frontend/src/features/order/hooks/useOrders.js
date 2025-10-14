@@ -1,4 +1,4 @@
-// src/features/order/hooks/useOrders.js
+// Filepath: src/features/order/hooks/useOrders.js
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useDispatch, useSelector, shallowEqual } from "react-redux";
 import {
@@ -30,7 +30,6 @@ export default function useOrders({ initialPage = 1, perPage = 15 } = {}) {
   const [q, setQ] = useState("");
   const [localPerPage, setLocalPerPage] = useState(perPage);
 
-  // debounce for search to avoid spamming API
   const debounceRef = useRef(null);
   const debouncedFetch = useCallback(
     (term) => {
@@ -72,10 +71,11 @@ export default function useOrders({ initialPage = 1, perPage = 15 } = {}) {
     [dispatch]
   );
 
-  // assign an employee to an order
+  // assign an employee/user to an order
+  // new signature: (orderId, employeeId, employeeType = 'employee')
   const assign = useCallback(
-    (orderId, employeeId) => {
-      return dispatch(assignOrder({ orderId, employeeId }));
+    (orderId, employeeId, employeeType = "employee") => {
+      return dispatch(assignOrder({ orderId, employeeId, employeeType }));
     },
     [dispatch]
   );

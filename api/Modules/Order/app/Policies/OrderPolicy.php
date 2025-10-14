@@ -28,12 +28,11 @@ class OrderPolicy
         return false;
     }
 
-    public function assign(User $user, Order $order)
-    {
-        // only admin or manager can assign/unassign
-      //  return $user->hasRole('admin') || $user->hasRole('manager');
-        return $user->hasRole('admin');
-    }
+   public function assign(User $user, Order $order)
+{
+    // Only admin can assign/unassign
+    return $user->hasRole('admin');
+}
 
     // other abilities...
 }

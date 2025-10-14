@@ -1,5 +1,4 @@
 <?php
-// filepath: Modules/Invoice/Http/Controllers/InvoiceController.php
 
 namespace Modules\Invoice\Http\Controllers;
 
@@ -26,21 +25,130 @@ class InvoiceController extends Controller
         $this->invoiceService = $invoiceService;
     }
 
+    /**
+     * Helper: whether current user is admin
+     */
+    protected function userIsAdmin($user): bool
+    {
+        return $user && method_exists($user, 'hasRole') && $user->hasRole('admin');
+    }
+
+    /**
+     * Helper: whether current user is employee (role)
+     */
+    protected function userIsEmployee($user): bool
+    {
+        return $user && method_exists($user, 'hasRole') && $user->hasRole('employee');
+    }
+
+    /**
+     * Authorize creation of invoices (create permission)
+     * Admin or Employee only
+     */
+    protected function authorizeCreate(): void
+    {
+        $user = Auth::user();
+        if ($this->userIsAdmin($user)) {
+            return;
+        }
+        if ($this->userIsEmployee($user)) {
+            return;
+        }
+        abort(403, 'Unauthorized to create invoice.');
+    }
+
+    /**
+     * Authorize modification actions on a given invoice:
+     * - Admin always allowed
+     * - Employee allowed only if order is assigned to them (considering assigned_type)
+     * - If invoice has no order, only admin allowed
+     */
+    protected function authorizeModifyAccess(Invoice $invoice): void
+    {
+        $user = Auth::user();
+        if (!$user) {
+            abort(403, 'Unauthorized.');
+        }
+
+        // Only employees may edit (apart from admins)
+        if ($this->userIsEmployee($user) || $this->userIsAdmin($user)) {
+            $order = $invoice->order;
+            if (!$order) {
+                // No order attached -> only admin could modify, so deny
+                abort(403, 'Unauthorized to modify invoice without order.');
+            }
+
+            $assignedType = $order->assigned_type;
+            $assignedTo = $order->assigned_to;
+
+            // Case 1: order.assigned_type === 'employee'
+            if ($assignedType === 'employee') {
+                // Two common possibilities:
+                // - assigned_to stores the users.id of the employee user
+                // - OR assigned_to stores id from separate employees table
+                if ($assignedTo === $user->id) {
+                    return;
+                }
+
+                // If User has an employee relation (e.g. employeeProfile) check its id
+                if (isset($user->employeeProfile) && $user->employeeProfile && $assignedTo === $user->employeeProfile->id) {
+                    return;
+                }
+
+                // Also allow if user has 'employee' and assigned_to is numeric matching user's id (redundant)
+                // otherwise deny
+                abort(403, 'Unauthorized to modify invoice for this order.');
+            }
+
+            // Case 2: order.assigned_type === 'user' (assigned directly to a user)
+            if ($assignedType === 'user') {
+                if ($assignedTo === $user->id) {
+                    return;
+                }
+                abort(403, 'Unauthorized to modify invoice for this order.');
+            }
+
+            // Other/unknown assigned_type -> deny for employees
+            abort(403, 'Unauthorized to modify invoice.');
+        }
+
+        // Non-admin, non-employee cannot modify
+        abort(403, 'Unauthorized to modify invoice.');
+    }
+
     public function index(Request $request)
     {
-        $q = Invoice::with(['items', 'payments', 'refunds', 'order'])->orderBy('created_at', 'desc');
+        $q = Invoice::with(['items', 'payments', 'refunds', 'order'])->orderByDesc('created_at');
+
+        $user = Auth::user();
+
+        if ($user && method_exists($user, 'hasRole')) {
+            if ($user->hasRole('employee')) {
+                // Employee: only invoices where order assigned to them (and assigned_type = 'employee')
+                $q->whereHas('order', function ($oq) use ($user) {
+                    $oq->where('assigned_type', 'employee')
+                       ->where(function ($sub) use ($user) {
+                           $sub->where('assigned_to', $user->id);
+
+                           // If user has an employeeProfile relation (separate employees table), allow that id too
+                           if (isset($user->employeeProfile) && $user->employeeProfile) {
+                               $sub->orWhere('assigned_to', $user->employeeProfile->id);
+                           }
+                       });
+                });
+            } elseif ($user->hasRole('admin')) {
+                // Admin: no restriction
+            } else {
+                // Other users: show only invoices for orders assigned to them as 'user'
+                $q->whereHas('order', function ($oq) use ($user) {
+                    $oq->where('assigned_type', 'user')
+                       ->where('assigned_to', $user->id);
+                });
+            }
+        }
 
         if ($request->filled('order_id')) {
             $q->where('order_id', $request->order_id);
-        }
-
-        // If the authenticated user is an employee, restrict invoices to only
-        // those whose orders are assigned to that employee.
-        $user = Auth::user();
-        if ($user && $user->roles()->where('name', 'employee')->exists()) {
-            $q->whereHas('order', function ($oq) use ($user) {
-                $oq->where('assigned_to', $user->id);
-            });
         }
 
         return InvoiceResource::collection($q->paginate(25));
@@ -48,12 +156,16 @@ class InvoiceController extends Controller
 
     public function show(Invoice $invoice)
     {
+        // Viewing: allowed for everyone per your instruction
         $invoice->load(['items', 'payments', 'refunds', 'order']);
         return new InvoiceResource($invoice);
     }
 
     public function store(Request $request)
     {
+        // Only admin or employee allowed to create
+        $this->authorizeCreate();
+
         $data = $request instanceof StoreInvoiceRequest ? $request->validated() : $request->all();
         $invoice = $this->invoiceService->createFromPayload($data);
 
@@ -64,6 +176,9 @@ class InvoiceController extends Controller
 
     public function update(Request $request, Invoice $invoice)
     {
+        // Only admin or assigned employee can update
+        $this->authorizeModifyAccess($invoice);
+
         $payload = $request->only(['status', 'meta', 'vat_percent', 'coupon_discount']);
 
         $invoice->fill($payload);
@@ -78,6 +193,9 @@ class InvoiceController extends Controller
 
     public function addItem(Request $request, Invoice $invoice)
     {
+        // Only admin or assigned employee can modify invoice items
+        $this->authorizeModifyAccess($invoice);
+
         $validated = $request->validate([
             'service_name' => 'required|string',
             'unit_price' => 'required|numeric|min:0',
@@ -110,6 +228,9 @@ class InvoiceController extends Controller
 
     public function updateItem(Request $request, Invoice $invoice, InvoiceItem $item)
     {
+        // Only admin or assigned employee can modify invoice items
+        $this->authorizeModifyAccess($invoice);
+
         $validated = $request->validate([
             'unit_price' => 'nullable|numeric|min:0',
             'quantity' => 'nullable|integer|min:1',
@@ -141,6 +262,9 @@ class InvoiceController extends Controller
 
     public function deleteItem(Invoice $invoice, InvoiceItem $item)
     {
+        // Only admin or assigned employee can delete invoice items
+        $this->authorizeModifyAccess($invoice);
+
         if ($item->invoice_id !== $invoice->id) {
             return response()->json(['message' => 'mismatch'], 422);
         }
@@ -159,25 +283,120 @@ class InvoiceController extends Controller
     /**
      * Create invoice from order with automatic carryover
      */
-    public function createFromOrder(Request $request, $orderId)
+
+public function createFromOrder(Request $request, $orderId)
+{
+    $order = Order::with(['items', 'invoices.payments'])->findOrFail($orderId);
+
+    $items = $request->input('items');
+
+    // === CHANGED: default to ALL order items (not only items after last invoice) ===
+    if (!is_array($items) || empty($items)) {
+        // include all order items as invoice line items
+        $order->load('items');
+        $items = $order->items->map(fn($it) => [
+            'service_id' => $it->service_id,
+            'service_name' => $it->service_name,
+            'description' => $it->service_description ?? $it->description ?? null,
+            'unit_price' => $it->unit_price,
+            'quantity' => $it->quantity,
+            'meta' => $it->meta ?? null,
+        ])->toArray();
+    }
+
+    return DB::transaction(function () use ($request, $order, $items) {
+        $payload = [
+            'order_id' => $order->id,
+            'vat_percent' => $request->input('vat_percent', $order->vat_percent),
+            'coupon_discount' => $request->input('coupon_discount', $order->coupon_discount),
+            'invoice_number' => $request->input('invoice_number', 'INV-' . Str::upper(Str::random(8))),
+            'type' => $request->input('type', 'initial'),
+            'items' => $items,
+        ];
+
+        $invoice = $this->invoiceService->createFromPayload($payload);
+
+        // use service-level carryover logic
+        $carryoverAmount = $this->invoiceService->calculateCarryoverPayment($order, $invoice->id);
+
+        if ($carryoverAmount > 0) {
+            $applyAmount = min($carryoverAmount, (float) $invoice->grand_total);
+
+            InvoicePayment::create([
+                'invoice_id' => $invoice->id,
+                'payment_reference' => 'CARRY-' . strtoupper(Str::random(8)),
+                'staff_id' => Auth::id() ?? null,
+                'amount' => $applyAmount,
+                'method' => 'adjustment',
+                'status' => 'completed',
+                'note' => 'Auto-applied carryover from previous payments',
+            ]);
+
+            $invoice = $this->invoiceService->recalcAndRefresh($invoice);
+        }
+
+        $this->syncOrderPaymentStatus($invoice);
+
+        // Compute totals for response (clear labels)
+        $totalBill = (float) ($invoice->grand_total ?? 0.0);
+        // sum completed payments on this invoice
+        $totalPaid = (float) $invoice->payments()->where('status', 'completed')->sum('amount');
+        $totalDue = max(0.0, $totalBill - $totalPaid);
+        // payable: amount customer needs to pay now (same as totalDue)
+        $payable = $totalDue;
+
+        return response()->json([
+            'invoice' => $invoice->fresh(['items', 'payments', 'order']),
+            'carryover_applied' => $carryoverAmount > 0 ? $applyAmount : 0,
+            'summary' => [
+                'total_bill' => round($totalBill, 2),
+                'total_paid' => round($totalPaid, 2),
+                'total_due' => round($totalDue, 2),
+                'payable' => round($payable, 2),
+            ],
+        ], 201);
+    });
+}
+     
+    /** public function createFromOrder(Request $request, $orderId)
     {
+        // Only admin or employee (assigned to the order) can create invoice from order
         $order = Order::with(['items', 'invoices.payments'])->findOrFail($orderId);
-
+    
+        // If caller is not admin, ensure they are the assigned employee for this order
+        $user = Auth::user();
+        if (! $this->userIsAdmin($user)) {
+            if (! $this->userIsEmployee($user)) {
+                abort(403, 'Unauthorized to create invoice from order.');
+            }
+    
+            // must be assigned to this employee
+            $allowed = false;
+            if ($order->assigned_type === 'employee' && ($order->assigned_to === $user->id ||
+                    (isset($user->employeeProfile) && $order->assigned_to === $user->employeeProfile->id))) {
+                $allowed = true;
+            }
+    
+            if (! $allowed) {
+                abort(403, 'Unauthorized to create invoice from this order.');
+            }
+        }
+    
         $items = $request->input('items');
-
+    
         // If caller didn't provide explicit items, default to only the order items
         // that were added after the last invoice was created. This prevents the
         // new invoice from re-invoicing previously invoiced items.
         if (!is_array($items) || empty($items)) {
             $lastInvoice = $order->invoices()->orderByDesc('created_at')->first();
-
+    
             $query = $order->items();
             if ($lastInvoice) {
                 $query = $query->where('created_at', '>', $lastInvoice->created_at);
             }
-
+    
             $newItems = $query->get();
-
+    
             // If there are no new items to invoice, return a helpful error so
             // callers can either pass explicit items or avoid creating empty invoices.
             if ($newItems->isEmpty()) {
@@ -185,7 +404,7 @@ class InvoiceController extends Controller
                     'message' => 'No new order items found to invoice. Provide items in request or add items to order first.'
                 ], 422);
             }
-
+    
             $items = $newItems->map(fn($it) => [
                 'service_id' => $it->service_id,
                 'service_name' => $it->service_name,
@@ -195,7 +414,7 @@ class InvoiceController extends Controller
                 'meta' => $it->meta ?? null,
             ])->toArray();
         }
-
+    
         return DB::transaction(function () use ($request, $order, $items) {
             $payload = [
                 'order_id' => $order->id,
@@ -205,15 +424,15 @@ class InvoiceController extends Controller
                 'type' => $request->input('type', 'initial'),
                 'items' => $items,
             ];
-
+    
             $invoice = $this->invoiceService->createFromPayload($payload);
-
+    
             // use service-level carryover logic
             $carryoverAmount = $this->invoiceService->calculateCarryoverPayment($order, $invoice->id);
-
+    
             if ($carryoverAmount > 0) {
                 $applyAmount = min($carryoverAmount, (float) $invoice->grand_total);
-
+    
                 InvoicePayment::create([
                     'invoice_id' => $invoice->id,
                     'payment_reference' => 'CARRY-' . strtoupper(Str::random(8)),
@@ -223,18 +442,18 @@ class InvoiceController extends Controller
                     'status' => 'completed',
                     'note' => 'Auto-applied carryover from previous payments',
                 ]);
-
+    
                 $invoice = $this->invoiceService->recalcAndRefresh($invoice);
             }
-
+    
             $this->syncOrderPaymentStatus($invoice);
-
+    
             return response()->json([
                 'invoice' => $invoice->fresh(['items', 'payments', 'order']),
                 'carryover_applied' => $carryoverAmount > 0 ? $applyAmount : 0,
             ], 201);
         });
-    }
+    } */
 
     /**
      * Create invoice from another invoice (clone)
@@ -242,6 +461,9 @@ class InvoiceController extends Controller
     public function createFromInvoice(Request $request, $invoiceId)
     {
         $source = Invoice::with('items')->findOrFail($invoiceId);
+
+        // Only admin or assigned employee can clone (because cloning is a create action)
+        $this->authorizeModifyAccess($source);
 
         $itemsOverride = $request->input('items');
         $invoiceNumber = $request->input('invoice_number');
@@ -310,6 +532,9 @@ class InvoiceController extends Controller
      */
     public function recordPayment(Request $request, Invoice $invoice)
     {
+        // Only admin or assigned employee can record payments
+        $this->authorizeModifyAccess($invoice);
+
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
             'method' => 'nullable|string',
@@ -342,6 +567,9 @@ class InvoiceController extends Controller
 
     public function refund(Request $request, Invoice $invoice)
     {
+        // Only admin or assigned employee can process refunds
+        $this->authorizeModifyAccess($invoice);
+
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
             'invoice_payment_id' => 'nullable|exists:invoice_payments,id',
@@ -407,6 +635,7 @@ class InvoiceController extends Controller
 
     public function downloadPdf(Invoice $invoice)
     {
+        // Viewing/downloading PDF: allowed for everyone per your instruction
         $invoice->load(['items', 'order']);
         $pdf = Pdf::loadView('invoice::pdf.invoice', ['invoice' => $invoice]);
         return $pdf->download("Invoice-{$invoice->invoice_number}.pdf");

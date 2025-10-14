@@ -6,7 +6,7 @@ import { setUser, setEmployee, setAdmin, clearUser } from '../features/auth/slic
 
 export default function useAuthCheck() {
     const dispatch = useDispatch();
-    const { user, employee, admin } = useSelector((state) => state.auth); // <--- get from Redux
+    const { user, employee, admin } = useSelector((state) => state.auth);
     const effectRan = useRef(false);
     const [loading, setLoading] = useState(true);
 

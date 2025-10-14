@@ -35,7 +35,6 @@ export const fetchOrder = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const res = await fetchOrderApi(id);
-      // normalize common API shapes: { order: {...} } or { data: {...} } or raw
       const payload = res.data;
       return payload?.order ?? payload?.data ?? payload;
     } catch (err) {
@@ -109,7 +108,6 @@ export const createInvoiceFromOrder = createAsyncThunk(
   async ({ orderId, payload = {} }, { rejectWithValue }) => {
     try {
       const res = await createInvoiceFromOrderApi(orderId, payload);
-      // normalize response: backend may return { invoice, order } or wrapped { data: { ... } }
       const p = res.data;
       return p?.invoice ?? p?.data ?? p;
     } catch (err) {
@@ -120,26 +118,28 @@ export const createInvoiceFromOrder = createAsyncThunk(
 
 export const assignOrder = createAsyncThunk(
   "order/assignOrder",
-  async ({ orderId, employeeId }, { rejectWithValue }) => {
+  async (
+    { orderId, employeeId, employeeType = "employee" },
+    { rejectWithValue }
+  ) => {
     try {
-      const res = await assignOrderApi(orderId, { employee_id: employeeId });
-      return res.data; // expect { order: { ... } }
+      const res = await assignOrderApi(orderId, {
+        employee_id: employeeId,
+        employee_type: employeeType,
+      });
+      return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
   }
 );
 
-/**
- * Unassign an order (no body)
- * payload: number (orderId)
- */
 export const unassignOrder = createAsyncThunk(
   "order/unassignOrder",
   async (orderId, { rejectWithValue }) => {
     try {
       const res = await unassignOrderApi(orderId);
-      return res.data; // expect { order: { ... } }
+      return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
@@ -177,7 +177,6 @@ const orderSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // list
       .addCase(fetchOrders.pending, (s) => {
         s.loadingList = true;
         s.error = null;
@@ -185,12 +184,8 @@ const orderSlice = createSlice({
       .addCase(fetchOrders.fulfilled, (s, a) => {
         s.loadingList = false;
         const payload = a.payload;
-        // normalize nested resource shapes: items may be wrapped as { data: {...} }
         if (Array.isArray(payload)) {
-          ordersAdapter.setAll(
-            s,
-            payload.map((p) => p?.data ?? p)
-          );
+          ordersAdapter.setAll(s, payload.map((p) => p?.data ?? p));
           s.meta = null;
         } else if (payload && payload.data) {
           const items = Array.isArray(payload.data)
@@ -208,15 +203,12 @@ const orderSlice = createSlice({
         s.loadingList = false;
         s.error = a.payload || a.error;
       })
-
-      // single
       .addCase(fetchOrder.pending, (s) => {
         s.loadingCurrent = true;
         s.error = null;
       })
       .addCase(fetchOrder.fulfilled, (s, a) => {
         s.loadingCurrent = false;
-        // unwrap common API shapes: { order }, { data: { ... } } or raw object
         const o = a.payload?.order ?? a.payload?.data ?? a.payload;
         if (o) {
           ordersAdapter.upsertOne(s, o);
@@ -227,8 +219,6 @@ const orderSlice = createSlice({
         s.loadingCurrent = false;
         s.error = a.payload || a.error;
       })
-
-      // create
       .addCase(createOrder.pending, (s) => {
         s.saving = true;
         s.error = null;
@@ -245,8 +235,6 @@ const orderSlice = createSlice({
         s.saving = false;
         s.error = a.payload || a.error;
       })
-
-      // update
       .addCase(updateOrder.pending, (s) => {
         s.saving = true;
         s.error = null;
@@ -263,8 +251,6 @@ const orderSlice = createSlice({
         s.saving = false;
         s.error = a.payload || a.error;
       })
-
-      // items
       .addCase(addOrderItem.pending, (s) => {
         s.saving = true;
         s.error = null;
@@ -272,7 +258,6 @@ const orderSlice = createSlice({
       .addCase(addOrderItem.fulfilled, (s, a) => {
         s.saving = false;
         const payload = a.payload;
-        // API likely returns created item (or updated order). If order returned, upsert it.
         if (payload?.order) ordersAdapter.upsertOne(s, payload.order);
         if (payload?.data) {
           if (payload.data.order)
@@ -284,7 +269,6 @@ const orderSlice = createSlice({
         s.saving = false;
         s.error = a.payload || a.error;
       })
-
       .addCase(updateOrderItem.pending, (s) => {
         s.saving = true;
         s.error = null;
@@ -303,14 +287,12 @@ const orderSlice = createSlice({
         s.saving = false;
         s.error = a.payload || a.error;
       })
-
       .addCase(deleteOrderItem.pending, (s) => {
         s.saving = true;
         s.error = null;
       })
       .addCase(deleteOrderItem.fulfilled, (s, a) => {
         s.saving = false;
-        // backend likely returns updated order or message — try to handle if order returned
         if (a.payload?.data?.order)
           ordersAdapter.upsertOne(s, a.payload.data.order);
       })
@@ -318,25 +300,19 @@ const orderSlice = createSlice({
         s.saving = false;
         s.error = a.payload || a.error;
       })
-
-      // create invoice from order -> backend returns invoice; store invoice elsewhere via invoices slice but optionally keep order updated
       .addCase(createInvoiceFromOrder.pending, (s) => {
         s.saving = true;
         s.error = null;
       })
       .addCase(createInvoiceFromOrder.fulfilled, (s, a) => {
         s.saving = false;
-        // the returned payload may include { invoice, order } or { data: { ... } }
         const order = a.payload?.order ?? a.payload?.data ?? a.payload;
         if (order && order.id) ordersAdapter.upsertOne(s, order);
       })
       .addCase(createInvoiceFromOrder.rejected, (s, a) => {
         s.saving = false;
         s.error = a.payload || a.error;
-      });
-
-    // assign employee
-    builder
+      })
       .addCase(assignOrder.pending, (s) => {
         s.saving = true;
         s.error = null;
@@ -353,8 +329,6 @@ const orderSlice = createSlice({
         s.saving = false;
         s.error = a.payload || a.error;
       })
-
-      // unassign employee
       .addCase(unassignOrder.pending, (s) => {
         s.saving = true;
         s.error = null;
@@ -383,7 +357,6 @@ export const {
 } = ordersAdapter.getSelectors((state) => state.order);
 
 export const selectOrderMeta = (state) => state.order.meta;
-// memoized loading selector to return a stable reference
 export const selectOrderLoading = createSelector(
   (state) => state.order.loadingList,
   (state) => state.order.loadingCurrent,

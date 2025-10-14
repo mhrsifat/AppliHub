@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
+use App\Models\User;
+use Modules\Employee\Models\Employee as EmployeeModel;
 use Modules\Order\Models\Order;
 use Modules\Order\Models\OrderItem;
 use Modules\Order\Transformers\OrderResource;
@@ -28,29 +31,40 @@ class OrderController extends Controller
     }
 
     /**
+     * Helper: current authenticated user (guard already resolved by middleware)
+     */
+    protected function currentUser()
+    {
+        return Auth::user();
+    }
+
+    /**
      * List orders
      * Admin/manager: sees all
      * Employee: sees only assigned orders
      */
-
-public function index(Request $request)
+     public function index(Request $request)
 {
     $query = Order::with('items')->orderByDesc('id');
     $user = Auth::user();
 
-    // 🧠 Role-based filtering
-    if ($user instanceof \Modules\Employee\Models\Employee) {
-        // Employee: Only their assigned orders
-        $query->where('assigned_to', $user->id);
+    if ($user->hasRole('employee')) {
+        // Employee: Only orders assigned to them
+        $query->where(function($q) use ($user) {
+            $q->where('assigned_to', $user->id)
+              ->where('assigned_type', 'employee');
+        });
     } elseif (method_exists($user, 'hasRole') && $user->hasRole('admin')) {
         // Admin: can see all orders
         // no filter needed
     } else {
-        // Other users: see nothing (or only their own, if you want)
-        $query->whereNull('id'); // returns empty
+        // Other users: see only orders assigned to them
+        $query->where(function($q) use ($user) {
+            $q->where('assigned_to', $user->id)
+              ->where('assigned_type', 'user');
+        });
     }
 
-    // 🔍 Search filter
     if ($request->filled('q')) {
         $q = $request->get('q');
         $query->where(function ($qry) use ($q) {
@@ -63,30 +77,37 @@ public function index(Request $request)
         });
     }
 
-    // 📄 Pagination
     $perPage = (int) $request->get('per_page', 15);
     return OrderResource::collection($query->paginate($perPage));
 }
+    
 
     /**
      * Show single order
      */
-    public function show($id)
-    {
-        $order = Order::with(['items', 'invoices.payments'])->findOrFail($id);
-        $user = Auth::user();
-       logger(Auth::user());
+     public function show($id)
+{
+    $order = Order::with(['items', 'invoices.payments'])->findOrFail($id);
+    $user = Auth::user();
 
-
-        if ($user && method_exists($user, 'hasRole') && $user->hasRole('employee')) {
-            // Employee cannot access unassigned or others' orders
-            if (!$order->assigned_to || $order->assigned_to !== $user->id) {
+    if ($user && method_exists($user, 'hasRole')) {
+        if ($user->hasRole('employee')) {
+            // Employee: only if assigned to them
+            if ($order->assigned_type !== 'employee' || $order->assigned_to !== $user->id) {
+                abort(403, 'Unauthorized to view this order');
+            }
+        } elseif (!$user->hasRole('admin')) {
+            // Regular user: only if assigned to them
+            if ($order->assigned_type !== 'user' || $order->assigned_to !== $user->id) {
                 abort(403, 'Unauthorized to view this order');
             }
         }
-
-        return new OrderResource($order);
+        // Admin: can view all
     }
+
+    return new OrderResource($order);
+}
+    
 
     /**
      * Create an order and associated invoice
@@ -350,39 +371,52 @@ public function index(Request $request)
             $order->save();
         }
     }
+/**
+ * Assign order to employee or user
+ */
+public function assign(Request $request, $id)
+{
+    $request->validate([
+        'employee_id' => 'required|integer',
+        'employee_type' => 'required|string|in:user,employee'
+    ]);
 
-    /**
-     * Assign order to employee
-     */
-    public function assign(Request $request, $id)
-    {
-        $request->validate(['employee_id' => 'required|exists:users,id']);
-        $order = Order::findOrFail($id);
-        $this->authorize('assign', $order);
+    $order = Order::findOrFail($id);
+    $this->authorize('assign', $order);
 
-        $order->assigned_to = $request->employee_id;
-        $order->save();
+    $order->assigned_to = $request->employee_id;
+    $order->assigned_type = $request->employee_type;
+    $order->save();
 
-        if ($employee = \App\Models\User::find($request->employee_id)) {
-            $employee->notify(new \Modules\Order\Notifications\OrderAssigned($order));
-        }
-
-        return response()->json(['message' => 'Order assigned', 'order' => $order], 200);
+    // Notify the assignee
+    if ($request->employee_type === 'user') {
+        $modelClass = \App\Models\User::class;
+    } else {
+        $modelClass = \Modules\Employee\Models\Employee::class;
     }
 
-    /**
-     * Unassign order
-     */
-    public function unassign(Request $request, $id)
-    {
-        $order = Order::findOrFail($id);
-        $this->authorize('assign', $order);
-
-        $order->assigned_to = null;
-        $order->save();
-
-        return response()->json(['message' => 'Order unassigned', 'order' => $order], 200);
+    if ($assignee = $modelClass::find($request->employee_id)) {
+        $assignee->notify(new \Modules\Order\Notifications\OrderAssigned($order));
     }
+
+    return response()->json(['message' => 'Order assigned', 'order' => $order], 200);
+}
+
+/**
+ * Unassign order
+ */
+public function unassign(Request $request, $id)
+{
+    $order = Order::findOrFail($id);
+    $this->authorize('assign', $order);
+
+    $order->assigned_to = null;
+    $order->assigned_type = null;
+    $order->save();
+
+    return response()->json(['message' => 'Order unassigned', 'order' => $order], 200);
+}
+    
 
     /**
      * Public tracking method with payment carryover calculation
@@ -498,7 +532,7 @@ public function index(Request $request)
      * Calculate carryover credit for an order
      * Returns excess payment that hasn't been applied to any invoice
      */
-    protected function calculateOrderCarryover(Order $order): float
+       protected function calculateOrderCarryover(Order $order): float
     {
         $invoices = $order->invoices()->with('payments')->get();
 

@@ -1,12 +1,4 @@
-// src/features/order/components/OrderAssignment.jsx
-/**
- * src/features/order/components/OrderAssignment.jsx
- *
- * A feature-rich, minimal MUI component to assign or unassign an employee
- * to an order. Integrates useOrders() + useEmployees().
- * Designed to be used inside a Dialog (like in OrderList.jsx).
- */
-
+// Filepath: src/features/order/components/OrderAssignment.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
@@ -44,9 +36,12 @@ export default function OrderAssignment({ order, onClose }) {
     if (!selected) return;
     setSaving(true);
     try {
-      // useOrders.assign expects (orderId, employeeId)
-      await assign(order.id, selected);
+      // pass employeeType as 'employee' because useEmployees lists from employees table
+      await assign(order.id, selected, "employee");
       onClose?.();
+    } catch (err) {
+      // You might want to show error toast here
+      console.error("Assign failed", err);
     } finally {
       setSaving(false);
     }
@@ -56,7 +51,7 @@ export default function OrderAssignment({ order, onClose }) {
     setSaving(true);
     try {
       await unassign(order.id);
-      onClose?.(); 
+      onClose?.();
     } finally {
       setSaving(false);
     }

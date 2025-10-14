@@ -20,7 +20,7 @@ class FortifyController extends Controller
     // ----------------------------
     protected function cookieForRefresh(string $plainToken, bool $remember): \Symfony\Component\HttpFoundation\Cookie
     {
-        $minutes = $remember ? 60 * 24 * 30 : 0;
+        $minutes = $remember ? 60 * 24 * 30 : 60;
         $usePartitioned = filter_var(env('PARTITIONED_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
 
         $sameSite = 'None';

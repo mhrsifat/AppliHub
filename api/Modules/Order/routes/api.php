@@ -8,7 +8,7 @@ Route::get('/public/track-order', [OrderController::class, 'publicTrack']);
 
 Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
 
-Route::prefix('orders')->middleware(['auth:sanctum'])->group(function () {
+Route::prefix('orders')->middleware(['multi-auth'])->group(function () {
     Route::get('/', [OrderController::class, 'index'])->name('orders.index');
     Route::get('/{id}', [OrderController::class, 'show'])->name('orders.show');
     Route::put('/{id}', [OrderController::class, 'update'])->name('orders.update');
