@@ -281,211 +281,6 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Create invoice from order with automatic carryover
-     */
-     
-     // filepath: Modules/Invoice/Http/Controllers/InvoiceController.php
-
-public function createFromOrder(Request $request, $orderId)
-{
-    // load order items (we will include ALL order items by default)
-    $order = Order::with(['items', 'invoices.payments'])->findOrFail($orderId);
-
-    // If caller provided explicit items, use them (override)
-    $itemsInput = $request->input('items');
-    if (is_array($itemsInput) && !empty($itemsInput)) {
-        $items = $itemsInput;
-    } else {
-        // DEFAULT: include ALL order items in the invoice
-        $order->load('items');
-        $items = $order->items->map(function ($it) {
-            return [
-                'service_id' => $it->service_id,
-                'service_name' => $it->service_name,
-                'description' => $it->service_description ?? $it->description ?? null,
-                'unit_price' => $it->unit_price,
-                'quantity' => $it->quantity,
-                'meta' => $it->meta ?? null,
-            ];
-        })->toArray();
-    }
-
-    return DB::transaction(function () use ($request, $order, $items) {
-        $payload = [
-            'order_id' => $order->id,
-            'vat_percent' => $request->input('vat_percent', $order->vat_percent),
-            'coupon_discount' => $request->input('coupon_discount', $order->coupon_discount),
-            'invoice_number' => $request->input('invoice_number', 'INV-' . Str::upper(Str::random(8))),
-            'type' => $request->input('type', 'initial'),
-            'items' => $items,
-        ];
-
-        // create invoice (this will compute grand_total based on items)
-        $invoice = $this->invoiceService->createFromPayload($payload);
-
-        // recalc carryover using current order invoices/payments
-        $orderForCarry = Order::with(['invoices.payments'])->find($order->id);
-        $carryoverAmount = $this->invoiceService->calculateCarryoverPayment($orderForCarry, $invoice->id);
-
-        if ($carryoverAmount > 0) {
-            $applyAmount = min($carryoverAmount, (float) $invoice->grand_total);
-
-            InvoicePayment::create([
-                'invoice_id' => $invoice->id,
-                'payment_reference' => 'CARRY-' . strtoupper(Str::random(8)),
-                'staff_id' => Auth::id() ?? null,
-                'amount' => $applyAmount,
-                'method' => 'adjustment',
-                'status' => 'completed',
-                'note' => 'Auto-applied carryover from previous payments',
-            ]);
-
-            // refresh invoice totals after applying carryover payment
-            $invoice = $this->invoiceService->recalcAndRefresh($invoice);
-        }
-
-        $this->syncOrderPaymentStatus($invoice);
-
-        // response summary
-        $totalBill = (float) ($invoice->grand_total ?? 0.0);
-        $totalPaid = (float) $invoice->payments()->where('status', 'completed')->sum('amount');
-        $totalDue = max(0.0, $totalBill - $totalPaid);
-
-        return response()->json([
-            'invoice' => $invoice->fresh(['items', 'payments', 'order']),
-            'carryover_applied' => $carryoverAmount > 0 ? ($applyAmount ?? 0) : 0,
-            'summary' => [
-                'total_bill' => round($totalBill, 2),
-                'total_paid' => round($totalPaid, 2),
-                'total_due' => round($totalDue, 2),
-            ],
-        ], 201);
-    });
-}
-     
-/** public function createFromOrder(Request $request, $orderId)
-{
-    $order = Order::with(['items'])->findOrFail($orderId);
-
-    // allow caller to force include all items (back-compat)
-    $forceIncludeAll = $request->boolean('include_all', false);
-
-    $itemsInput = $request->input('items');
-
-    // If explicit items provided, use them (caller override)
-    if (is_array($itemsInput) && !empty($itemsInput)) {
-        $items = $itemsInput;
-    } else {
-        if ($forceIncludeAll) {
-            // include all order items as invoice line items
-            $order->load('items');
-            $items = $order->items->map(fn($it) => [
-                'service_id' => $it->service_id,
-                'service_name' => $it->service_name,
-                'description' => $it->service_description ?? $it->description ?? null,
-                'unit_price' => $it->unit_price,
-                'quantity' => $it->quantity,
-                'meta' => $it->meta ?? null,
-            ])->toArray();
-        } else {
-            // compute remaining / uninvoiced quantities per order item
-            $order->load('items');
-
-            $items = [];
-            foreach ($order->items as $it) {
-                // compute already invoiced quantity for this order item
-                $invoicedQtyQuery = \Modules\Invoice\Models\InvoiceItem::query()
-                    ->whereHas('invoice', function ($q) use ($order) {
-                        $q->where('order_id', $order->id);
-                    });
-
-                if (!empty($it->service_id)) {
-                    // match by service_id primarily
-                    $invoicedQtyQuery->where('service_id', $it->service_id);
-                } else {
-                    // fallback: match by service_name if service_id absent
-                    $invoicedQtyQuery->where('service_name', $it->service_name);
-                }
-
-                $invoicedQty = (float) $invoicedQtyQuery->sum('quantity');
-
-                $remainingQty = max(0, (float)$it->quantity - $invoicedQty);
-
-                if ($remainingQty > 0) {
-                    $items[] = [
-                        'service_id' => $it->service_id,
-                        'service_name' => $it->service_name,
-                        'description' => $it->service_description ?? $it->description ?? null,
-                        'unit_price' => $it->unit_price,
-                        'quantity' => $remainingQty,
-                        'meta' => $it->meta ?? null,
-                    ];
-                }
-            }
-
-            // If nothing remains to invoice, return helpful error rather than creating 0 invoice
-            if (empty($items)) {
-                return response()->json([
-                    'message' => 'No uninvoiced order items found. Provide explicit items or set include_all=1 to invoice all items.'
-                ], 422);
-            }
-        }
-    }
-
-    return DB::transaction(function () use ($request, $order, $items) {
-        $payload = [
-            'order_id' => $order->id,
-            'vat_percent' => $request->input('vat_percent', $order->vat_percent),
-            'coupon_discount' => $request->input('coupon_discount', $order->coupon_discount),
-            'invoice_number' => $request->input('invoice_number', 'INV-' . Str::upper(Str::random(8))),
-            'type' => $request->input('type', 'initial'),
-            'items' => $items,
-        ];
-
-        $invoice = $this->invoiceService->createFromPayload($payload);
-
-        // recalc carryover using current order invoices/payments
-        $orderForCarry = Order::with(['invoices.payments'])->find($order->id);
-        $carryoverAmount = $this->invoiceService->calculateCarryoverPayment($orderForCarry, $invoice->id);
-
-        if ($carryoverAmount > 0) {
-            $applyAmount = min($carryoverAmount, (float) $invoice->grand_total);
-
-            InvoicePayment::create([
-                'invoice_id' => $invoice->id,
-                'payment_reference' => 'CARRY-' . strtoupper(Str::random(8)),
-                'staff_id' => Auth::id() ?? null,
-                'amount' => $applyAmount,
-                'method' => 'adjustment',
-                'status' => 'completed',
-                'note' => 'Auto-applied carryover from previous payments',
-            ]);
-
-            $invoice = $this->invoiceService->recalcAndRefresh($invoice);
-        }
-
-        $this->syncOrderPaymentStatus($invoice);
-
-        // Compute totals for response (clear labels)
-        $totalBill = (float) ($invoice->grand_total ?? 0.0);
-        $totalPaid = (float) $invoice->payments()->where('status', 'completed')->sum('amount');
-        $totalDue = max(0.0, $totalBill - $totalPaid);
-        $payable = $totalDue;
-
-        return response()->json([
-            'invoice' => $invoice->fresh(['items', 'payments', 'order']),
-            'carryover_applied' => $carryoverAmount > 0 ? $applyAmount : 0,
-            'summary' => [
-                'total_bill' => round($totalBill, 2),
-                'total_paid' => round($totalPaid, 2),
-                'total_due' => round($totalDue, 2),
-                'payable' => round($payable, 2),
-            ],
-        ], 201);
-    });
-} */
-
-    /**
      * Create invoice from another invoice (clone)
      */
     public function createFromInvoice(Request $request, $invoiceId)
@@ -713,4 +508,240 @@ public function createFromOrder(Request $request, $orderId)
             $order->update(['payment_status' => $newStatus]);
         }
     }
+    
+    
+     
+/** public function createFromOrder(Request $request, $orderId)
+{
+    $order = Order::with(['items'])->findOrFail($orderId);
+
+    // allow caller to force include all items (back-compat)
+    $forceIncludeAll = $request->boolean('include_all', false);
+
+    $itemsInput = $request->input('items');
+
+    // If explicit items provided, use them (caller override)
+    if (is_array($itemsInput) && !empty($itemsInput)) {
+        $items = $itemsInput;
+    } else {
+        if ($forceIncludeAll) {
+            // include all order items as invoice line items
+            $order->load('items');
+            $items = $order->items->map(fn($it) => [
+                'service_id' => $it->service_id,
+                'service_name' => $it->service_name,
+                'description' => $it->service_description ?? $it->description ?? null,
+                'unit_price' => $it->unit_price,
+                'quantity' => $it->quantity,
+                'meta' => $it->meta ?? null,
+            ])->toArray();
+        } else {
+            // compute remaining / uninvoiced quantities per order item
+            $order->load('items');
+
+            $items = [];
+            foreach ($order->items as $it) {
+                // compute already invoiced quantity for this order item
+                $invoicedQtyQuery = \Modules\Invoice\Models\InvoiceItem::query()
+                    ->whereHas('invoice', function ($q) use ($order) {
+                        $q->where('order_id', $order->id);
+                    });
+
+                if (!empty($it->service_id)) {
+                    // match by service_id primarily
+                    $invoicedQtyQuery->where('service_id', $it->service_id);
+                } else {
+                    // fallback: match by service_name if service_id absent
+                    $invoicedQtyQuery->where('service_name', $it->service_name);
+                }
+
+                $invoicedQty = (float) $invoicedQtyQuery->sum('quantity');
+
+                $remainingQty = max(0, (float)$it->quantity - $invoicedQty);
+
+                if ($remainingQty > 0) {
+                    $items[] = [
+                        'service_id' => $it->service_id,
+                        'service_name' => $it->service_name,
+                        'description' => $it->service_description ?? $it->description ?? null,
+                        'unit_price' => $it->unit_price,
+                        'quantity' => $remainingQty,
+                        'meta' => $it->meta ?? null,
+                    ];
+                }
+            }
+
+            // If nothing remains to invoice, return helpful error rather than creating 0 invoice
+            if (empty($items)) {
+                return response()->json([
+                    'message' => 'No uninvoiced order items found. Provide explicit items or set include_all=1 to invoice all items.'
+                ], 422);
+            }
+        }
+    }
+
+    return DB::transaction(function () use ($request, $order, $items) {
+        $payload = [
+            'order_id' => $order->id,
+            'vat_percent' => $request->input('vat_percent', $order->vat_percent),
+            'coupon_discount' => $request->input('coupon_discount', $order->coupon_discount),
+            'invoice_number' => $request->input('invoice_number', 'INV-' . Str::upper(Str::random(8))),
+            'type' => $request->input('type', 'initial'),
+            'items' => $items,
+        ];
+
+        $invoice = $this->invoiceService->createFromPayload($payload);
+
+        // recalc carryover using current order invoices/payments
+        $orderForCarry = Order::with(['invoices.payments'])->find($order->id);
+        $carryoverAmount = $this->invoiceService->calculateCarryoverPayment($orderForCarry, $invoice->id);
+
+        if ($carryoverAmount > 0) {
+            $applyAmount = min($carryoverAmount, (float) $invoice->grand_total);
+
+            InvoicePayment::create([
+                'invoice_id' => $invoice->id,
+                'payment_reference' => 'CARRY-' . strtoupper(Str::random(8)),
+                'staff_id' => Auth::id() ?? null,
+                'amount' => $applyAmount,
+                'method' => 'adjustment',
+                'status' => 'completed',
+                'note' => 'Auto-applied carryover from previous payments',
+            ]);
+
+            $invoice = $this->invoiceService->recalcAndRefresh($invoice);
+        }
+
+        $this->syncOrderPaymentStatus($invoice);
+
+        // Compute totals for response (clear labels)
+        $totalBill = (float) ($invoice->grand_total ?? 0.0);
+        $totalPaid = (float) $invoice->payments()->where('status', 'completed')->sum('amount');
+        $totalDue = max(0.0, $totalBill - $totalPaid);
+        $payable = $totalDue;
+
+        return response()->json([
+            'invoice' => $invoice->fresh(['items', 'payments', 'order']),
+            'carryover_applied' => $carryoverAmount > 0 ? $applyAmount : 0,
+            'summary' => [
+                'total_bill' => round($totalBill, 2),
+                'total_paid' => round($totalPaid, 2),
+                'total_due' => round($totalDue, 2),
+                'payable' => round($payable, 2),
+            ],
+        ], 201);
+    });
+} */
+
+
+ /**
+     * Create invoice from order with automatic carryover
+     */
+     // filepath: Modules/Invoice/Http/Controllers/InvoiceController.php
+
+public function createFromOrder(Request $request, $orderId)
+{
+    $order = Order::with(['items', 'invoices.payments'])->findOrFail($orderId);
+
+    // allow explicit override items
+    $itemsInput = $request->input('items');
+
+    if (is_array($itemsInput) && !empty($itemsInput)) {
+        // caller provided explicit invoice items -> use as-is
+        $items = $itemsInput;
+    } else {
+        // DEFAULT: include ALL order items in the invoice (for transparency)
+        // but annotate each item with invoiced_qty and remaining_qty so UI can display status
+        $order->load('items');
+
+        $items = [];
+        foreach ($order->items as $it) {
+            // compute already invoiced quantity for this order item (match by service_id if present, else service_name)
+            $invoicedQtyQuery = \Modules\Invoice\Models\InvoiceItem::query()
+                ->whereHas('invoice', function ($q) use ($order) {
+                    $q->where('order_id', $order->id);
+                });
+
+            if (!empty($it->service_id)) {
+                $invoicedQtyQuery->where('service_id', $it->service_id);
+            } else {
+                $invoicedQtyQuery->where('service_name', $it->service_name);
+            }
+
+            $invoicedQty = (float) $invoicedQtyQuery->sum('quantity');
+
+            $remainingQty = max(0, (float)$it->quantity - $invoicedQty);
+
+            // include full original quantity in invoice items for visibility,
+            // but add meta with invoiced/remaining info. Financially the carryover
+            // (applied below) will ensure customer is not double-charged.
+            $items[] = [
+                'service_id' => $it->service_id,
+                'service_name' => $it->service_name,
+                'description' => $it->service_description ?? $it->description ?? null,
+                'unit_price' => $it->unit_price,
+                // keep original quantity so items list shows full order
+                'quantity' => $it->quantity,
+                'meta' => array_merge($it->meta ?? [], [
+                    'order_item_id' => $it->id,
+                    'invoiced_qty' => $invoicedQty,
+                    'remaining_qty' => $remainingQty,
+                ]),
+            ];
+        }
+    }
+
+    return DB::transaction(function () use ($request, $order, $items) {
+        $payload = [
+            'order_id' => $order->id,
+            'vat_percent' => $request->input('vat_percent', $order->vat_percent),
+            'coupon_discount' => $request->input('coupon_discount', $order->coupon_discount),
+            'invoice_number' => $request->input('invoice_number', 'INV-' . Str::upper(Str::random(8))),
+            'type' => $request->input('type', 'initial'),
+            'items' => $items,
+        ];
+
+        // create invoice (grand_total computed from items)
+        $invoice = $this->invoiceService->createFromPayload($payload);
+
+        // recompute carryover using latest order invoices/payments
+        $orderForCarry = Order::with(['invoices.payments'])->find($order->id);
+        $carryoverAmount = $this->invoiceService->calculateCarryoverPayment($orderForCarry, $invoice->id);
+
+        $applyAmount = 0;
+        if ($carryoverAmount > 0) {
+            $applyAmount = min($carryoverAmount, (float) $invoice->grand_total);
+
+            InvoicePayment::create([
+                'invoice_id' => $invoice->id,
+                'payment_reference' => 'CARRY-' . strtoupper(Str::random(8)),
+                'staff_id' => Auth::id() ?? null,
+                'amount' => $applyAmount,
+                'method' => 'adjustment',
+                'status' => 'completed',
+                'note' => 'Auto-applied carryover from previous payments',
+            ]);
+
+            // refresh invoice totals after applying carryover
+            $invoice = $this->invoiceService->recalcAndRefresh($invoice);
+        }
+
+        $this->syncOrderPaymentStatus($invoice);
+
+        // Build response summary
+        $totalBill = (float) ($invoice->grand_total ?? 0.0);
+        $totalPaid = (float) $invoice->payments()->where('status', 'completed')->sum('amount');
+        $totalDue = max(0.0, $totalBill - $totalPaid);
+
+        return response()->json([
+            'invoice' => $invoice->fresh(['items', 'payments', 'order']),
+            'carryover_applied' => round($applyAmount, 2),
+            'summary' => [
+                'total_bill' => round($totalBill, 2),
+                'total_paid' => round($totalPaid, 2),
+                'total_due' => round($totalDue, 2),
+            ],
+        ], 201);
+    });
+} 
 }
