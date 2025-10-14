@@ -56,65 +56,66 @@ class InvoiceController extends Controller
         }
         abort(403, 'Unauthorized to create invoice.');
     }
+/**
+ * Authorize modification actions on a given invoice:
+ * - Admin always allowed
+ * - Employee allowed only if order is assigned to them
+ * - If invoice has no order, only admin allowed
+ */
+protected function authorizeModifyAccess(Invoice $invoice): void
+{
+    $user = Auth::user();
+    if (!$user) {
+        abort(403, 'Unauthorized.');
+    }
 
-    /**
-     * Authorize modification actions on a given invoice:
-     * - Admin always allowed
-     * - Employee allowed only if order is assigned to them (considering assigned_type)
-     * - If invoice has no order, only admin allowed
-     */
-    protected function authorizeModifyAccess(Invoice $invoice): void
-    {
-        $user = Auth::user();
-        if (!$user) {
-            abort(403, 'Unauthorized.');
+    // Admin can always modify
+    if ($this->userIsAdmin($user)) {
+        return;
+    }
+
+    // Only employees can modify if assigned
+    if ($this->userIsEmployee($user)) {
+        $order = $invoice->order;
+
+        if (!$order) {
+            // No order attached -> only admin allowed, so deny
+            abort(403, 'Unauthorized to modify invoice without order.');
         }
 
-        // Only employees may edit (apart from admins)
-        if ($this->userIsEmployee($user) || $this->userIsAdmin($user)) {
-            $order = $invoice->order;
-            if (!$order) {
-                // No order attached -> only admin could modify, so deny
-                abort(403, 'Unauthorized to modify invoice without order.');
+        $assignedType = $order->assigned_type;
+        $assignedTo = $order->assigned_to;
+
+        // assigned to employee
+        if ($assignedType === 'employee') {
+            if ($assignedTo === $user->id) {
+                return;
             }
 
-            $assignedType = $order->assigned_type;
-            $assignedTo = $order->assigned_to;
-
-            // Case 1: order.assigned_type === 'employee'
-            if ($assignedType === 'employee') {
-                // Two common possibilities:
-                // - assigned_to stores the users.id of the employee user
-                // - OR assigned_to stores id from separate employees table
-                if ($assignedTo === $user->id) {
-                    return;
-                }
-
-                // If User has an employee relation (e.g. employeeProfile) check its id
-                if (isset($user->employeeProfile) && $user->employeeProfile && $assignedTo === $user->employeeProfile->id) {
-                    return;
-                }
-
-                // Also allow if user has 'employee' and assigned_to is numeric matching user's id (redundant)
-                // otherwise deny
-                abort(403, 'Unauthorized to modify invoice for this order.');
+            if (isset($user->employeeProfile) && $assignedTo === $user->employeeProfile->id) {
+                return;
             }
 
-            // Case 2: order.assigned_type === 'user' (assigned directly to a user)
-            if ($assignedType === 'user') {
-                if ($assignedTo === $user->id) {
-                    return;
-                }
-                abort(403, 'Unauthorized to modify invoice for this order.');
-            }
-
-            // Other/unknown assigned_type -> deny for employees
-            abort(403, 'Unauthorized to modify invoice.');
+            abort(403, 'Unauthorized to modify invoice for this order.');
         }
 
-        // Non-admin, non-employee cannot modify
+        // assigned directly to a user
+        if ($assignedType === 'user') {
+            if ($assignedTo === $user->id) {
+                return;
+            }
+
+            abort(403, 'Unauthorized to modify invoice for this order.');
+        }
+
+        // unknown assigned_type -> deny
         abort(403, 'Unauthorized to modify invoice.');
     }
+
+    // Non-admin, non-employee cannot modify
+    abort(403, 'Unauthorized to modify invoice.');
+}
+    
 
     public function index(Request $request)
     {
@@ -511,7 +512,7 @@ class InvoiceController extends Controller
     
     
      
- /** public function createFromOrder(Request $request, $orderId)
+ public function createFromOrder(Request $request, $orderId)
 {
     $order = Order::with(['items'])->findOrFail($orderId);
 
@@ -631,113 +632,5 @@ class InvoiceController extends Controller
             ],
         ], 201);
     });
-} */
-
-public function createFromOrder(Request $request, $orderId)
-{
-    $order = Order::with(['items'])->findOrFail($orderId);
-
-    // allow caller to force include all items
-    $forceIncludeAll = $request->boolean('include_all', false);
-    $itemsInput = $request->input('items');
-
-    // Determine which items to invoice
-    if (is_array($itemsInput) && !empty($itemsInput)) {
-        $items = $itemsInput; // caller override
-    } else {
-        $order->load('items');
-        $items = [];
-
-        foreach ($order->items as $it) {
-            $invoicedQtyQuery = \Modules\Invoice\Models\InvoiceItem::query()
-                ->whereHas('invoice', fn($q) => $q->where('order_id', $order->id));
-
-            if (!empty($it->service_id)) {
-                $invoicedQtyQuery->where('service_id', $it->service_id);
-            } else {
-                $invoicedQtyQuery->where('service_name', $it->service_name);
-            }
-
-            $invoicedQty = (float) $invoicedQtyQuery->sum('quantity');
-            $remainingQty = max(0, (float)$it->quantity - $invoicedQty);
-
-            // include all items if forced, else only remaining
-            if ($forceIncludeAll || $remainingQty > 0) {
-                $qtyToInvoice = $forceIncludeAll ? (float)$it->quantity : $remainingQty;
-
-                $items[] = [
-                    'service_id' => $it->service_id,
-                    'service_name' => $it->service_name,
-                    'description' => $it->service_description ?? $it->description ?? null,
-                    'unit_price' => $it->unit_price,
-                    'quantity' => $qtyToInvoice,
-                    'line_total' => round($it->unit_price * $qtyToInvoice, 2),
-                    'meta' => array_merge($it->meta ?? [], [
-                        'order_item_id' => $it->id,
-                        'invoiced_qty' => $invoicedQty,
-                        'remaining_qty' => $remainingQty,
-                    ]),
-                ];
-            }
-        }
-
-        if (empty($items)) {
-            return response()->json([
-                'message' => 'No uninvoiced order items found. Provide explicit items or set include_all=1.'
-            ], 422);
-        }
-    }
-
-    return DB::transaction(function () use ($request, $order, $items) {
-        $payload = [
-            'order_id' => $order->id,
-            'vat_percent' => $request->input('vat_percent', $order->vat_percent),
-            'coupon_discount' => $request->input('coupon_discount', $order->coupon_discount),
-            'invoice_number' => $request->input('invoice_number', 'INV-' . Str::upper(Str::random(8))),
-            'type' => $request->input('type', 'initial'),
-            'items' => $items,
-        ];
-
-        $invoice = $this->invoiceService->createFromPayload($payload);
-
-        // recalc carryover using current order invoices/payments
-        $orderForCarry = Order::with(['invoices.payments'])->find($order->id);
-        $carryoverAmount = $this->invoiceService->calculateCarryoverPayment($orderForCarry, $invoice->id);
-
-        if ($carryoverAmount > 0) {
-            $applyAmount = min($carryoverAmount, (float) $invoice->grand_total);
-
-            InvoicePayment::create([
-                'invoice_id' => $invoice->id,
-                'payment_reference' => 'CARRY-' . strtoupper(Str::random(8)),
-                'staff_id' => Auth::id() ?? null,
-                'amount' => $applyAmount,
-                'method' => 'adjustment',
-                'status' => 'completed',
-                'note' => 'Auto-applied carryover from previous payments',
-            ]);
-
-            $invoice = $this->invoiceService->recalcAndRefresh($invoice);
-        }
-
-        $this->syncOrderPaymentStatus($invoice);
-
-        // Compute totals for response
-        $totalBill = (float) ($invoice->grand_total ?? 0.0);
-        $totalPaid = (float) $invoice->payments()->where('status', 'completed')->sum('amount');
-        $totalDue = max(0.0, $totalBill - $totalPaid);
-        $payable = $totalDue;
-
-        return response()->json([
-            'invoice' => $invoice->fresh(['items', 'payments', 'order']),
-            'carryover_applied' => $carryoverAmount > 0 ? $applyAmount : 0,
-            'summary' => [
-                'total_bill' => round($totalBill, 2),
-                'total_paid' => round($totalPaid, 2),
-                'total_due' => round($totalDue, 2),
-                'payable' => round($payable, 2),
-            ],
-        ], 201);
-    });
-}
+} 
 }
