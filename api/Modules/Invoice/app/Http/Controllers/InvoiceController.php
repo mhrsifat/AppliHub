@@ -511,7 +511,7 @@ class InvoiceController extends Controller
     
     
      
- public function createFromOrder(Request $request, $orderId)
+ /** public function createFromOrder(Request $request, $orderId)
 {
     $order = Order::with(['items'])->findOrFail($orderId);
 
@@ -631,30 +631,26 @@ class InvoiceController extends Controller
             ],
         ], 201);
     });
-} 
+} */
 
-/** public function createFromOrder(Request $request, $orderId)
+public function createFromOrder(Request $request, $orderId)
 {
-    $order = Order::with(['items', 'invoices.payments'])->findOrFail($orderId);
+    $order = Order::with(['items'])->findOrFail($orderId);
 
-    // allow explicit override items
+    // allow caller to force include all items
+    $forceIncludeAll = $request->boolean('include_all', false);
     $itemsInput = $request->input('items');
 
+    // Determine which items to invoice
     if (is_array($itemsInput) && !empty($itemsInput)) {
-        // caller provided explicit invoice items -> use as-is
-        $items = $itemsInput;
+        $items = $itemsInput; // caller override
     } else {
-        // DEFAULT: include ALL order items in the invoice (for transparency)
-        // but annotate each item with invoiced_qty and remaining_qty so UI can display status
         $order->load('items');
-
         $items = [];
+
         foreach ($order->items as $it) {
-            // compute already invoiced quantity for this order item (match by service_id if present, else service_name)
             $invoicedQtyQuery = \Modules\Invoice\Models\InvoiceItem::query()
-                ->whereHas('invoice', function ($q) use ($order) {
-                    $q->where('order_id', $order->id);
-                });
+                ->whereHas('invoice', fn($q) => $q->where('order_id', $order->id));
 
             if (!empty($it->service_id)) {
                 $invoicedQtyQuery->where('service_id', $it->service_id);
@@ -663,25 +659,32 @@ class InvoiceController extends Controller
             }
 
             $invoicedQty = (float) $invoicedQtyQuery->sum('quantity');
-
             $remainingQty = max(0, (float)$it->quantity - $invoicedQty);
 
-            // include full original quantity in invoice items for visibility,
-            // but add meta with invoiced/remaining info. Financially the carryover
-            // (applied below) will ensure customer is not double-charged.
-            $items[] = [
-                'service_id' => $it->service_id,
-                'service_name' => $it->service_name,
-                'description' => $it->service_description ?? $it->description ?? null,
-                'unit_price' => $it->unit_price,
-                // keep original quantity so items list shows full order
-                'quantity' => $it->quantity,
-                'meta' => array_merge($it->meta ?? [], [
-                    'order_item_id' => $it->id,
-                    'invoiced_qty' => $invoicedQty,
-                    'remaining_qty' => $remainingQty,
-                ]),
-            ];
+            // include all items if forced, else only remaining
+            if ($forceIncludeAll || $remainingQty > 0) {
+                $qtyToInvoice = $forceIncludeAll ? (float)$it->quantity : $remainingQty;
+
+                $items[] = [
+                    'service_id' => $it->service_id,
+                    'service_name' => $it->service_name,
+                    'description' => $it->service_description ?? $it->description ?? null,
+                    'unit_price' => $it->unit_price,
+                    'quantity' => $qtyToInvoice,
+                    'line_total' => round($it->unit_price * $qtyToInvoice, 2),
+                    'meta' => array_merge($it->meta ?? [], [
+                        'order_item_id' => $it->id,
+                        'invoiced_qty' => $invoicedQty,
+                        'remaining_qty' => $remainingQty,
+                    ]),
+                ];
+            }
+        }
+
+        if (empty($items)) {
+            return response()->json([
+                'message' => 'No uninvoiced order items found. Provide explicit items or set include_all=1.'
+            ], 422);
         }
     }
 
@@ -695,14 +698,12 @@ class InvoiceController extends Controller
             'items' => $items,
         ];
 
-        // create invoice (grand_total computed from items)
         $invoice = $this->invoiceService->createFromPayload($payload);
 
-        // recompute carryover using latest order invoices/payments
+        // recalc carryover using current order invoices/payments
         $orderForCarry = Order::with(['invoices.payments'])->find($order->id);
         $carryoverAmount = $this->invoiceService->calculateCarryoverPayment($orderForCarry, $invoice->id);
 
-        $applyAmount = 0;
         if ($carryoverAmount > 0) {
             $applyAmount = min($carryoverAmount, (float) $invoice->grand_total);
 
@@ -716,26 +717,27 @@ class InvoiceController extends Controller
                 'note' => 'Auto-applied carryover from previous payments',
             ]);
 
-            // refresh invoice totals after applying carryover
             $invoice = $this->invoiceService->recalcAndRefresh($invoice);
         }
 
         $this->syncOrderPaymentStatus($invoice);
 
-        // Build response summary
+        // Compute totals for response
         $totalBill = (float) ($invoice->grand_total ?? 0.0);
         $totalPaid = (float) $invoice->payments()->where('status', 'completed')->sum('amount');
         $totalDue = max(0.0, $totalBill - $totalPaid);
+        $payable = $totalDue;
 
         return response()->json([
             'invoice' => $invoice->fresh(['items', 'payments', 'order']),
-            'carryover_applied' => round($applyAmount, 2),
+            'carryover_applied' => $carryoverAmount > 0 ? $applyAmount : 0,
             'summary' => [
                 'total_bill' => round($totalBill, 2),
                 'total_paid' => round($totalPaid, 2),
                 'total_due' => round($totalDue, 2),
+                'payable' => round($payable, 2),
             ],
         ], 201);
     });
-} */
+}
 }
