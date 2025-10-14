@@ -84,7 +84,7 @@ class Order extends Model
     
 public function assignedTo()
 {
-    return $this->belongsTo(\App\Models\User::class, 'assigned_to');
+    return $this->belongsTo(\Modules\Employee\Models\Employee::class, 'assigned_to');
 }
 
     // placeholder for invoices relation (Invoices module will define Invoice model)

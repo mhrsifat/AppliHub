@@ -18,6 +18,8 @@ use Modules\Order\Http\Requests\StoreOrderRequest;
 use Modules\Order\Http\Requests\UpdateOrderRequest;
 use Modules\Order\Http\Requests\OrderItemRequest;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Modules\Invoice\Models\InvoicePayment;
+use Modules\Invoice\Models\Refund;
 
 class OrderController extends Controller
 {
@@ -553,5 +555,103 @@ public function unassign(Request $request, $id)
         $carryover = $totalPaid - $totalInvoiced;
 
         return max(0, round($carryover, 2));
+    }
+    
+    public function getFullOrderDetails(Request $request, $orderId)
+    {
+        $order = Order::with([
+            'items',
+            'assignedTo:id,first_name,last_name,email,phone,avatar,location,full_address,status',
+            'invoices.items',
+            'invoices.payments',
+            'invoices.refunds',
+        ])->findOrFail($orderId);
+
+        // Build assigned employee info
+        $assignedEmployee = null;
+        if ($order->assignedTo) {
+            $assignedEmployee = [
+                'id' => $order->assignedTo->id,
+                'name' => trim($order->assignedTo->first_name . ' ' . $order->assignedTo->last_name),
+                'email' => $order->assignedTo->email,
+                'phone' => $order->assignedTo->phone,
+                'avatar' => $order->assignedTo->avatar,
+                'location' => $order->assignedTo->location,
+                'full_address' => $order->assignedTo->full_address,
+                'status' => $order->assignedTo->status,
+            ];
+        }
+
+        // Calculate totals across invoices
+        $invoiceSummary = [
+            'total_invoice_amount' => 0,
+            'total_paid' => 0,
+            'total_refunded' => 0,
+            'total_due' => 0,
+        ];
+
+        $invoices = $order->invoices->map(function ($inv) use (&$invoiceSummary) {
+            $paid = $inv->payments->where('status', 'completed')->sum('amount');
+            $refunded = $inv->refunds->sum('amount');
+            $netPaid = max(0, $paid - $refunded);
+            $due = max(0, $inv->grand_total - $netPaid);
+
+            $invoiceSummary['total_invoice_amount'] += $inv->grand_total;
+            $invoiceSummary['total_paid'] += $paid;
+            $invoiceSummary['total_refunded'] += $refunded;
+            $invoiceSummary['total_due'] += $due;
+
+            return [
+                'id' => $inv->id,
+                'invoice_number' => $inv->invoice_number,
+                'status' => $inv->status,
+                'grand_total' => (float) $inv->grand_total,
+                'paid' => (float) $paid,
+                'refunded' => (float) $refunded,
+                'due' => (float) $due,
+                'items' => $inv->items->map(function ($it) {
+                    return [
+                        'id' => $it->id,
+                        'service_name' => $it->service_name,
+                        'quantity' => $it->quantity,
+                        'unit_price' => (float)$it->unit_price,
+                        'line_total' => (float)$it->line_total,
+                    ];
+                }),
+            ];
+        });
+
+        return response()->json([
+            'order' => [
+                'id' => $order->id,
+                'order_number' => $order->order_number,
+                'customer_name' => $order->customer_name,
+                'customer_email' => $order->customer_email,
+                'customer_phone' => $order->customer_phone,
+                'customer_address' => $order->customer_address,
+                'status' => $order->status,
+                'payment_status' => $order->payment_status,
+                'total' => (float) $order->total,
+                'vat_percent' => (float) $order->vat_percent,
+                'vat_amount' => (float) $order->vat_amount,
+                'coupon_discount' => (float) $order->coupon_discount,
+                'grand_total' => (float) $order->grand_total,
+                'created_at' => $order->created_at,
+            ],
+            'items' => $order->items->map(function ($it) {
+                return [
+                    'id' => $it->id,
+                    'service_id' => $it->service_id,
+                    'service_name' => $it->service_name,
+                    'description' => $it->description,
+                    'unit_price' => (float) $it->unit_price,
+                    'quantity' => (float) $it->quantity,
+                    'line_total' => (float) $it->line_total,
+                ];
+            }),
+            'assigned_employee' => $assignedEmployee,
+            'invoices' => $invoices,
+            'summary' => $invoiceSummary,
+        ]);
     }
 }
