@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Pusher from 'pusher-js';
-import { Box, TextField, IconButton, Button, List, ListItem, Avatar } from '@mui/material';
-import SendIcon from '@mui/icons-material/Send';
-import AttachmentIcon from '@mui/icons-material/AttachFile';
-import api, { setAccessToken } from '../../services/api'; // your api.js client
+import { Box, TextField, IconButton, Button, List } from '@mui/material';
+import api from '../../services/api'; // your api.js client
 import MessageItem from './MessageItem';
+
+// Heroicons
+import { PaperAirplaneIcon, PaperClipIcon } from '@heroicons/react/24/outline';
 
 export default function ChatWindow({ apiBase, onClose }) {
   const [conversation, setConversation] = useState(null);
@@ -17,7 +18,6 @@ export default function ChatWindow({ apiBase, onClose }) {
   const listRef = useRef(null);
 
   useEffect(() => {
-    // when conversation set, load messages and subscribe
     if (!conversation) return;
     fetchMessages();
 
@@ -27,20 +27,20 @@ export default function ChatWindow({ apiBase, onClose }) {
         cluster: process.env.VITE_PUSHER_CLUSTER,
         authEndpoint: `${apiBase}/broadcasting/auth`,
         auth: {
-          params: { contact }, // anonymous subscribers include contact to be authorzied on server channel
+          params: { contact },
         },
       });
 
       const channel = pusherRef.current.subscribe(`conversation.${conversation.id}`);
+
+      // Laravel sometimes sends the FQCN event name, sometimes a short name. Bind both.
       channel.bind('App\\Events\\MessageSent', (data) => {
-        // event payload uses 'message'
         if (data.message) {
           setMessages((m) => [...m, data.message]);
           scrollToBottom();
         }
       });
 
-      // also bind simpler event if server sends no namespaced event name
       channel.bind('message', (data) => {
         if (data.message) {
           setMessages((m) => [...m, data.message]);
@@ -49,8 +49,12 @@ export default function ChatWindow({ apiBase, onClose }) {
       });
 
       return () => {
-        pusherRef.current.unsubscribe(`conversation.${conversation.id}`);
-        pusherRef.current.disconnect();
+        try {
+          pusherRef.current.unsubscribe(`conversation.${conversation.id}`);
+          pusherRef.current.disconnect();
+        } catch (e) {
+          // ignore
+        }
       };
     }
   }, [conversation]);
@@ -71,11 +75,9 @@ export default function ChatWindow({ apiBase, onClose }) {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      setConversation(res.data.data || res.data);
-      if (res.data.data && res.data.data.id) {
-        // fetch messages shortly
-        fetchMessagesForConversation(res.data.data.id);
-      }
+      const conv = res.data.data || res.data;
+      setConversation(conv);
+      if (conv && conv.id) fetchMessagesForConversation(conv.id);
       setBody('');
       setAttachments([]);
     } catch (err) {
@@ -86,7 +88,6 @@ export default function ChatWindow({ apiBase, onClose }) {
 
   const sendMessage = async () => {
     if (!conversation) {
-      // start new conversation
       await createConversation();
       return;
     }
@@ -166,11 +167,13 @@ export default function ChatWindow({ apiBase, onClose }) {
             value={body}
             onChange={(e) => setBody(e.target.value)}
           />
-          <IconButton component="label">
+
+          <IconButton component="label" title="Attach files">
             <input hidden multiple type="file" onChange={(e) => setAttachments(Array.from(e.target.files))} />
-            <AttachmentIcon />
+            <PaperClipIcon className="w-5 h-5" />
           </IconButton>
-          <Button variant="contained" endIcon={<SendIcon />} onClick={sendMessage}>
+
+          <Button variant="contained" endIcon={<PaperAirplaneIcon className="w-4 h-4" />} onClick={sendMessage}>
             Send
           </Button>
         </Box>
