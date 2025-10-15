@@ -13,7 +13,7 @@ Route::prefix('message')->group(function () {
     Route::post('/conversations/{conversation}/attachments', [AttachmentController::class, 'store']); // upload attachment (public)
 
     // Staff / authenticated
-    Route::middleware(['auth:sanctum'])->group(function () {
+    Route::middleware(['multi-auth'])->group(function () {
         Route::get('/conversations', [ConversationController::class, 'index']); // list for employees
         Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
         Route::post('/conversations/{conversation}/join', [ConversationController::class, 'join']); // mark participant

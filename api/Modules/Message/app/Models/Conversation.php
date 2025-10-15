@@ -18,6 +18,11 @@ class Conversation extends Model
         'assigned_to', 'status',
         'last_message_preview', 'last_message_at',
     ];
+    
+    public function getRouteKeyName()
+{
+    return 'uuid';
+}
 
     public function messages(): HasMany
     {

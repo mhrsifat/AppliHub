@@ -26,7 +26,19 @@ class MessageController extends Controller
 
         $payload = $request->validated();
 
-        $isStaff = (bool) ($user && property_exists($user, 'is_staff') && $user->is_staff);
+        // Fetch staff roles from config so you can extend easily later.
+        $staffRoles = config('message.staff_roles', ['admin','employee','manager']);
+
+        // Use Spatie hasAnyRole if available. Fallback to false.
+        $isStaff = false;
+        if ($user) {
+            if (method_exists($user, 'hasAnyRole')) {
+                $isStaff = (bool) $user->hasAnyRole($staffRoles);
+            } else {
+                // In case you don't use Spatie, optionally check a column 'role' or 'is_staff' if exists
+                $isStaff = (bool) ($user->is_staff ?? false);
+            }
+        }
 
         $senderName = $payload['name'] ?? ($user->name ?? 'Unknown');
         $senderContact = $payload['contact'] ?? ($user->email ?? null);
@@ -40,11 +52,19 @@ class MessageController extends Controller
             'body' => $payload['body'] ?? null,
         ]);
 
-        // attachments if present
+        // attachments if present (support single or multiple)
         if ($request->hasFile('attachments')) {
+            $files = $request->file('attachments');
+            // If single file sent without array key - normalize to array
+            if (!is_array($files)) {
+                $files = [$files];
+            }
+
             $message->has_attachments = true;
-            foreach ($request->file('attachments') as $file) {
+            foreach ($files as $file) {
+                // store on public disk (ensure php artisan storage:link has been run)
                 $path = $file->store('messages', 'public');
+
                 Attachment::create([
                     'message_id' => $message->id,
                     'filename' => $file->getClientOriginalName(),
@@ -70,10 +90,29 @@ class MessageController extends Controller
     public function destroy(Request $request, $id)
     {
         $message = Message::findOrFail($id);
-        // Only staff can delete messages (enforced via middleware)
+
         $user = $request->user();
-        if (!$user || !property_exists($user, 'is_staff') || !$user->is_staff) {
+        $staffRoles = config('message.staff_roles', ['admin','employee','manager']);
+
+        $isStaff = false;
+        if ($user) {
+            if (method_exists($user, 'hasAnyRole')) {
+                $isStaff = (bool) $user->hasAnyRole($staffRoles);
+            } else {
+                $isStaff = (bool) ($user->is_staff ?? false);
+            }
+        }
+
+        if (!$isStaff) {
             return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        // delete attachments physically (optional)
+        foreach ($message->attachments as $att) {
+            if ($att->path && Storage::disk('public')->exists($att->path)) {
+                Storage::disk('public')->delete($att->path);
+            }
+            $att->delete();
         }
 
         $message->delete();
