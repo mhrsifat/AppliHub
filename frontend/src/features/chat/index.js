@@ -6,6 +6,6 @@ export * from './services/chatService';
 
 
 // import { ChatWidget } from "@/features/chat";
-     {// <ChatWidget position="right" />  }
+     {/* <ChatWidget position="right" />  */}
       {/* position = "left" or "right" */}
 
