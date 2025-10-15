@@ -4,9 +4,12 @@ namespace Modules\Message\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Conversation extends Model
 {
+    use HasFactory;
+
     protected $table = 'message_conversations';
 
     protected $fillable = [
@@ -15,6 +18,11 @@ class Conversation extends Model
         'assigned_to', 'status',
         'last_message_preview', 'last_message_at',
     ];
+    
+    public function getRouteKeyName()
+{
+    return 'uuid';
+}
 
     public function messages(): HasMany
     {
@@ -24,5 +32,10 @@ class Conversation extends Model
     public function participants(): HasMany
     {
         return $this->hasMany(ConversationParticipant::class, 'conversation_id');
+    }
+
+    protected static function newFactory()
+    {
+        return \Modules\Message\Database\Factories\ConversationFactory::new();
     }
 }

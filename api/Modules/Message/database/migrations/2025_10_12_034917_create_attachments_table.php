@@ -8,7 +8,7 @@ class CreateAttachmentsTable extends Migration
 {
     public function up()
     {
-        Schema::create('attachments', function (Blueprint $table) {
+        Schema::create('message_attachments', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->unsignedBigInteger('message_id')->index();
             $table->string('filename');
@@ -18,13 +18,13 @@ class CreateAttachmentsTable extends Migration
             $table->timestamps();
 
             $table->foreign('message_id')
-                ->references('id')->on('messages')
+                ->references('id')->on('message_messages')
                 ->onDelete('cascade');
         });
     }
 
     public function down()
     {
-        Schema::dropIfExists('attachments');
+        Schema::dropIfExists('message_attachments');
     }
 }

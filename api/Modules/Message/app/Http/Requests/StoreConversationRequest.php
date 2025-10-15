@@ -6,7 +6,10 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreConversationRequest extends FormRequest
 {
-    public function authorize() { return true; }
+    public function authorize()
+    {
+        return true;
+    }
 
     public function rules()
     {
@@ -15,7 +18,8 @@ class StoreConversationRequest extends FormRequest
             'contact' => 'required|string|max:191', // either phone or email - backend won't enforce format
             'subject' => 'nullable|string|max:191',
             'message' => 'nullable|string',
-            'attachments.*' => 'nullable|file|max:10240', // 10MB each
+            'attachments' => 'nullable|array|max:5',
+            'attachments.*' => 'file|mimes:jpg,jpeg,png,gif,pdf,doc,docx,txt|max:10240', // 10MB each
         ];
     }
 }

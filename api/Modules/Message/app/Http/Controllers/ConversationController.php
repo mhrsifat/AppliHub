@@ -30,6 +30,8 @@ class ConversationController extends Controller
     {
         $data = $request->validated();
 
+        $data['name'] = $data['name'] ?? "Anonimus User";
+
         $conversation = Conversation::create([
             'uuid' => (string) Str::uuid(),
             'subject' => $data['subject'] ?? null,
@@ -72,7 +74,6 @@ class ConversationController extends Controller
 
     public function join(Request $request, Conversation $conversation)
     {
-        // for staff -> add staff participant
         $user = $request->user();
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 

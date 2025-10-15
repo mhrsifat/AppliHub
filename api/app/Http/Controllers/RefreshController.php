@@ -11,84 +11,139 @@ use App\Models\RefreshToken;
 
 class RefreshController extends Controller
 {
-    public function me(Request $request)
+    protected function cookieForRefresh(string $plainToken, bool $remember): \Symfony\Component\HttpFoundation\Cookie
     {
-        // ------------------------
-        // 1) Check Authorization header (Bearer token)
-        // ------------------------
-        $authHeader = $request->header('Authorization');
-        if ($authHeader && Str::startsWith($authHeader, 'Bearer ')) {
-            $token = Str::substr($authHeader, 7);
-            $pat = PersonalAccessToken::findToken($token);
-            if ($pat && $pat->tokenable) {
-                return response()->json(['user' => $pat->tokenable]);
-            }
+        $minutes = $remember ? 60 * 24 * 30 : 0;
+        $usePartitioned = filter_var(env('PARTITIONED_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
+
+        $sameSite = 'None';
+        $secure = request()->isSecure() || app()->environment('production');
+        $forceSecure = filter_var(env('FORCE_SECURE_COOKIES', false), FILTER_VALIDATE_BOOLEAN);
+        if ($forceSecure) {
+            $secure = true;
+        }
+        if ($sameSite === 'None') {
+            $secure = true;
         }
 
-        // ------------------------
-        // 2) Check refresh_token cookie
-        // ------------------------
-        $refreshToken = $request->cookie('refresh_token');
-        if ($refreshToken) {
-            $hashedToken = hash('sha256', $refreshToken);
-
-            $refresh = RefreshToken::where('token', $hashedToken)
-                ->valid()
-                ->first();
-
-            if ($refresh) {
-                return DB::transaction(function () use ($refresh, $request) {
-                    $user = $refresh->user;
-
-                    // Issue new access token
-                    $accessToken = $user->createToken('auth_token')->plainTextToken;
-
-                    // Generate new refresh token
-                    $newRefreshToken = Str::random(60);
-                    $newHashed = hash('sha256', $newRefreshToken);
-
-                    // Store new refresh token
-                    RefreshToken::create([
-                        'user_id' => $user->id,
-                        'token' => $newHashed,
-                        'device_name' => $request->userAgent() ?? 'unknown',
-                        'expires_at' => now()->addDays(30),
-                    ]);
-
-                    // Delete old refresh token
-                    $refresh->delete();
-
-                    // Prepare secure cookie
-                    $minutes = 60 * 24 * 30; // 30 days
-                    $isProduction = app()->environment('production');
-                    $cookie = cookie(
-                        'refresh_token',
-                        $newRefreshToken,
-                        $minutes,
-                        '/',
-                        null,
-                        $isProduction,
-                        true,
-                        false,
-                        $isProduction ? 'None' : 'Lax'
-                    );
-
-                    return response()->json([
-                        'access_token' => $accessToken,
-                        'token_type' => 'Bearer',
-                        'user' => $user,
-                    ])->withCookie($cookie);
-                });
-            }
-
-            // Invalid or expired refresh token -> clear cookie
-            Cookie::queue(Cookie::forget('refresh_token'));
-            return response()->json(['message' => 'Invalid or expired refresh token'], 401);
+        if ($usePartitioned) {
+            return cookie(
+                'refresh_token',
+                $plainToken,
+                $minutes,
+                '/',
+                null,
+                $secure,
+                true,
+                false,
+                $sameSite
+            );
         }
+        $domain = env('COOKIE_DOMAIN', null);
 
-        // ------------------------
-        // 3) No valid auth found
-        // ------------------------
+        return cookie(
+            'refresh_token',
+            $plainToken,
+            $minutes,
+            '/',
+            $domain,
+            $secure,
+            true,
+            false,
+            $sameSite
+        );
+    }
+
+    protected function clearRefreshCookie(): void
+    {
+        Cookie::queue(Cookie::forget('refresh_token'));
+        $domain = env('COOKIE_DOMAIN', null);
+        if ($domain) {
+            Cookie::queue(cookie('refresh_token', '', -2628000, '/', $domain));
+        }
+    }
+
+
+public function me(Request $request)
+{
+    // 1) Bearer token check
+    $authHeader = $request->header('Authorization');
+    if ($authHeader && Str::startsWith($authHeader, 'Bearer ')) {
+        $token = Str::substr($authHeader, 7);
+        $pat = PersonalAccessToken::findToken($token);
+
+        if ($pat && $pat->tokenable) {
+            $entity = $pat->tokenable;
+            // Return role-keyed data at top-level (e.g., 'admin' => {...})
+            return response()->json($this->mapUserResponse($entity));
+        }
+    }
+
+    // 2) Cookie path
+    $refreshToken = $request->cookie('refresh_token');
+    if (!$refreshToken) {
         return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    $hashedToken = hash('sha256', $refreshToken);
+    $refresh = RefreshToken::where('token', $hashedToken)->valid()->first();
+
+    if (!$refresh) {
+        $this->clearRefreshCookie();
+        return response()->json(['message' => 'Invalid or expired refresh token'], 401);
+    }
+
+    return DB::transaction(function () use ($refresh, $request) {
+        $entity = $refresh->tokenable;
+        if (! $entity) {
+            $refresh->delete();
+            $this->clearRefreshCookie();
+            return response()->json(['message' => 'Invalid token owner'], 401);
+        }
+
+        // rotate access + refresh
+        $accessToken = $entity->createToken('auth_token')->plainTextToken;
+        $newPlain = bin2hex(random_bytes(40));
+
+        RefreshToken::create([
+            'tokenable_id' => $entity->id,
+            'tokenable_type' => get_class($entity),
+            'token' => hash('sha256', $newPlain),
+            'device_name' => $request->userAgent() ?? 'unknown',
+            'expires_at' => now()->addDays(30),
+        ]);
+
+        // remove old one
+        $refresh->delete();
+
+        $cookie = $this->cookieForRefresh($newPlain, true);
+
+        // merge access token data with role-keyed user data so result has no "user" wrapper
+        $payload = array_merge(
+            ['access_token' => $accessToken, 'token_type' => 'Bearer'],
+            $this->mapUserResponse($entity)
+        );
+
+        return response()->json($payload)->withCookie($cookie);
+    });
+}
+
+    protected function mapUserResponse($entity)
+    {
+        $response = [];
+
+        if ($entity instanceof \Modules\Employee\Models\Employee) {
+            $role = $entity->role ?? 'employee';
+            $response[$role] = $entity;
+        } elseif ($entity instanceof \App\Models\User) {
+            $roles = $entity->getRoleNames();
+            foreach ($roles as $r) {
+                $response[$r] = $entity;
+            }
+        } else {
+            abort(401, 'Unauthorized');
+        }
+
+        return $response;
     }
 }

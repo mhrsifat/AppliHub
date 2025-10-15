@@ -43,7 +43,6 @@ class UserSeeder extends Seeder
         // -----------------------------
         $usersData = [
             ['name' => 'Admin User', 'email' => 'admin@gmail.com', 'role' => $adminRole],
-            ['name' => 'Employee User', 'email' => 'employee@gmail.com', 'role' => $employeeRole],
             ['name' => 'Normal User', 'email' => 'user@gmail.com', 'role' => $userRole],
             ['name' => 'MhrSifat', 'email' => 'mhrsifat@gmail.com', 'role' => $userRole],
         ];

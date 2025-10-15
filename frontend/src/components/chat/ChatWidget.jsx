@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Fab, Modal, Box, Typography, IconButton } from '@mui/material';
-import ChatIcon from '@mui/icons-material/Chat';
-import CloseIcon from '@mui/icons-material/Close';
+
+// Heroicons
+import { ChatBubbleLeftEllipsisIcon, XMarkIcon } from '@heroicons/react/24/outline';
+
 import ChatWindow from './ChatWindow';
-import 'tailwindcss/tailwind.css';
 
 export default function ChatWidget({ apiBase }) {
   const [open, setOpen] = useState(false);
@@ -15,8 +16,9 @@ export default function ChatWidget({ apiBase }) {
         aria-label="chat"
         onClick={() => setOpen(true)}
         className="fixed bottom-6 right-6 z-50"
+        sx={{ width: 56, height: 56 }}
       >
-        <ChatIcon />
+        <ChatBubbleLeftEllipsisIcon className="w-6 h-6 text-white" />
       </Fab>
 
       <Modal open={open} onClose={() => setOpen(false)}>
@@ -37,7 +39,9 @@ export default function ChatWidget({ apiBase }) {
         >
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1 }}>
             <Typography variant="subtitle1">Chat with Support</Typography>
-            <IconButton onClick={() => setOpen(false)} size="small"><CloseIcon /></IconButton>
+            <IconButton onClick={() => setOpen(false)} size="small">
+              <XMarkIcon className="w-5 h-5" />
+            </IconButton>
           </Box>
           <ChatWindow apiBase={apiBase} onClose={() => setOpen(false)} />
         </Box>

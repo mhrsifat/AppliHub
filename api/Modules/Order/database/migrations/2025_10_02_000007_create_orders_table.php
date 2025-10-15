@@ -28,6 +28,7 @@ class CreateOrdersTable extends Migration
             // Summary amounts
             $table->decimal('total', 14, 2)->default(0); // sum of items before VAT & discounts
              $table->unsignedBigInteger('assigned_to')->nullable()->index();
+              $table->string('assigned_type')->nullable();
             $table->decimal('vat_percent', 5, 2)->default(0);
             $table->decimal('vat_amount', 14, 2)->default(0);
 
@@ -54,7 +55,6 @@ class CreateOrdersTable extends Migration
 
             // if you have customers table, optionally add foreign key later
             // $table->foreign('customer_id')->references('id')->on('customers')->nullOnDelete();
-            $table->foreign('assigned_to')->references('id')->on('users')->onDelete('set null');
         });
     }
 

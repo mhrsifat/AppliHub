@@ -5,7 +5,7 @@ use Modules\Message\Http\Controllers\ConversationController;
 use Modules\Message\Http\Controllers\MessageController;
 use Modules\Message\Http\Controllers\AttachmentController;
 
-Route::prefix('api/message')->group(function () {
+Route::prefix('message')->group(function () {
     // Public - client
     Route::post('/conversations', [ConversationController::class, 'store']); // create conversation + first message
     Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']); // list messages (public)
@@ -13,7 +13,7 @@ Route::prefix('api/message')->group(function () {
     Route::post('/conversations/{conversation}/attachments', [AttachmentController::class, 'store']); // upload attachment (public)
 
     // Staff / authenticated
-    Route::middleware(['auth:sanctum'])->group(function () {
+    Route::middleware(['multi-auth'])->group(function () {
         Route::get('/conversations', [ConversationController::class, 'index']); // list for employees
         Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
         Route::post('/conversations/{conversation}/join', [ConversationController::class, 'join']); // mark participant

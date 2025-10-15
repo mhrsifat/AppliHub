@@ -8,7 +8,7 @@ class CreateConversationParticipantsTable extends Migration
 {
     public function up()
     {
-        Schema::create('conversation_participants', function (Blueprint $table) {
+        Schema::create('message_conversation_participants', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->unsignedBigInteger('conversation_id')->index();
             $table->unsignedBigInteger('user_id')->nullable();
@@ -18,13 +18,13 @@ class CreateConversationParticipantsTable extends Migration
             $table->timestamps();
 
             $table->foreign('conversation_id')
-                ->references('id')->on('conversations')
+                ->references('id')->on('message_conversations')
                 ->onDelete('cascade');
         });
     }
 
     public function down()
     {
-        Schema::dropIfExists('conversation_participants');
+        Schema::dropIfExists('message_conversation_participants');
     }
 }

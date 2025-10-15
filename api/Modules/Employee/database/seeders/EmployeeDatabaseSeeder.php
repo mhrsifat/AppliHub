@@ -15,8 +15,8 @@ class EmployeeDatabaseSeeder extends Seeder
         // Ensure default roles exist
         $roles = ['admin', 'employee'];
         foreach ($roles as $roleName) {
-        Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'sanctum']);
-    }
+            Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'sanctum']);
+        }
         foreach ($roles as $roleName) {
             Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'sanctum']);
         }
@@ -31,6 +31,15 @@ class EmployeeDatabaseSeeder extends Seeder
                 'password'   => Hash::make('password'),
                 'status'     => 'active',
                 'roles'      => ['admin'],
+            ],
+            [
+                'first_name' => 'Kalo Employee',
+                'last_name'  => 'Ahmed',
+                'email'      => 'employee@gmail.com',
+                'phone'      => '01710000004',
+                'password'   => Hash::make(12345678),
+                'status'     => 'active',
+                'roles'      => ['employee'],
             ],
             [
                 'first_name' => 'Sadia',
@@ -70,13 +79,13 @@ class EmployeeDatabaseSeeder extends Seeder
         }
 
         // Add 50 random employees
-    //$fakerEmployees = Employee::factory(50)->create();
+        //$fakerEmployees = Employee::factory(50)->create();
 
-    // Assign random roles
-   // $fakerEmployees->each(function ($employee) use ($roles) {
+        // Assign random roles
+        // $fakerEmployees->each(function ($employee) use ($roles) {
         //$employee->syncRoles(collect($roles)->random());
-  //  });
+        //  });
 
-    $this->command->info('✅ Employee + Role seeding complete (including 50 fake employees).');
+        $this->command->info('✅ Employee + Role seeding complete (including 50 fake employees).');
     }
 }

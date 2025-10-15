@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Button } from '@mui/material';
+import { Box } from '@mui/material';
 import api from '../services/api';
 import ChatWindow from '../components/chat/ChatWindow';
 import { useParams } from 'react-router-dom';
@@ -21,6 +21,7 @@ export default function AdminConversationView() {
   return (
     <Box>
       <h2>{conv.subject || conv.created_by_name}</h2>
+      {/* Reuse ChatWindow; authenticated admin will have their token in api.js */}
       <ChatWindow apiBase={process.env.VITE_API_BASE} />
     </Box>
   );

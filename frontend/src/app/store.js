@@ -6,11 +6,13 @@ import orderReducer from "../features/order/slices/orderSlice";
 import serviceReducer from "../features/service/slices/serviceSlice";
 import blogsReducer from "../features/blog/slices/blogSlice";
 import clientBlogsReducer from "../features/client/slices/clientBlogSlice";
+import dashboardReducer from "../features/dashboard/dashboardSlice";
 
 // Create store instance
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    dashboard: dashboardReducer,
     employee: employeeReducer,
     invoice: invoiceReducer,
     order: orderReducer,

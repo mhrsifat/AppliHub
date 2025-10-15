@@ -1,0 +1,1 @@
+when new invoice create,all  order item will copy to new invoice. total due, total pay.

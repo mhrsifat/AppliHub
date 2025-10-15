@@ -8,7 +8,7 @@ class CreateMessagesTable extends Migration
 {
     public function up()
     {
-        Schema::create('messages', function (Blueprint $table) {
+        Schema::create('message_messages', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->unsignedBigInteger('conversation_id')->index();
             $table->unsignedBigInteger('sender_user_id')->nullable();
@@ -20,13 +20,13 @@ class CreateMessagesTable extends Migration
             $table->timestamps();
 
             $table->foreign('conversation_id')
-                ->references('id')->on('conversations')
+                ->references('id')->on('message_conversations')
                 ->onDelete('cascade');
         });
     }
 
     public function down()
     {
-        Schema::dropIfExists('messages');
+        Schema::dropIfExists('message_messages');
     }
 }

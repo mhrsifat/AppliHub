@@ -1,6 +1,6 @@
 // src/features/employee/hooks/useEmployees.js
-import { useEffect, useState, useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useEffect, useState, useCallback } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   fetchEmployees,
   createEmployee,
@@ -13,18 +13,23 @@ import {
   deleteSalary,
   setItem,
   clearError,
-} from '../slices/employeeSlice';
+} from "../slices/employeeSlice";
 
 export default function useEmployees(initialPage = 1, perPage = 15) {
   const dispatch = useDispatch();
-  const { list, meta, loading, error, item } = useSelector((s) => s.employee || {});
+  const { list, meta, loading, error, item } = useSelector(
+    (s) => s.employee || {}
+  );
 
   const [page, setPage] = useState(initialPage);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
 
+  // load supports an optional `filters` object, e.g. { location: 'Dhaka' }
   const load = useCallback(
-    (p = 1, s = '') => {
-      dispatch(fetchEmployees({ page: p, per_page: perPage, search: s }));
+    (p = 1, s = "", filters = {}) => {
+      dispatch(
+        fetchEmployees({ page: p, per_page: perPage, search: s, ...filters })
+      );
       setPage(p);
     },
     [dispatch, perPage]
@@ -44,16 +49,22 @@ export default function useEmployees(initialPage = 1, perPage = 15) {
     load(p, search);
   };
 
-  const onCreate = async (formData) => dispatch(createEmployee(formData)).unwrap();
-  const onUpdate = async (id, formData) => dispatch(updateEmployee({ id, formData })).unwrap();
+  const onCreate = async (formData) =>
+    dispatch(createEmployee(formData)).unwrap();
+  const onUpdate = async (id, formData) =>
+    dispatch(updateEmployee({ id, formData })).unwrap();
   const onDelete = async (id) => dispatch(deleteEmployee(id)).unwrap();
   const onRestore = async (id) => dispatch(restoreEmployee(id)).unwrap();
-  const onForceDelete = async (id) => dispatch(forceDeleteEmployee(id)).unwrap();
+  const onForceDelete = async (id) =>
+    dispatch(forceDeleteEmployee(id)).unwrap();
 
   // Salary / Promotion
-  const onAddSalary = async (id, payload) => dispatch(addSalary({ id, payload })).unwrap();
-  const onListSalaries = async (id, params) => dispatch(listSalaries({ id, params })).unwrap();
-  const onDeleteSalary = async (id, salaryId) => dispatch(deleteSalary({ id, salaryId })).unwrap();
+  const onAddSalary = async (id, payload) =>
+    dispatch(addSalary({ id, payload })).unwrap();
+  const onListSalaries = async (id, params) =>
+    dispatch(listSalaries({ id, params })).unwrap();
+  const onDeleteSalary = async (id, salaryId) =>
+    dispatch(deleteSalary({ id, salaryId })).unwrap();
 
   const setSelectedItem = (payload) => dispatch(setItem(payload));
   const clearErrors = () => dispatch(clearError());

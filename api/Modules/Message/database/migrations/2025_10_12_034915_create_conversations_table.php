@@ -8,12 +8,12 @@ class CreateConversationsTable extends Migration
 {
     public function up()
     {
-        Schema::create('conversations', function (Blueprint $table) {
+        Schema::create('message_conversations', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->uuid('uuid')->nullable()->unique();
             $table->string('subject')->nullable();
-            $table->string('created_by_name');
-            $table->string('created_by_contact');
+            $table->string('created_by_name')->nullable();
+            $table->string('created_by_contact')->nullable();
             $table->unsignedBigInteger('assigned_to')->nullable(); // user_id
             $table->enum('status', ['open', 'closed'])->default('open');
             $table->text('last_message_preview')->nullable();
@@ -24,6 +24,6 @@ class CreateConversationsTable extends Migration
 
     public function down()
     {
-        Schema::dropIfExists('conversations');
+        Schema::dropIfExists('message_conversations');
     }
 }

@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
+use App\Models\User;
+use Modules\Employee\Models\Employee as EmployeeModel;
 use Modules\Order\Models\Order;
 use Modules\Order\Models\OrderItem;
 use Modules\Order\Transformers\OrderResource;
@@ -15,11 +18,13 @@ use Modules\Order\Http\Requests\StoreOrderRequest;
 use Modules\Order\Http\Requests\UpdateOrderRequest;
 use Modules\Order\Http\Requests\OrderItemRequest;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Modules\Invoice\Models\InvoicePayment;
+use Modules\Invoice\Models\Refund;
 
 class OrderController extends Controller
 {
     use AuthorizesRequests;
-    
+
     protected InvoiceService $invoiceService;
 
     public function __construct(InvoiceService $invoiceService)
@@ -28,54 +33,83 @@ class OrderController extends Controller
     }
 
     /**
+     * Helper: current authenticated user (guard already resolved by middleware)
+     */
+    protected function currentUser()
+    {
+        return Auth::user();
+    }
+
+    /**
      * List orders
      * Admin/manager: sees all
      * Employee: sees only assigned orders
      */
-    public function index(Request $request)
-    {
-        $query = Order::with('items')->orderByDesc('id');
-        $user = Auth::user();
+     public function index(Request $request)
+{
+    $query = Order::with('items')->orderByDesc('id');
+    $user = Auth::user();
 
-        // Use Spatie hasRole() to check role properly
-        if ($user && method_exists($user, 'hasRole') && $user->hasRole('employee')) {
-            $query->where('assigned_to', $user->id);
-        }
-
-        // Search
-        if ($request->filled('q')) {
-            $q = $request->get('q');
-            $query->where(function ($qry) use ($q) {
-                $qry->where('order_number', 'like', "%{$q}%")
-                    ->orWhere('customer_name', 'like', "%{$q}%")
-                    ->orWhere('customer_email', 'like', "%{$q}%")
-                    ->orWhere('customer_phone', 'like', "%{$q}%")
-                    ->orWhere('customer_address', 'like', "%{$q}%")
-                    ->orWhere('coupon_code', 'like', "%{$q}%");
-            });
-        }
-
-        $perPage = (int) $request->get('per_page', 15);
-        return OrderResource::collection($query->paginate($perPage));
+    if ($user->hasRole('employee')) {
+        // Employee: Only orders assigned to them
+        $query->where(function($q) use ($user) {
+            $q->where('assigned_to', $user->id)
+              ->where('assigned_type', 'employee');
+        });
+    } elseif (method_exists($user, 'hasRole') && $user->hasRole('admin')) {
+        // Admin: can see all orders
+        // no filter needed
+    } else {
+        // Other users: see only orders assigned to them
+        $query->where(function($q) use ($user) {
+            $q->where('assigned_to', $user->id)
+              ->where('assigned_type', 'user');
+        });
     }
+
+    if ($request->filled('q')) {
+        $q = $request->get('q');
+        $query->where(function ($qry) use ($q) {
+            $qry->where('order_number', 'like', "%{$q}%")
+                ->orWhere('customer_name', 'like', "%{$q}%")
+                ->orWhere('customer_email', 'like', "%{$q}%")
+                ->orWhere('customer_phone', 'like', "%{$q}%")
+                ->orWhere('customer_address', 'like', "%{$q}%")
+                ->orWhere('coupon_code', 'like', "%{$q}%");
+        });
+    }
+
+    $perPage = (int) $request->get('per_page', 15);
+    return OrderResource::collection($query->paginate($perPage));
+}
+    
 
     /**
      * Show single order
      */
-    public function show($id)
-    {
-        $order = Order::with(['items', 'invoices.payments'])->findOrFail($id);
-        $user = Auth::user();
+     public function show($id)
+{
+    $order = Order::with(['items', 'invoices.payments'])->findOrFail($id);
+    $user = Auth::user();
 
-        if ($user && method_exists($user, 'hasRole') && $user->hasRole('employee')) {
-            // Employee cannot access unassigned or others' orders
-            if (!$order->assigned_to || $order->assigned_to !== $user->id) {
+    if ($user && method_exists($user, 'hasRole')) {
+        if ($user->hasRole('employee')) {
+            // Employee: only if assigned to them
+            if ($order->assigned_type !== 'employee' || $order->assigned_to !== $user->id) {
+                abort(403, 'Unauthorized to view this order');
+            }
+        } elseif (!$user->hasRole('admin')) {
+            // Regular user: only if assigned to them
+            if ($order->assigned_type !== 'user' || $order->assigned_to !== $user->id) {
                 abort(403, 'Unauthorized to view this order');
             }
         }
-
-        return new OrderResource($order);
+        // Admin: can view all
     }
+
+    return new OrderResource($order);
+}
+    
 
     /**
      * Create an order and associated invoice
@@ -235,13 +269,13 @@ class OrderController extends Controller
     public function addItem(OrderItemRequest $request, $orderId)
     {
         $order = Order::with('items')->findOrFail($orderId);
-        
+
         $item = $order->items()->create(array_merge($request->validated(), [
             'added_by' => Auth::id(),
         ]));
 
         $this->recalculateOrder($order);
-        
+
         return new OrderItemResource($item);
     }
 
@@ -268,7 +302,7 @@ class OrderController extends Controller
         $order->items()->findOrFail($itemId)->delete();
 
         $this->recalculateOrder($order);
-        
+
         return response()->json(['message' => 'Item deleted']);
     }
 
@@ -278,7 +312,7 @@ class OrderController extends Controller
     protected function recalculateOrder(Order $order)
     {
         $order->load('items', 'invoices.payments');
-        
+
         // Recalculate order totals from items
         $order->total = $order->items->sum('total_price');
         $order->vat_amount = round(($order->vat_percent / 100) * $order->total, 2);
@@ -312,7 +346,7 @@ class OrderController extends Controller
             $paidAmount = (float) $invoice->payments()
                 ->where('status', 'completed')
                 ->sum('amount');
-            
+
             $grandTotal = (float) $invoice->grand_total;
 
             if ($grandTotal > 0) {
@@ -339,39 +373,52 @@ class OrderController extends Controller
             $order->save();
         }
     }
+/**
+ * Assign order to employee or user
+ */
+public function assign(Request $request, $id)
+{
+    $request->validate([
+        'employee_id' => 'required|integer',
+        'employee_type' => 'required|string|in:user,employee'
+    ]);
 
-    /**
-     * Assign order to employee
-     */
-    public function assign(Request $request, $id)
-    {
-        $request->validate(['employee_id' => 'required|exists:users,id']);
-        $order = Order::findOrFail($id);
-        $this->authorize('assign', $order);
+    $order = Order::findOrFail($id);
+    $this->authorize('assign', $order);
 
-        $order->assigned_to = $request->employee_id;
-        $order->save();
+    $order->assigned_to = $request->employee_id;
+    $order->assigned_type = $request->employee_type;
+    $order->save();
 
-        if ($employee = \App\Models\User::find($request->employee_id)) {
-            $employee->notify(new \Modules\Order\Notifications\OrderAssigned($order));
-        }
-
-        return response()->json(['message' => 'Order assigned', 'order' => $order], 200);
+    // Notify the assignee
+    if ($request->employee_type === 'user') {
+        $modelClass = \App\Models\User::class;
+    } else {
+        $modelClass = \Modules\Employee\Models\Employee::class;
     }
 
-    /**
-     * Unassign order
-     */
-    public function unassign(Request $request, $id)
-    {
-        $order = Order::findOrFail($id);
-        $this->authorize('assign', $order);
-
-        $order->assigned_to = null;
-        $order->save();
-
-        return response()->json(['message' => 'Order unassigned', 'order' => $order], 200);
+    if ($assignee = $modelClass::find($request->employee_id)) {
+        $assignee->notify(new \Modules\Order\Notifications\OrderAssigned($order));
     }
+
+    return response()->json(['message' => 'Order assigned', 'order' => $order], 200);
+}
+
+/**
+ * Unassign order
+ */
+public function unassign(Request $request, $id)
+{
+    $order = Order::findOrFail($id);
+    $this->authorize('assign', $order);
+
+    $order->assigned_to = null;
+    $order->assigned_type = null;
+    $order->save();
+
+    return response()->json(['message' => 'Order unassigned', 'order' => $order], 200);
+}
+    
 
     /**
      * Public tracking method with payment carryover calculation
@@ -487,7 +534,7 @@ class OrderController extends Controller
      * Calculate carryover credit for an order
      * Returns excess payment that hasn't been applied to any invoice
      */
-    protected function calculateOrderCarryover(Order $order): float
+       protected function calculateOrderCarryover(Order $order): float
     {
         $invoices = $order->invoices()->with('payments')->get();
 
@@ -509,4 +556,204 @@ class OrderController extends Controller
 
         return max(0, round($carryover, 2));
     }
+    
+    
+   
+   // Filepath: Modules/Order/Http/Controllers/OrderController.php
+
+public function getFullOrderDetails(Request $request, $orderId)
+{
+    // Load items and invoices.items only. We'll query payments/refunds explicitly to avoid stale collection issues.
+    $order = Order::with([
+        'items',
+        'assignedTo:id,first_name,last_name,email,phone,avatar,location,full_address,status',
+        'invoices.items',
+    ])->findOrFail($orderId);
+
+    // Assigned employee payload
+    $assignedEmployee = null;
+    if ($order->assignedTo) {
+        $assignedEmployee = [
+            'id' => $order->assignedTo->id,
+            'name' => trim($order->assignedTo->first_name . ' ' . $order->assignedTo->last_name),
+            'email' => $order->assignedTo->email,
+            'phone' => $order->assignedTo->phone,
+            'avatar' => $order->assignedTo->avatar,
+            'location' => $order->assignedTo->location,
+            'full_address' => $order->assignedTo->full_address,
+            'status' => $order->assignedTo->status,
+        ];
+    }
+
+    // Build invoice-items index (by service_id if present, otherwise normalized name)
+    $invoiceItemsIndex = collect();
+    foreach ($order->invoices as $inv) {
+        foreach ($inv->items as $iit) {
+            $serviceKey = $iit->service_id ? 'id_' . $iit->service_id : null;
+            $nameKey = 'name_' . mb_strtolower(trim((string)$iit->service_name));
+
+            $entry = [
+                'service_name' => $iit->service_name,
+                'quantity' => (float)$iit->quantity,
+                'unit_price' => (float)$iit->unit_price,
+                'line_total' => (float)($iit->line_total ?? round(((float)$iit->unit_price * (float)$iit->quantity), 2)),
+            ];
+
+            if ($serviceKey) {
+                if ($invoiceItemsIndex->has($serviceKey)) {
+                    $ex = $invoiceItemsIndex->get($serviceKey);
+                    $invoiceItemsIndex->put($serviceKey, [
+                        'service_name' => $ex['service_name'],
+                        'quantity' => $ex['quantity'] + $entry['quantity'],
+                        'unit_price' => $entry['unit_price'] ?: $ex['unit_price'],
+                        'line_total' => $ex['line_total'] + $entry['line_total'],
+                    ]);
+                } else {
+                    $invoiceItemsIndex->put($serviceKey, $entry);
+                }
+            }
+
+            if ($invoiceItemsIndex->has($nameKey)) {
+                $ex = $invoiceItemsIndex->get($nameKey);
+                $invoiceItemsIndex->put($nameKey, [
+                    'service_name' => $ex['service_name'],
+                    'quantity' => $ex['quantity'] + $entry['quantity'],
+                    'unit_price' => $entry['unit_price'] ?: $ex['unit_price'],
+                    'line_total' => $ex['line_total'] + $entry['line_total'],
+                ]);
+            } else {
+                $invoiceItemsIndex->put($nameKey, $entry);
+            }
+        }
+    }
+
+    // Build invoices + compute invoice summary (use DB queries for payments/refunds to ensure correctness)
+    $invoiceSummary = [
+        'total_invoice_amount' => 0.0,
+        'total_paid' => 0.0,
+        'total_refunded' => 0.0,
+        'total_due' => 0.0,
+    ];
+
+    $invoices = $order->invoices->map(function ($inv) use (&$invoiceSummary) {
+        // Prefer accessor if available (it queries payments), but still safe to query payments table directly
+        // Use payments()->where('status','completed') to get committed payments
+        $paid = (float) $inv->payments()->where('status', 'completed')->sum('amount');
+
+        // Refunds: consider only completed refunds (status = 'completed' or relevant status)
+        $refunded = (float) $inv->refunds()->where('status', 'completed')->sum('amount');
+
+        $netPaid = max(0.0, $paid - $refunded);
+        $grandTotal = (float) ($inv->grand_total ?? 0.0);
+        $due = max(0.0, $grandTotal - $netPaid);
+
+        $invoiceSummary['total_invoice_amount'] += $grandTotal;
+        $invoiceSummary['total_paid'] += $paid;
+        $invoiceSummary['total_refunded'] += $refunded;
+        $invoiceSummary['total_due'] += $due;
+
+        return [
+            'id' => $inv->id,
+            'invoice_number' => $inv->invoice_number,
+            'status' => $inv->status,
+            'grand_total' => $grandTotal,
+            'paid' => round($paid, 2),
+            'refunded' => round($refunded, 2),
+            'due' => round($due, 2),
+            'items' => $inv->items->map(function ($it) {
+                $computed = round(((float)$it->unit_price * (float)$it->quantity), 2);
+                return [
+                    'id' => $it->id,
+                    'service_name' => $it->service_name,
+                    'quantity' => is_numeric($it->quantity) ? (float)$it->quantity : (float)$it->quantity,
+                    'unit_price' => (float)$it->unit_price,
+                    'line_total' => (float) ($it->line_total ?? $computed),
+                ];
+            })->values(),
+        ];
+    })->values();
+
+    // Build order items output — prioritize invoice-derived line_total, then item's own line_total, then compute
+    $itemsOut = $order->items->map(function ($it) use ($invoiceItemsIndex) {
+        $computed = round(((float)$it->unit_price * (float)$it->quantity), 2);
+
+        $match = null;
+        if (!empty($it->service_id)) {
+            $serviceKey = 'id_' . $it->service_id;
+            if ($invoiceItemsIndex->has($serviceKey)) {
+                $match = $invoiceItemsIndex->get($serviceKey);
+            }
+        }
+
+        if (!$match) {
+            $nameKey = 'name_' . mb_strtolower(trim((string)$it->service_name));
+            if ($invoiceItemsIndex->has($nameKey)) {
+                $match = $invoiceItemsIndex->get($nameKey);
+            }
+        }
+
+        if ($match) {
+            // If invoice index exists, try to compute proportional line_total for this order item:
+            // If invoice aggregated quantity > 0, compute per-unit from invoice index and multiply by this item's quantity.
+            if (!empty($match['quantity']) && (float)$match['quantity'] > 0) {
+                $perUnit = $match['line_total'] / $match['quantity'];
+                $lineTotal = round($perUnit * (float)$it->quantity, 2);
+            } else {
+                // fallback to invoice's unit_price * qty or computed
+                $lineTotal = (float) ($match['unit_price'] ? round((float)$match['unit_price'] * (float)$it->quantity, 2) : $computed);
+            }
+        } elseif (!empty($it->line_total) && (float)$it->line_total > 0) {
+            $lineTotal = (float)$it->line_total;
+        } else {
+            $lineTotal = $computed;
+        }
+
+        return [
+            'id' => $it->id,
+            'service_id' => $it->service_id,
+            'service_name' => $it->service_name,
+            'description' => $it->description,
+            'unit_price' => (float) $it->unit_price,
+            'quantity' => (float) $it->quantity,
+            'line_total' => (float) $lineTotal,
+        ];
+    })->values();
+
+    // Recompute order totals from itemsOut (so front-end sees consistent totals)
+    $calculatedTotal = $itemsOut->sum(function ($it) {
+        return (float) ($it['line_total'] ?? 0);
+    });
+
+    $vatAmount = round(($order->vat_percent / 100) * $calculatedTotal, 2);
+    $grandTotalCalc = round($calculatedTotal + $vatAmount - (float)$order->coupon_discount, 2);
+
+    // Final response: keep same shape but with corrected/calculated numbers
+    return response()->json([
+        'order' => [
+            'id' => $order->id,
+            'order_number' => $order->order_number,
+            'customer_name' => $order->customer_name,
+            'customer_email' => $order->customer_email,
+            'customer_phone' => $order->customer_phone,
+            'customer_address' => $order->customer_address,
+            'status' => $order->status,
+            'payment_status' => $order->payment_status,
+            'total' => (float) $calculatedTotal,
+            'vat_percent' => (float) $order->vat_percent,
+            'vat_amount' => (float) $vatAmount,
+            'coupon_discount' => (float) $order->coupon_discount,
+            'grand_total' => (float) $grandTotalCalc,
+            'created_at' => $order->created_at,
+        ],
+        'items' => $itemsOut,
+        'assigned_employee' => $assignedEmployee,
+        'invoices' => $invoices,
+        'summary' => [
+            'total_invoice_amount' => round($invoiceSummary['total_invoice_amount'], 2),
+            'total_paid' => round($invoiceSummary['total_paid'], 2),
+            'total_refunded' => round($invoiceSummary['total_refunded'], 2),
+            'total_due' => round($invoiceSummary['total_due'], 2),
+        ],
+    ]);
+}
 }
