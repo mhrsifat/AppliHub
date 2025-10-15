@@ -116,7 +116,7 @@ export default function OrderList() {
 
           <Button
             variant="contained"
-            onClick={() => navigate("/admin/orders/create")}
+            onClick={() => navigate("orders/create")}
           >
             New Order
           </Button>
@@ -207,7 +207,7 @@ export default function OrderList() {
                       >
                         <IconButton
                           size="small"
-                          onClick={() => navigate(`/admin/orders/${o.id}`)}
+                          onClick={() => navigate(`orders/${o.id}`)}
                           title="View"
                         >
                           <EyeIcon style={{ width: 18, height: 18 }} />
@@ -215,7 +215,7 @@ export default function OrderList() {
 
                         <IconButton
                           size="small"
-                          onClick={() => navigate(`/admin/orders/${o.id}/edit`)}
+                          onClick={() => navigate(`orders/${o.id}/edit`)}
                           title="Edit"
                         >
                           <PencilSquareIcon style={{ width: 18, height: 18 }} />
@@ -224,7 +224,7 @@ export default function OrderList() {
                         <IconButton
                           size="small"
                           onClick={() =>
-                            navigate("/admin/invoices/create", {
+                            navigate("invoices/create", {
                               state: { fromOrderId: o.id },
                             })
                           }

@@ -160,7 +160,7 @@ export default function OrderDetailPage() {
       const invoice = (res && (res.invoice ?? res)) || null;
       const invoiceId = invoice?.id ?? invoice?.data?.id ?? null;
       if (invoiceId) {
-        navigate(`/admin/invoices/${invoiceId}`);
+        navigate(`invoices/${invoiceId}`);
       } else {
         await refresh();
         alert("Invoice created");
@@ -307,7 +307,7 @@ export default function OrderDetailPage() {
             </button>
 
             <button
-              onClick={() => navigate(`/admin/orders/${ord.id}/edit`)}
+              onClick={() => navigate(`orders/${ord.id}/edit`)}
               className="px-3 py-1 border rounded"
             >
               Edit Order
@@ -587,7 +587,7 @@ export default function OrderDetailPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() =>
-                              navigate(`/admin/invoices/${inv.id}`)
+                              navigate(`invoices/${inv.id}`)
                             }
                             className="text-blue-600"
                           >
