@@ -1,0 +1,383 @@
+this code is code but doc is made by chatgpt. so if not work. figure out by yourself.
+
+Message Module — API Reference (Routes & Responses)
+
+ডকটায় ১–১ করে রুটের নাম, উদ্দেশ্য, রিকোয়েস্ট ফরম্যাট ও সফল রেসপন্স দেয়া আছে। (প্রতিটি টেকনিক্যাল ইংরেজি শব্দের পাশে বাংলা অনুবাদ দেওয়া আছে।)
+
+
+---
+
+> নোট: সব এন্ডপয়েন্টের প্রিফিক্স ধরা হয়েছে /api/message। যদি প্রকল্পে আলাদা থাকে তাহলে সেই অনুযায়ী এন্ডপয়েন্ট ব্যবহার করবে।
+
+
+
+
+---
+
+Routes (Route name — কি জন্য)
+
+1) Create Conversation
+
+Route (পথ): POST /message/conversations
+
+Name (নাম): message.conversations.store
+
+What for (উদ্দেশ্য): নতুন conversation (আলাপ/চ্যাট) তৈরি করা — public (পাবলিক) ইউজারের জন্য (anonymous/অজ্ঞাত ব্যবহারকারীর জন্য)।
+
+
+Request (রিকোয়েস্ট):
+
+Content-Type: multipart/form-data বা application/json.
+
+Headers: none (public)
+
+Body fields:
+
+name (string) — required (যদি anonymous allowed থাকে)
+
+contact (string) — required (ফোন/ইমেল)
+
+subject (string) — optional
+
+message (string) — optional (প্রথম মেসেজ)
+
+attachments[] (file[]) — optional, multipart file(s). (attachments = সংযুক্তি)
+
+
+
+Success Response (201 Created) নমুনা:
+
+{
+  "data": {
+    "id": 1,
+    "uuid": "5bed7bce-e600-4531-8f8c-092bbe44e004",
+    "subject": "Test message",
+    "created_by_name": "John Doe",
+    "created_by_contact": "+8801xxxxxxxxx",
+    "last_message_preview": "Hello world",
+    "last_message_at": "2025-10-14T13:22:56.000000Z"
+  }
+}
+
+
+---
+
+2) List Messages (Conversation)
+
+Route: GET /message/conversations/{uuid}/messages
+
+Name: message.conversations.messages.index
+
+What for: কোনো নির্দিষ্ট conversation-এর সব মেসেজ লোড করা (public-ভিউ) — UUID (ইউইডি / অনন্য আইডি) ব্যবহার করে access control কে অনির্দেশ্য (unguessable) করা হয়েছে।
+
+
+Request:
+
+Query params: page (optional), per_page (optional)
+
+Headers: none (public)
+
+
+Success Response (200 OK) নমুনা:
+
+{
+  "data": [
+    {
+      "id": 2,
+      "conversation_id": 2,
+      "sender_name": "John Doe",
+      "sender_contact": "+8801xxxxxxxxx",
+      "is_staff": false,
+      "body": "Hello world",
+      "attachments": [],
+      "created_at": "2025-10-14T13:31:21.000000Z"
+    }
+  ]
+}
+
+
+---
+
+3) Send Message (to Conversation)
+
+Route: POST /message/conversations/{uuid}/messages
+
+Name: message.conversations.messages.store
+
+What for: নির্দিষ্ট conversation-এ নতুন মেসেজ পাঠানো (public বা staff উভয়ই ব্যবহার করতে পারে)।
+
+
+Request:
+
+Content-Type: multipart/form-data (ফাইল পাঠালে)
+
+Headers:
+
+Authorization: Bearer <token> (optional — staff হলে প্রেরক authenticated হবে)
+
+
+Body fields:
+
+name (string) — sometimes|required (public)
+
+contact (string) — sometimes|required (public)
+
+body (string) — optional
+
+attachments[] (file[]) — optional, supported mime: jpg,jpeg,png,gif,pdf,doc,docx,txt,mp4,mov,avi (ভিডিও/video সমর্থন করতে mp4/mov/avi যোগ করা হয়েছে)
+
+
+
+Success Response (201 Created) নমুনা:
+
+{
+  "data": {
+    "id": 8,
+    "conversation_id": 2,
+    "sender_user_id": 1,
+    "sender_name": "hd",
+    "is_staff": true,
+    "body": "bhdh",
+    "attachments": [
+      {
+        "id": 1,
+        "filename": "hero.png",
+        "url": "https://your-app/storage/messages/abc.png",
+        "mime": "image/png",
+        "size": 51460
+      }
+    ],
+    "created_at": "2025-10-14T13:53:45.000000Z"
+  }
+}
+
+Notes (নোট): large files like videos: নিশ্চিত করো php.ini এর upload_max_filesize এবং post_max_size যথেষ্ট বড়।
+
+
+---
+
+4) List Conversations (staff)
+
+Route: GET /message/conversations
+
+Name: message.conversations.index
+
+What for: সমস্ত conversation তালিকা (pagination সহ) — staff-only (স্টাফ মাত্র)।
+
+
+Request:
+
+Headers: Authorization: Bearer <staff_token> (প্রয়োজন)
+
+Query params: page, per_page, filters (optional)
+
+
+Success Response (200 OK) নমুনা:
+
+{
+  "data": [ /* ConversationResource objects */ ],
+  "meta": { "current_page":1, "per_page":20, "total":2 }
+}
+
+
+---
+
+5) Join Conversation (staff)
+
+Route: POST /message/conversations/{uuid}/join
+
+Name: message.conversations.join
+
+What for: authenticated staff participant হিসেবে conversation-এ যোগ দেওয়া (mark as participant)।
+
+
+Request:
+
+Headers: Authorization: Bearer <staff_token>
+
+Body: none
+
+
+Success Response (200 OK):
+
+{ "ok": true }
+
+
+---
+
+6) Assign Conversation (staff)
+
+Route: POST /message/conversations/{uuid}/assign
+
+Name: message.conversations.assign
+
+What for: conversation কে current authenticated staff এর কাছে অ্যাসাইন (claim) করা।
+
+
+Request:
+
+Headers: Authorization: Bearer <staff_token>
+
+Body: none
+
+
+Success Response (200 OK) নমুনা:
+
+{ "data": { /* updated ConversationResource with assigned_to set */ } }
+
+
+---
+
+7) Show Conversation (detailed)
+
+Route: GET /message/conversations/{uuid}
+
+Name: message.conversations.show
+
+What for: conversation এর full detail (messages, participants, metadata)।
+
+
+Request:
+
+Headers: Authorization: Bearer <staff_token> (recommended)
+
+
+Success Response (200 OK) নমুনা:
+
+{
+  "data": {
+    "id": 2,
+    "uuid": "897c0fba-...",
+    "participants": [ /* ... */ ],
+    "messages": [ /* messages with attachments */ ]
+  }
+}
+
+
+---
+
+8) Delete Message (staff)
+
+Route: DELETE /message/messages/{id}
+
+Name: message.messages.destroy
+
+What for: নির্দিষ্ট মেসেজ ডিলিট করা — শুধুমাত্র staff (রোল/ভূমিকা ভিত্তিক)।
+
+
+Request:
+
+Headers: Authorization: Bearer <staff_token>
+
+
+Success Response (200 OK):
+
+{ "ok": true }
+
+
+---
+
+9) Show Attachment (public/staff)
+
+Route: GET /message/attachments/{id}
+
+Name: message.attachments.show
+
+What for: attachment metadata ও public URL রিটার্ন করা (ব্যবহার: preview/download)।
+
+
+Request:
+
+Headers: (optional) Authorization: Bearer <staff_token>
+
+
+Success Response (200 OK) নমুনা:
+
+{
+  "url": "https://your-app/storage/messages/abc.png",
+  "filename": "abc.png",
+  "mime": "image/png",
+  "size": 51460
+}
+
+
+---
+
+10) Typing (broadcast) — lightweight endpoint
+
+Route: POST /message/conversations/{id}/typing
+
+Name: message.conversations.typing
+
+What for: একজন ইউজার টাইপ করছে এমন ইভেন্ট (typing indicator — টাইপিং সূচক) broadcast করা।
+
+
+Request:
+
+Headers: optional Authorization: Bearer <staff_token>
+
+Body (JSON): { "name": "John Doe" } or no body (server uses auth user)
+
+
+Success Response (200 OK):
+
+{ "status": "ok" }
+
+Broadcast behavior:
+
+Event: App\Events\UserTyping (UserTyping — টাইপিং ইভেন্ট)
+
+Channel: conversation.{conversationId} (public/private channel নাম)
+
+Payload: { conversationId, userName, isStaff }
+
+
+
+---
+
+WebSocket / Broadcasting (Pusher) (পুশার)
+
+Events
+
+MessageSent — Broadcast when নতুন message সেভ হয়।
+
+Channel: conversation.{conversationId}
+
+Payload: { message: MessageResource }
+
+
+UserTyping — Broadcast when কেউ টাইপ করছে।
+
+Channel: conversation.{conversationId}
+
+Payload: { conversationId, userName, isStaff }
+
+
+
+Frontend subscription example (Pusher):
+
+const pusher = new Pusher(PUSHER_KEY, { cluster: 'ap2' });
+const channel = pusher.subscribe('conversation.'+conversationId);
+channel.bind('MessageSent', data => { /* append message */ });
+channel.bind('UserTyping', data => { /* show typing indicator */ });
+
+
+---
+
+Common notes (সাধারণ নোট)
+
+Authentication (প্রমাণীকরণ): staff-only রুটগুলোতে Authorization: Bearer <token> প্রয়োজন।
+
+Attachments (সংযুক্তি): send করতে হলে multipart/form-data এবং attachments[] key ব্যবহার করো।
+
+Video (ভিডিও): mp4,mov,avi mime types অনুমোদন করলে ভিডিও আপলোড যাবে; নিশ্চিত করো php.ini তে upload_max_filesize ও post_max_size যথেষ্ট বড় আছে।
+
+Role config (রোল কনফিগ): config/message.php-এ staff_roles অ্যারে বাড়িয়ে নতুন রোল যোগ করতে পারো (তুমি আগে Spatie ব্যবহার করেছো)।
+
+
+
+---
+
+প্রয়োজনে আমি এই ডকটাকে Markdown → PDF করে দেবো, অথবা Postman collection বানিয়ে দেবো যাতে তুমি এক ক্লিকে সব রুট টেস্ট করতে পারো। কোনটা লাগবে?
+
+

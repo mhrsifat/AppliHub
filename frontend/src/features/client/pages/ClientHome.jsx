@@ -8,7 +8,8 @@ import HeroSection from "../components/HeroSection";
 import ServiceHighlights from "../components/ServiceHighlights";
 
 // Chat widget: import directly so the floating bubble appears immediately
-import ChatWidget from "@/components/chat/ChatWidget";
+//import ChatWidget from "@/components/chat/ChatWidget";
+import { ChatWidget } from "@/features/chat";
 
 // Lazy-load non-critical sections
 const OurServices = lazy(() => import("../components/OurServices"));
@@ -39,9 +40,8 @@ const ClientHome = () => {
         <ContactForm />
         <Footer />
       </Suspense>
-
-      {/* Floating chat widget (position: fixed inside the component) */}
-      <ChatWidget apiBase={import.meta.env.VITE_API_BASE} />
+      
+      <ChatWidget position="right" /> 
     </>
   );
 };
