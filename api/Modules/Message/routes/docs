@@ -356,8 +356,8 @@ Payload: { conversationId, userName, isStaff }
 
 Frontend subscription example (Pusher):
 
-const pusher = new Pusher(PUSHER_KEY, { cluster: 'ap2' });
-const channel = pusher.subscribe('conversation.'+conversationId);
+const pusher = new Pusher(PUSHER_KEY, { cluster: 'ap1' });
+const channel = pusher.subscribe('conversation.'+conversationUuid);
 channel.bind('MessageSent', data => { /* append message */ });
 channel.bind('UserTyping', data => { /* show typing indicator */ });
 

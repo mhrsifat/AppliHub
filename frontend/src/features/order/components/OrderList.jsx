@@ -201,14 +201,14 @@ export default function OrderList() {
                           View
                         </Button>
 
-                        <Button
+                       {/* <Button
                           component={Link}
                           to={`${reflink()}orders/${o.id}/edit`}
                           startIcon={<PencilSquareIcon style={{ width: 18, height: 18 }} />}
                           size="small"
                         >
                           Edit
-                        </Button>
+                        </Button> */}
 
                         <Button
                           component={Link}
