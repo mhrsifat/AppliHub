@@ -5,7 +5,7 @@ import Pusher from 'pusher-js'; import api from './api';
 
 let pusher = null; const channels = new Map();
 
-function getPusher() { if (!pusher) { const key = typeof window !== 'undefined' ? window.CHAT_WIDGET_PUSHER_KEY : null; pusher = new Pusher(key || '', { cluster: typeof window !== 'undefined' ? window.CHAT_WIDGET_PUSHER_CLUSTER || 'mt1' : 'mt1', forceTLS: true }); } return pusher; }
+function getPusher() { if (!pusher) { const key = typeof window !== 'undefined' ? window.CHAT_WIDGET_PUSHER_KEY : null; pusher = new Pusher(key || '', { cluster: typeof window !== 'undefined' ? window.CHAT_WIDGET_PUSHER_CLUSTER || 'ap1' : 'mt1', forceTLS: true }); } return pusher; }
 
 export async function fetchMessages(uuid, { page = 1, per_page = 50 } = {}) { if (!uuid) return []; const res = await api.get(/message/conversations/${uuid}/messages, { params: { page, per_page } }); // normalize array
 return res.data.data || res.data; }
