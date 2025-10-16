@@ -1,6 +1,6 @@
 // filepath: src/features/chat/services/chatService.js
 import Pusher from "pusher-js";
-import api from "./api";
+import api from "@/services/api";
 
 // Small wrapper for pusher subscriptions and REST calls.
 // Exports: fetchMessages, sendMessage, sendTyping, subscribe, unsubscribe
