@@ -1,89 +1,106 @@
 // filepath: src/features/chat/services/chatService.js
-import Pusher from "pusher-js";
-import api from "@/services/api";
+import api from '../../../services/api';
 
-// Small wrapper for pusher subscriptions and REST calls.
-// Exports: fetchMessages, sendMessage, sendTyping, subscribe, unsubscribe
+const chatService = {
+  // Create new conversation (public)
+  createConversation: async (data) => {
+    const formData = new FormData();
+    formData.append('name', data.name);
+    formData.append('contact', data.contact);
+    if (data.subject) formData.append('subject', data.subject);
+    if (data.message) formData.append('message', data.message);
+    
+    if (data.attachments?.length) {
+      data.attachments.forEach(file => {
+        formData.append('attachments[]', file);
+      });
+    }
 
-let pusher = null;
-const channels = new Map();
-
-function getPusher() {
-  if (!pusher) {
-    const key =
-      typeof window !== "undefined" ? window.CHAT_WIDGET_PUSHER_KEY : null;
-    pusher = new Pusher(key || "", {
-      cluster:
-        typeof window !== "undefined"
-          ? window.CHAT_WIDGET_PUSHER_CLUSTER || "ap1"
-          : "mt1",
-      forceTLS: true,
+    const response = await api.post('/message/conversations', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
     });
+    return response.data;
+  },
+
+  // Get conversation messages
+  fetchMessages: async (uuid, page = 1, perPage = 50) => {
+    const response = await api.get(`/message/conversations/${uuid}/messages`, {
+      params: { page, per_page: perPage }
+    });
+    return response.data;
+  },
+
+  // Send message to conversation
+  sendMessage: async (uuid, data, isStaff = false) => {
+    const formData = new FormData();
+    
+    if (!isStaff) {
+      formData.append('name', data.name);
+      formData.append('contact', data.contact);
+    }
+    
+    if (data.body) formData.append('body', data.body);
+    
+    if (data.attachments?.length) {
+      data.attachments.forEach(file => {
+        formData.append('attachments[]', file);
+      });
+    }
+
+    const response = await api.post(
+      `/message/conversations/${uuid}/messages`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+
+  // Send typing indicator
+  sendTyping: async (conversationId, name = null) => {
+    const response = await api.post(
+      `/message/conversations/${conversationId}/typing`,
+      name ? { name } : {}
+    );
+    return response.data;
+  },
+
+  // Staff: List all conversations
+  listConversations: async (page = 1, perPage = 20, filters = {}) => {
+    const response = await api.get('/message/conversations', {
+      params: { page, per_page: perPage, ...filters }
+    });
+    return response.data;
+  },
+
+  // Staff: Get conversation detail
+  getConversation: async (uuid) => {
+    const response = await api.get(`/message/conversations/${uuid}`);
+    return response.data;
+  },
+
+  // Staff: Join conversation
+  joinConversation: async (uuid) => {
+    const response = await api.post(`/message/conversations/${uuid}/join`);
+    return response.data;
+  },
+
+  // Staff: Assign conversation
+  assignConversation: async (uuid) => {
+    const response = await api.post(`/message/conversations/${uuid}/assign`);
+    return response.data;
+  },
+
+  // Staff: Delete message
+  deleteMessage: async (messageId) => {
+    const response = await api.delete(`/message/messages/${messageId}`);
+    return response.data;
+  },
+
+  // Get attachment metadata
+  getAttachment: async (attachmentId) => {
+    const response = await api.get(`/message/attachments/${attachmentId}`);
+    return response.data;
   }
-  return pusher;
-}
-
-export async function fetchMessages(uuid, { page = 1, per_page = 50 } = {}) {
-  if (!uuid) return [];
-  const res = await api.get(`/message/conversations/${uuid}/messages`, {
-    params: { page, per_page },
-  });
-  return res.data.data || res.data;
-}
-
-export async function sendMessage(uuid, formData) {
-  if (!uuid) throw new Error("conversation uuid required");
-  const res = await api.post(`/message/conversations/${uuid}/messages`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return res.data.data || res.data;
-}
-
-export async function sendTyping(uuid, payload = {}) {
-  if (!uuid) return null;
-  const res = await api.post(`/message/conversations/${uuid}/typing`, payload);
-  return res.data;
-}
-
-export function subscribe(uuid, handlers = {}) {
-  if (!uuid) return null;
-  const channelName = `conversation.${uuid}`;
-  if (channels.has(channelName)) return channels.get(channelName);
-
-  const instance = getPusher();
-  const channel = instance.subscribe(channelName);
-
-  const onMessage = (data) => {
-    if (handlers.onMessage) handlers.onMessage(data.message || data);
-  };
-  const onTyping = (data) => {
-    if (handlers.onTyping) handlers.onTyping(data);
-  };
-
-  channel.bind("MessageSent", onMessage);
-  channel.bind("UserTyping", onTyping);
-
-  const subscription = { channel, onMessage, onTyping };
-  channels.set(channelName, subscription);
-  return subscription;
-}
-
-export function unsubscribe(uuid) {
-  const channelName = `conversation.${uuid}`;
-  const sub = channels.get(channelName);
-  if (!sub) return;
-
-  const instance = getPusher();
-  sub.channel.unbind("MessageSent", sub.onMessage);
-  sub.channel.unbind("UserTyping", sub.onTyping);
-  instance.unsubscribe(channelName);
-  channels.delete(channelName);
-}
-
-export default {
-  fetchMessages,
-  sendMessage,
-  sendTyping,
-  subscribe,
-  unsubscribe,
 };
+
+export default chatService;

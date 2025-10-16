@@ -1,27 +1,58 @@
-// filepath: src/features/chat/hooks/useTyping.js 
-import { useEffect, useRef, useState } from 'react'; import chatService from '../services/chatService';
+// filepath: src/features/chat/hooks/useTyping.js
+import { useCallback, useRef } from "react";
+import chatService from "../services/chatService";
 
-// debounce helper function
-debounce(fn, wait) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); }; }
+export const useTyping = (conversationId, userName) => {
+  const typingTimeoutRef = useRef(null);
+  const lastTypingTimeRef = useRef(0);
 
-export default function useTyping(conversationUuid, { name } = {}) { const [typing, setTyping] = useState(null); const lastEmit = useRef(0);
+  const sendTypingIndicator = useCallback(() => {
+    if (!conversationId) return;
 
-useEffect(() => { // subscribe to typing events locally via pusher handled in useChat or chatService // Here we only expose local typing state; the app-level subscription will feed UI.
-function onTyping(payload) { const p = payload.data ? payload.data : payload; if (!p) return; setTyping({ name: p.userName || name || 'Someone', isStaff: !!p.isStaff }); setTimeout(() => setTyping(null), 3000); }
+    const now = Date.now();
+    // Throttle: only send typing indicator every 3 seconds
+    if (now - lastTypingTimeRef.current < 3000) return;
 
-// subscribe to pusher channel directly to listen typing events
-if (!conversationUuid) return;
-const sub = chatService.subscribe(conversationUuid, { onTyping });
+    lastTypingTimeRef.current = now;
 
-return () => {
-  if (conversationUuid) chatService.unsubscribe(conversationUuid);
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Send typing event. If server returns 404 for a UUID, try to fetch
+    // the conversation (to get numeric id) and retry.
+    chatService.sendTyping(conversationId, userName).catch(async (err) => {
+      // If 404 and conversationId looks like a UUID, attempt fallback
+      const isUuid =
+        typeof conversationId === "string" &&
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89ABab][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(
+          conversationId
+        );
+      if (err?.response?.status === 404 && isUuid) {
+        try {
+          const res = await chatService.getConversation(conversationId);
+          const numericId = res.data?.id || res.id || null;
+          if (numericId) {
+            await chatService.sendTyping(numericId, userName);
+            return;
+          }
+        } catch (innerErr) {
+          console.error(
+            "Failed to resolve conversation by uuid for typing fallback:",
+            innerErr
+          );
+        }
+      }
+
+      console.error("Failed to send typing indicator:", err);
+    });
+
+    // Set timeout to stop sending after user stops typing
+    typingTimeoutRef.current = setTimeout(() => {
+      lastTypingTimeRef.current = 0;
+    }, 3000);
+  }, [conversationId, userName]);
+
+  return { sendTypingIndicator };
 };
-
-}, [conversationUuid, name]);
-
-// function to emit typing
-(debounced) const emit = useRef(debounce(async () => { if (!conversationUuid) return; try { await chatService.sendTyping(conversationUuid, { name }); lastEmit.current = Date.now(); } catch (e) { // ignore 
-} }, 800));
-
-return { typing, emit: emit.current }; }
-

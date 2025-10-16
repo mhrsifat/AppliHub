@@ -1,26 +1,165 @@
-// filepath: src/features/chat/components/MessageComposer.jsx 
-import React, { useState, useRef } from 'react'; import api from '../services/api'; import chatService from '../services/chatService'; import useUpload from '../hooks/useUpload';
+// filepath: src/features/chat/components/MessageComposer.jsx
+import React, { useState, useRef } from "react";
+import { Send, Paperclip, Smile, Loader2 } from "lucide-react";
+import { useTyping } from "../hooks/useTyping";
+import { useUpload } from "../hooks/useUpload";
+import AttachmentPreview from "./AttachmentPreview";
 
-export default function MessageComposer({ conversationUuid, apiBase = '/api', onCreated }) { const [name, setName] = useState(''); const [contact, setContact] = useState(''); const [body, setBody] = useState(''); const [sending, setSending] = useState(false); const fileRef = useRef(null); const { files, addFiles, removeFile, clear } = useUpload();
+const MessageComposer = ({
+  onSend,
+  sending = false,
+  conversationId,
+  userName,
+  disabled = false,
+  placeholder = "Type your message...",
+}) => {
+  const [message, setMessage] = useState("");
+  const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
 
-const ensureConversation = async () => { // If there's no conversationUuid, create a conversation first 
-if (conversationUuid) return conversationUuid; const payload = { name: name || 'Anonymous', contact }; const res = await api.post(${apiBase}/message/conversations, payload); const uuid = res.data.data.uuid || res.data.uuid || res.data.data?.uuid; if (onCreated) onCreated(uuid); return uuid; };
+  const { sendTypingIndicator } = useTyping(conversationId, userName);
+  const {
+    files,
+    previews,
+    addFiles,
+    removeFile,
+    clearAll,
+    formatFileSize,
+    errors,
+  } = useUpload();
 
-const handleFiles = (e) => { const inputFiles = Array.from(e.target.files || []); addFiles(inputFiles); };
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
 
-const handleSend = async () => { if (!body && files.length === 0) return; setSending(true); try { const uuid = await ensureConversation(); const form = new FormData(); if (name) form.append('name', name); if (contact) form.append('contact', contact); form.append('body', body); files.forEach(f => form.append('attachments[]', f));
+    if ((!message.trim() && files.length === 0) || sending) return;
 
-// optimistic UI: chatService handle local state
-  await chatService.sendMessage(uuid, form);
-  setBody('');
-  clear();
-} catch (err) {
-  console.error(err);
-} finally {
-  setSending(false);
-}
+    const messageData = {
+      body: message.trim(),
+      attachments: files,
+    };
 
+    try {
+      console.log("MessageComposer: sending", messageData);
+      await onSend(messageData);
+      setMessage("");
+      clearAll();
+
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+    } catch (error) {
+      console.error("Failed to send message:", error);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setMessage(e.target.value);
+    sendTypingIndicator();
+
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height =
+        Math.min(textareaRef.current.scrollHeight, 120) + "px";
+    }
+  };
+
+  const handleFileSelect = async (e) => {
+    const selectedFiles = e.target.files;
+    if (selectedFiles && selectedFiles.length > 0) {
+      await addFiles(selectedFiles);
+    }
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="border-t border-gray-200 bg-white">
+      {/* Error messages */}
+      {errors.length > 0 && (
+        <div className="px-4 py-2 bg-red-50 border-b border-red-100">
+          {errors.map((error, idx) => (
+            <p key={idx} className="text-xs text-red-600">
+              {error}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Attachment previews */}
+      <AttachmentPreview
+        previews={previews}
+        onRemove={removeFile}
+        formatFileSize={formatFileSize}
+      />
+
+      {/* Input area */}
+      <div className="flex items-end gap-2 p-4">
+        {/* Attach button */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={disabled || sending}
+          className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+          title="Attach file"
+        >
+          <Paperclip className="w-5 h-5" />
+        </button>
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* Text input */}
+        <div className="flex-1 relative">
+          <textarea
+            ref={textareaRef}
+            value={message}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            disabled={disabled || sending}
+            placeholder={placeholder}
+            rows={1}
+            className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+            style={{ maxHeight: "120px" }}
+          />
+        </div>
+
+        {/* Send button */}
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={
+            disabled || sending || (!message.trim() && files.length === 0)
+          }
+          className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+          title="Send message"
+        >
+          {sending ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <Send className="w-5 h-5" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
 };
 
-return ( <div className="flex flex-col gap-2"> <div className="flex gap-2"> <input value={name} onChange={e => setName(e.target.value)} placeholder="Name (optional)" className="flex-1 input input-sm" /> <input value={contact} onChange={e => setContact(e.target.value)} placeholder="Contact (optional)" className="w-36 input input-sm" /> </div> <div className="flex items-end gap-2"> <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write a message..." className="flex-1 textarea resize-none h-20" /> <div className="flex flex-col gap-2"> <input ref={fileRef} type="file" multiple onChange={handleFiles} className="hidden" /> <button onClick={() => fileRef.current && fileRef.current.click()} className="btn btn-ghost">Attach</button> <button onClick={handleSend} disabled={sending} className="btn btn-primary">{sending ? 'Sending...' : 'Send'}</button> </div> </div> {files.length > 0 && ( <div className="flex gap-2 overflow-auto"> {files.map((f, i) => ( <div key={i} className="w-20 h-20 rounded border p-1 relative"> {f.type.startsWith('image') ? ( <img src={URL.createObjectURL(f)} alt={f.name} className="w-full h-full object-cover rounded" /> ) : f.type.startsWith('video') ? ( <video src={URL.createObjectURL(f)} className="w-full h-full object-cover" /> ) : ( <div className="text-xs">{f.name}</div> )} <button onClick={() => removeFile(i)} className="absolute top-0 right-0 text-xs bg-white rounded-full p-1">✕</button> </div> ))} </div> )} </div> ); }
-
+export default MessageComposer;

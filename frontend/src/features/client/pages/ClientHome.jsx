@@ -6,10 +6,7 @@ import Loader from "../../../components/common/Loader";
 import Navbar from "../components/Navbar";
 import HeroSection from "../components/HeroSection";
 import ServiceHighlights from "../components/ServiceHighlights";
-
-// Chat widget: import directly so the floating bubble appears immediately
-//import ChatWidget from "@/components/chat/ChatWidget";
-import { ChatWidget } from "@/features/chat";
+import { UserComponent } from '@/features/chat';
 
 // Lazy-load non-critical sections
 const OurServices = lazy(() => import("../components/OurServices"));
@@ -41,7 +38,7 @@ const ClientHome = () => {
         <Footer />
       </Suspense>
       
-      <ChatWidget position="right" /> 
+      <UserComponent unreadCount={0} />  {/* Chat component */}
     </>
   );
 };

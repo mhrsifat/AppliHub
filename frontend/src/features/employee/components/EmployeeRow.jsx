@@ -9,7 +9,7 @@ export default function EmployeeRow({ index, employee, onEdit, onView, onDelete,
       <td className="p-3">{index}</td>
       <td className="p-3 flex items-center gap-3">
         <img
-          src={employee.avatar ? `/storage/${employee.avatar}` : `https://ui-avatars.com/api/?name=${employee.first_name}+${employee.last_name}`}
+          src={employee.avatar ? `${employee.avatar}` : `https://ui-avatars.com/api/?name=${employee.first_name}+${employee.last_name}`}
           alt="avatar"
           className="w-10 h-10 rounded-full object-cover"
         />

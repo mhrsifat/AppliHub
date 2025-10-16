@@ -2,7 +2,6 @@
 import React from "react";
 import {
   Box,
-  Grid,
   Typography,
   Link as MuiLink,
   List,
@@ -60,9 +59,19 @@ export default function Footer() {
       }}
     >
       <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 3, md: 2 } }}>
-        <Grid container spacing={4}>
+        <Box
+          sx={{
+            display: "grid",
+            gap: 4,
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(2, minmax(0, 1fr))",
+              md: "repeat(3, minmax(0, 1fr))",
+            },
+          }}
+        >
           {/* Section 1 - Company & Contact */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Box>
             <Typography variant="h6" sx={{ mb: 1 }}>
               AppliHub
             </Typography>
@@ -76,14 +85,22 @@ export default function Footer() {
             <List dense sx={{ p: 0, mb: 1 }}>
               <ListItem sx={{ py: 0.5 }}>
                 <EnvelopeIcon className="w-5 h-5" style={{ marginRight: 10 }} />
-                <MuiLink href="mailto:support@applihub.com" underline="hover" color="inherit">
+                <MuiLink
+                  href="mailto:support@applihub.com"
+                  underline="hover"
+                  color="inherit"
+                >
                   support@applihub.com
                 </MuiLink>
               </ListItem>
 
               <ListItem sx={{ py: 0.5 }}>
                 <PhoneIcon className="w-5 h-5" style={{ marginRight: 10 }} />
-                <MuiLink href="tel:+8801700000000" underline="hover" color="inherit">
+                <MuiLink
+                  href="tel:+8801700000000"
+                  underline="hover"
+                  color="inherit"
+                >
                   +880 1700 000000
                 </MuiLink>
               </ListItem>
@@ -97,55 +114,81 @@ export default function Footer() {
             </List>
 
             <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-              <IconButton aria-label="facebook" size="large" href="https://facebook.com/applihub" component="a">
+              <IconButton
+                aria-label="facebook"
+                size="large"
+                href="https://facebook.com/applihub"
+                component="a"
+              >
                 <LinkIcon className="w-5 h-5" />
               </IconButton>
-              <IconButton aria-label="instagram" size="large" href="https://instagram.com/applihub" component="a">
+              <IconButton
+                aria-label="instagram"
+                size="large"
+                href="https://instagram.com/applihub"
+                component="a"
+              >
                 <ChatBubbleLeftRightIcon className="w-5 h-5" />
               </IconButton>
               <IconButton aria-label="home" size="large" href="/" component="a">
                 <HomeModernIcon className="w-5 h-5" />
               </IconButton>
             </Box>
-          </Grid>
+          </Box>
 
           {/* Section 2 - Services & Company */}
-          <Grid item xs={12} sm={6} md={4}>
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
+          <Box>
+            <Box
+              sx={{
+                display: "grid",
+                gap: 2,
+                gridTemplateColumns: "repeat(2, minmax(0,1fr))",
+              }}
+            >
+              <Box>
                 <Typography variant="subtitle1" sx={{ mb: 1 }}>
                   Our Services
                 </Typography>
                 <List dense sx={{ p: 0 }}>
                   {serviceLinks.map((l) => (
                     <ListItem key={l.href} sx={{ py: 0.5 }}>
-                      <MuiLink href={l.href} underline="hover" color="inherit" sx={{ fontSize: 14 }}>
+                      <MuiLink
+                        href={l.href}
+                        underline="hover"
+                        color="inherit"
+                        sx={{ fontSize: 14 }}
+                      >
                         {l.label}
                       </MuiLink>
                     </ListItem>
                   ))}
                 </List>
-              </Grid>
+              </Box>
 
-              <Grid item xs={6}>
+              <Box>
                 <Typography variant="subtitle1" sx={{ mb: 1 }}>
                   Company
                 </Typography>
                 <List dense sx={{ p: 0 }}>
                   {companyLinks.map((l) => (
                     <ListItem key={l.href} sx={{ py: 0.5 }}>
-                      <MuiLink href={l.href} underline="hover" color="inherit" sx={{ fontSize: 14 }}>
+                      <MuiLink
+                        href={l.href}
+                        underline="hover"
+                        color="inherit"
+                        sx={{ fontSize: 14 }}
+                      >
                         {l.label}
                       </MuiLink>
                     </ListItem>
                   ))}
                 </List>
-              </Grid>
-            </Grid>
-          </Grid>
+              </Box>
+            </Box>
+          </Box>
 
           {/* Section 3 - Newsletter & Support */}
-          <Grid item xs={12} sm={12} md={4}>
+          <Box>
             <Typography variant="h6" sx={{ mb: 1 }}>
               Stay Updated
             </Typography>
@@ -154,7 +197,10 @@ export default function Footer() {
               inbox.
             </Typography>
 
-            <Box component="section" sx={{ display: "flex", gap: 1, mb: 2, alignItems: "center" }}>
+            <Box
+              component="section"
+              sx={{ display: "flex", gap: 1, mb: 2, alignItems: "center" }}
+            >
               <TextField
                 placeholder="Your email"
                 variant="outlined"
@@ -162,7 +208,9 @@ export default function Footer() {
                 aria-label="newsletter email"
                 sx={{ flex: 1 }}
               />
-              <Button variant="contained" size="medium">Subscribe</Button>
+              <Button variant="contained" size="medium">
+                Subscribe
+              </Button>
             </Box>
 
             <Typography variant="subtitle2" sx={{ mt: 1, mb: 1 }}>
@@ -182,27 +230,51 @@ export default function Footer() {
             <Box sx={{ mt: 3, display: "flex", gap: 2, alignItems: "center" }}>
               <ShieldCheckIcon className="w-5 h-5" />
               <Typography variant="caption">
-                All services backed by verified technicians and warranty support.
+                All services backed by verified technicians and warranty
+                support.
               </Typography>
             </Box>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
 
         <Divider sx={{ my: 4 }} />
 
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
           <Typography variant="caption">
             © {new Date().getFullYear()} AppliHub. All rights reserved.
           </Typography>
 
           <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-            <MuiLink href="/privacy" underline="hover" color="inherit" sx={{ fontSize: 13 }}>
+            <MuiLink
+              href="/privacy"
+              underline="hover"
+              color="inherit"
+              sx={{ fontSize: 13 }}
+            >
               Privacy
             </MuiLink>
-            <MuiLink href="/terms" underline="hover" color="inherit" sx={{ fontSize: 13 }}>
+            <MuiLink
+              href="/terms"
+              underline="hover"
+              color="inherit"
+              sx={{ fontSize: 13 }}
+            >
               Terms
             </MuiLink>
-            <MuiLink href="/sitemap" underline="hover" color="inherit" sx={{ fontSize: 13 }}>
+            <MuiLink
+              href="/sitemap"
+              underline="hover"
+              color="inherit"
+              sx={{ fontSize: 13 }}
+            >
               Sitemap
             </MuiLink>
           </Box>

@@ -7,6 +7,7 @@ import serviceReducer from "../features/service/slices/serviceSlice";
 import blogsReducer from "../features/blog/slices/blogSlice";
 import clientBlogsReducer from "../features/client/slices/clientBlogSlice";
 import dashboardReducer from "../features/dashboard/dashboardSlice";
+import chatReducer from '../features/chat/store/chatSlice';
 
 // Create store instance
 export const store = configureStore({
@@ -19,6 +20,7 @@ export const store = configureStore({
     service: serviceReducer,
     blogs: blogsReducer,
     clientBlog: clientBlogsReducer,
+    chat: chatReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

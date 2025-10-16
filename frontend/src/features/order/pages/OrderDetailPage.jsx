@@ -24,7 +24,6 @@ export default function OrderDetailPage() {
   const { current: order, getOne } = useOrders();
   // Normalize API responses that may be wrapped as { data: {...} }
   const ord = order?.data ?? order;
-  alert("res", ord);
   const [adding, setAdding] = useState(false);
   const [newItem, setNewItem] = useState(blankItem());
   const [editingItemId, setEditingItemId] = useState(null);

@@ -1,13 +1,33 @@
 // src/features/client/components/Testimonials.jsx
 import React, { useState, useEffect } from "react";
-import { Box, Typography, IconButton, Avatar, Grid } from "@mui/material";
+import { Box, Typography, IconButton, Avatar } from "@mui/material";
 import { motion, AnimatePresence } from "framer-motion";
 
 const items = [
-  { name: "Rana", text: "Great service, fixed my laptop in 2 days!", role: "Customer", image: "https://randomuser.me/api/portraits/men/1.jpg" },
-  { name: "Mitu", text: "Transparent pricing and fast support.", role: "Customer", image: "https://randomuser.me/api/portraits/men/2.jpg" },
-  { name: "Sabbir", text: "Technician arrived on time and solved the issue.", role: "Customer", image: "https://randomuser.me/api/portraits/men/3.jpg" },
-  { name: "Nabila", text: "Friendly staff and quick service.", role: "Customer", image: "https://randomuser.me/api/portraits/women/4.jpg" },
+  {
+    name: "Rana",
+    text: "Great service, fixed my laptop in 2 days!",
+    role: "Customer",
+    image: "https://randomuser.me/api/portraits/men/1.jpg",
+  },
+  {
+    name: "Mitu",
+    text: "Transparent pricing and fast support.",
+    role: "Customer",
+    image: "https://randomuser.me/api/portraits/men/2.jpg",
+  },
+  {
+    name: "Sabbir",
+    text: "Technician arrived on time and solved the issue.",
+    role: "Customer",
+    image: "https://randomuser.me/api/portraits/men/3.jpg",
+  },
+  {
+    name: "Nabila",
+    text: "Friendly staff and quick service.",
+    role: "Customer",
+    image: "https://randomuser.me/api/portraits/women/4.jpg",
+  },
 ];
 
 export default function Testimonials() {
@@ -40,9 +60,16 @@ export default function Testimonials() {
         What clients say
       </Typography>
 
-      <Grid container spacing={4} justifyContent="center">
+      <Box
+        sx={{
+          display: "grid",
+          gap: 4,
+          justifyContent: "center",
+          gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+        }}
+      >
         {displayed.map((item, i) => (
-          <Grid item xs={12} md={5} key={i}>
+          <Box key={i}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={item.name}
@@ -81,9 +108,9 @@ export default function Testimonials() {
                 </Box>
               </motion.div>
             </AnimatePresence>
-          </Grid>
+          </Box>
         ))}
-      </Grid>
+      </Box>
 
       {/* Navigation buttons */}
       <Box sx={{ display: "flex", justifyContent: "center", gap: 1, mt: 4 }}>

@@ -15,7 +15,7 @@ const Employees = lazy(() => import("../features/employee/pages/EmployeeListPage
 const Services = lazy(() => import("../features/service/pages/ServicesPage"));
 const Orders = lazy(() => import("../features/order/pages/OrderListPage"));
 const Invoices = lazy(() => import("../features/invoice/pages/InvoiceListPage"));
-const Messages = lazy(() => import("../pages/Messages"));
+const Messages = lazy(() => import("@/features/chat/pages/AdminPage"));
 const Permissions = lazy(() => import("../pages/admin/Permissions"));
 const Reports = lazy(() => import("../pages/admin/Reports"));
 const Settings = lazy(() => import("../pages/admin/Settings"));

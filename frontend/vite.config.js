@@ -14,15 +14,4 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
-  // Development proxy to forward `/api` to the backend (avoid CORS cookie issues in dev)
-  server: {
-    proxy: {
-      "/api": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-        secure: false,
-        // keep path as-is, do not rewrite
-      },
-    },
-  },
 });
