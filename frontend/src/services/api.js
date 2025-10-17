@@ -14,8 +14,15 @@ const api = axios.create({
 
 // Helper to set/remove access token in memory
 export const setAccessToken = (token) => {
-  if (token) api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-  else delete api.defaults.headers.common["Authorization"];
+  if (token) {
+    const headerValue = `Bearer ${token}`;
+    api.defaults.headers.common["Authorization"] = headerValue;
+    // 🔔 Broadcast with full header string
+    window.dispatchEvent(new CustomEvent("tokenChanged", { detail: headerValue }));
+  } else {
+    delete api.defaults.headers.common["Authorization"];
+    window.dispatchEvent(new CustomEvent("tokenChanged", { detail: null }));
+  }
 };
 
 // Separate Axios instance for refresh to avoid interceptor recursion

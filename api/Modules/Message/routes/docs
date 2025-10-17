@@ -1,17 +1,3 @@
-this code is code but doc is made by chatgpt. so if not work. figure out by yourself.
-
-Message Module — API Reference (Routes & Responses)
-
-ডকটায় ১–১ করে রুটের নাম, উদ্দেশ্য, রিকোয়েস্ট ফরম্যাট ও সফল রেসপন্স দেয়া আছে। (প্রতিটি টেকনিক্যাল ইংরেজি শব্দের পাশে বাংলা অনুবাদ দেওয়া আছে।)
-
-
----
-
-> নোট: সব এন্ডপয়েন্টের প্রিফিক্স ধরা হয়েছে /api/message। যদি প্রকল্পে আলাদা থাকে তাহলে সেই অনুযায়ী এন্ডপয়েন্ট ব্যবহার করবে।
-
-
-
-
 ---
 
 Routes (Route name — কি জন্য)
@@ -305,7 +291,7 @@ Success Response (200 OK) নমুনা:
 
 10) Typing (broadcast) — lightweight endpoint
 
-Route: POST /message/conversations/{id}/typing
+Route: POST /message/conversations/{uuid}/typing
 
 Name: message.conversations.typing
 
@@ -327,9 +313,9 @@ Broadcast behavior:
 
 Event: App\Events\UserTyping (UserTyping — টাইপিং ইভেন্ট)
 
-Channel: conversation.{conversationId} (public/private channel নাম)
+Channel: conversation.{conversationUuid} (public/private channel নাম)
 
-Payload: { conversationId, userName, isStaff }
+Payload: { conversationUuid, userName, isStaff }
 
 
 
@@ -341,16 +327,16 @@ Events
 
 MessageSent — Broadcast when নতুন message সেভ হয়।
 
-Channel: conversation.{conversationId}
+Channel: conversation.{conversationUuid}
 
 Payload: { message: MessageResource }
 
 
 UserTyping — Broadcast when কেউ টাইপ করছে।
 
-Channel: conversation.{conversationId}
+Channel: conversation.{conversationUuid}
 
-Payload: { conversationId, userName, isStaff }
+Payload: { conversationUuid, userName, isStaff }
 
 
 
@@ -363,21 +349,3 @@ channel.bind('UserTyping', data => { /* show typing indicator */ });
 
 
 ---
-
-Common notes (সাধারণ নোট)
-
-Authentication (প্রমাণীকরণ): staff-only রুটগুলোতে Authorization: Bearer <token> প্রয়োজন।
-
-Attachments (সংযুক্তি): send করতে হলে multipart/form-data এবং attachments[] key ব্যবহার করো।
-
-Video (ভিডিও): mp4,mov,avi mime types অনুমোদন করলে ভিডিও আপলোড যাবে; নিশ্চিত করো php.ini তে upload_max_filesize ও post_max_size যথেষ্ট বড় আছে।
-
-Role config (রোল কনফিগ): config/message.php-এ staff_roles অ্যারে বাড়িয়ে নতুন রোল যোগ করতে পারো (তুমি আগে Spatie ব্যবহার করেছো)।
-
-
-
----
-
-প্রয়োজনে আমি এই ডকটাকে Markdown → PDF করে দেবো, অথবা Postman collection বানিয়ে দেবো যাতে তুমি এক ক্লিকে সব রুট টেস্ট করতে পারো। কোনটা লাগবে?
-
-

@@ -6,7 +6,11 @@ import Loader from "../../../components/common/Loader";
 import Navbar from "../components/Navbar";
 import HeroSection from "../components/HeroSection";
 import ServiceHighlights from "../components/ServiceHighlights";
-import { UserComponent } from '@/features/chat';
+import { createPusherBroadcaster } from "@/features/chat/broadcaster/pusherBroadcaster";
+import UserChatWidget from "@/features/chat/components/UserChatWidget";
+import useTokenListener from "@/features/chat/useTokenListener";
+
+
 
 // Lazy-load non-critical sections
 const OurServices = lazy(() => import("../components/OurServices"));
@@ -19,26 +23,37 @@ const ContactForm = lazy(() => import("../components/ContactForm"));
 const Footer = lazy(() => import("../components/Footer"));
 
 const ClientHome = () => {
+  const authHeader = useTokenListener();
+
+  const pb = useMemo(() => {
+    if (!authHeader) return null;
+    return createPusherBroadcaster({
+      key: import.meta.env.VITE_PUSHER_KEY,
+      cluster: import.meta.env.VITE_PUSHER_CLUSTER,
+      authHeaders: { Authorization: authHeader },
+    });
+  }, [authHeader]);
+  
   return (
     <>
       {/* Fast-load core */}
       <Navbar />
       <HeroSection />
       <ServiceHighlights />
-
-      {/* Lazy-load the rest */}
-      <Suspense fallback={<Loader size="medium" />}>
-        <OurServices />
+      <OurServices />
         <AboutUs />
         <CallToAction />
         <Testimonials />
         <ProcessSteps />
+
+      {/* Lazy-load the rest */}
+      <Suspense fallback={<Loader size="medium" />}>
         <BlogSection />
         <ContactForm />
         <Footer />
       </Suspense>
       
-      <UserComponent unreadCount={0} />  {/* Chat component */}
+        <UserChatWidget broadcaster={pb} />
     </>
   );
 };

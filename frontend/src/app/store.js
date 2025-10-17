@@ -7,7 +7,7 @@ import serviceReducer from "../features/service/slices/serviceSlice";
 import blogsReducer from "../features/blog/slices/blogSlice";
 import clientBlogsReducer from "../features/client/slices/clientBlogSlice";
 import dashboardReducer from "../features/dashboard/dashboardSlice";
-import chatReducer from '../features/chat/store/chatSlice';
+import chatReducer from '../features/chat/chatSlices';
 
 // Create store instance
 export const store = configureStore({

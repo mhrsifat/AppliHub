@@ -137,27 +137,25 @@ class MessageServiceProvider extends ServiceProvider
     /**
      * Register broadcast channels.
      */
+
     protected function registerBroadcastChannels(): void
-    {
-        Broadcast::channel('conversation.{conversationId}', function ($user, $conversationId) {
-            // If user is logged in and is staff (assumes `is_staff` on users or use roles)
-            if ($user && property_exists($user, 'is_staff') && $user->is_staff) {
-                return true;
-            }
-            
-            // Otherwise anonymous: allow if `contact` query param matches conversation's contact
-            // (client will pass contact when subscribing)
-            $contact = request()->query('contact');
-            if ($contact) {
-                $conversation = \Modules\Message\Models\Conversation::find($conversationId);
-                if ($conversation && $conversation->created_by_contact === $contact) {
-                    return true;
-                }
-            }
-            
-            return false;
-        });
-    }
+{
+    Broadcast::channel('conversation.{uuid}', function ($user, $uuid) {
+        $conversation = \Modules\Message\Models\Conversation::where('uuid', $uuid)->first();
+        if (! $conversation) return false;
+
+        if ($user && property_exists($user, 'is_staff') && $user->is_staff) {
+            return true;
+        }
+
+        $contact = request()->query('contact');
+        if ($contact && $conversation->created_by_contact === $contact) {
+            return true;
+        }
+
+        return false;
+    });
+}
 
     /**
      * Get the services provided by the provider.
