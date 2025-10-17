@@ -9,6 +9,8 @@ import {
   createInvoiceFromOrder as createInvoiceFromOrderThunk,
 } from "../slices/orderSlice";
 
+import StatusButton from "../components/StatusButton";
+
 function blankItem() {
   return { service_name: "", unit_price: 0, quantity: 1 };
 }
@@ -271,6 +273,7 @@ export default function OrderDetailPage() {
         <div className="text-right">
           <div className="mb-2">
             Status: <span className="font-medium">{ord.status ?? "-"}</span>
+            <StatusButton order={ord} />
           </div>
           <div className="mb-2">
             Payment:{" "}

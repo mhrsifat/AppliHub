@@ -756,4 +756,18 @@ public function getFullOrderDetails(Request $request, $orderId)
         ],
     ]);
 }
+
+public function changeStatus(Request $request, Order $order)
+{
+    $request->validate([
+        'status' => 'required|string|in:pending,confirmed,processing,completed,cancelled',
+    ]);
+
+    $order->update(['status' => $request->status]);
+
+    return response()->json([
+        'message' => 'Order status updated successfully',
+        'order' => $order->fresh(),
+    ]);
+}
 }

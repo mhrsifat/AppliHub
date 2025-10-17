@@ -40,6 +40,7 @@ import {
 } from "@heroicons/react/24/outline";
 import useOrders from "../hooks/useOrders";
 import OrderAssignment from "./OrderAssignment";
+import StatusButton from "./StatusButton";
 import { useSelector } from "react-redux";
 
 export default function OrderList() {
@@ -187,7 +188,9 @@ export default function OrderList() {
                       </Box>
                     </TableCell>
 
-                    <TableCell>{o.status ?? "-"}</TableCell>
+                    <TableCell>{o.status ?? "-"}
+                    <StatusButton order={o} />
+                    </TableCell>
 
                     {/* Actions */}
                     <TableCell align="center">

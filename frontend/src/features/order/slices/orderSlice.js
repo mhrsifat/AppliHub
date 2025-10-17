@@ -16,7 +16,20 @@ import {
   createInvoiceFromOrderApi,
   assignOrderApi,
   unassignOrderApi,
+  changeStatus,
 } from "../services/orderService";
+
+export const changeOrderStatus = createAsyncThunk(
+  "order/changeStatus",
+  async ({ orderId, status }, { rejectWithValue }) => {
+    try {
+      const res = await api.post(`/orders/${orderId}/status`, { status });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
 
 export const fetchOrders = createAsyncThunk(
   "order/fetchOrders",
@@ -345,6 +358,10 @@ const orderSlice = createSlice({
         s.saving = false;
         s.error = a.payload || a.error;
       });
+      .addCase(changeOrderStatus.fulfilled, (s, a) => {
+        const o = a.payload?.order ?? a.payload;
+        if (o && o.id) ordersAdapter.upsertOne(s, o);
+});
   },
 });
 

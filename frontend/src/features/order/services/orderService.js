@@ -28,3 +28,6 @@ export const unassignOrderApi = (orderId) =>
   api.post(`/orders/${orderId}/unassign`);
   
   
+export const changeStatus = (orderId, status) =>
+  api.post(`/orders/${orderId}/status`, status);
+  

@@ -140,12 +140,12 @@ export default function InvoiceList() {
                       >
                         View
                       </Link>
-                      <Link
+                      {/*<Link
                         to={`${basePath}invoices/${i.id}/edit`}
                         className="text-green-600"
                       >
                         Edit
-                      </Link>
+                      </Link> */}
                       <Link
                         to={`${basePath}invoices/${i.id}/quick-pay`}
                         className="text-indigo-600"
