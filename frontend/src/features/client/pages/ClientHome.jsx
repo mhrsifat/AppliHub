@@ -53,7 +53,7 @@ const ClientHome = () => {
         <Footer />
       </Suspense>
       
-        <UserChatWidget broadcaster={pb} />
+       {/* <UserChatWidget broadcaster={pb} /> */}
     </>
   );
 };
