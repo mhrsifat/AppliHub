@@ -1,13 +1,12 @@
 // filepath: src/features/chat/useChat.js
 import { useEffect, useRef, useState, useCallback } from "react";
 import chatServices from "./chatServices";
-import debounce from "lodash.debounce";
 
 /**
  * useChat hook:
  * - loads messages
  * - optimistic sending + retry
- * - typing with debounce (ডিবাউনস)
+ * - typing with internal debounce
  * - rate limiting (থ্রটল) for sends
  * - scroll management
  * - broadcaster integration (pusher/socket) expected interface
@@ -22,30 +21,43 @@ export default function useChat(uuid, { broadcaster = null, page = 1, per_page =
   const [presence, setPresence] = useState({});
   const mountedRef = useRef(true);
   const lastSendAt = useRef(0);
-  const sendQueue = useRef({}); // tempId -> { args, resolve, reject }
   const scrollRef = useRef(null);
+
+  // ---------- local debounce helper ----------
+  const debounce = useCallback((fn, delay = 400) => {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
+    };
+  }, []);
+  // -------------------------------------------
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   // Load messages
-  const load = useCallback(async (p = page) => {
-    if (!uuid) return;
-    setLoading(true);
-    try {
-      const res = await chatServices.listMessages(uuid, { page: p, per_page });
-      if (!mountedRef.current) return;
-      setMessages(res.data || []);
-      // scroll to bottom after a short delay
-      setTimeout(() => scrollToBottom(), 80);
-    } catch (e) {
-      console.error("Failed to load messages", e);
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, [uuid, page, per_page]);
+  const load = useCallback(
+    async (p = page) => {
+      if (!uuid) return;
+      setLoading(true);
+      try {
+        const res = await chatServices.listMessages(uuid, { page: p, per_page });
+        if (!mountedRef.current) return;
+        setMessages(res.data || []);
+        setTimeout(() => scrollToBottom(), 80);
+      } catch (e) {
+        console.error("Failed to load messages", e);
+      } finally {
+        if (mountedRef.current) setLoading(false);
+      }
+    },
+    [uuid, page, per_page]
+  );
 
   useEffect(() => {
     if (uuid) load();
@@ -67,17 +79,12 @@ export default function useChat(uuid, { broadcaster = null, page = 1, per_page =
     const onTypingEvent = (payload) => {
       setTyping(payload);
       if (onTyping) onTyping(payload);
-      // clear typing after 2.5s
       setTimeout(() => setTyping(null), 2500);
     };
+    const onPresence = (payload) => setPresence(payload);
 
     broadcaster.bind(channel, "MessageSent", onMessageEvent);
     broadcaster.bind(channel, "UserTyping", onTypingEvent);
-
-    // presence (optional) if server broadcasts presence updates
-    const onPresence = (payload) => {
-      setPresence(payload);
-    };
     broadcaster.bind(channel, "PresenceUpdated", onPresence);
 
     return () => {
@@ -108,7 +115,7 @@ export default function useChat(uuid, { broadcaster = null, page = 1, per_page =
     return true;
   };
 
-  // sendTyping debounced
+  // sendTyping using internal debounce
   const sendTyping = useCallback(
     debounce(async (name) => {
       if (!uuid) return;
@@ -119,51 +126,59 @@ export default function useChat(uuid, { broadcaster = null, page = 1, per_page =
     [uuid]
   );
 
-  // sendMessage with optimistic UI and upload progress and retry
-  const sendMessage = useCallback(async ({ body = "", name, contact, attachments = [], onProgress = null } = {}) => {
-    if (!uuid) throw new Error("missing uuid");
-    if (!canSendNow()) throw new Error("rate_limited");
+  // sendMessage with optimistic UI and retry
+  const sendMessage = useCallback(
+    async ({ body = "", name, contact, attachments = [], onProgress = null } = {}) => {
+      if (!uuid) throw new Error("missing uuid");
+      if (!canSendNow()) throw new Error("rate_limited");
 
-    const tempId = `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    const optimisticMessage = {
-      _optimisticId: tempId,
-      body,
-      sender_name: name || "You",
-      is_staff: false,
-      attachments: attachments.map((f) => ({ name: f.name, size: f.size })),
-      created_at: new Date().toISOString(),
-      _status: "sending",
-    };
+      const tempId = `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const optimisticMessage = {
+        _optimisticId: tempId,
+        body,
+        sender_name: name || "You",
+        is_staff: false,
+        attachments: attachments.map((f) => ({ name: f.name, size: f.size })),
+        created_at: new Date().toISOString(),
+        _status: "sending",
+      };
 
-    setMessages((cur) => [...cur, optimisticMessage]);
+      setMessages((cur) => [...cur, optimisticMessage]);
 
-    try {
-      const res = await chatServices.sendMessage({ uuid, body, name, contact, attachments, onUploadProgress: (e) => {
-        if (onProgress && e.total) onProgress(Math.round((e.loaded * 100) / e.total));
-      } });
-      // server message in res.data.data or res.data
-      const serverMessage = res?.data || res;
-      // replace optimistic
-      setMessages((cur) => cur.map((m) => (m._optimisticId === tempId ? serverMessage : m)));
-      return serverMessage;
-    } catch (e) {
-      // mark failed
-      setMessages((cur) => cur.map((m) => (m._optimisticId === tempId ? { ...m, _status: "failed" } : m)));
-      throw e;
-    }
-  }, [uuid]);
+      try {
+        const res = await chatServices.sendMessage({
+          uuid,
+          body,
+          name,
+          contact,
+          attachments,
+          onUploadProgress: (e) => {
+            if (onProgress && e.total) onProgress(Math.round((e.loaded * 100) / e.total));
+          },
+        });
+        const serverMessage = res?.data || res;
+        setMessages((cur) => cur.map((m) => (m._optimisticId === tempId ? serverMessage : m)));
+        return serverMessage;
+      } catch (e) {
+        setMessages((cur) => cur.map((m) => (m._optimisticId === tempId ? { ...m, _status: "failed" } : m)));
+        throw e;
+      }
+    },
+    [uuid]
+  );
 
-  const retrySend = useCallback(async (optimisticMsg, { name, contact, attachments = [], onProgress = null } = {}) => {
-    // optimisticMsg contains body and temp id
-    try {
-      // remove failed marker before resend
-      setMessages((cur) => cur.filter((m) => m._optimisticId !== optimisticMsg._optimisticId));
-      const server = await sendMessage({ body: optimisticMsg.body, name, contact, attachments, onProgress });
-      return server;
-    } catch (e) {
-      throw e;
-    }
-  }, [sendMessage]);
+  const retrySend = useCallback(
+    async (optimisticMsg, { name, contact, attachments = [], onProgress = null } = {}) => {
+      try {
+        setMessages((cur) => cur.filter((m) => m._optimisticId !== optimisticMsg._optimisticId));
+        const server = await sendMessage({ body: optimisticMsg.body, name, contact, attachments, onProgress });
+        return server;
+      } catch (e) {
+        throw e;
+      }
+    },
+    [sendMessage]
+  );
 
   return {
     messages,
