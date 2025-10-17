@@ -357,11 +357,11 @@ const orderSlice = createSlice({
       .addCase(unassignOrder.rejected, (s, a) => {
         s.saving = false;
         s.error = a.payload || a.error;
-      });
+      })
       .addCase(changeOrderStatus.fulfilled, (s, a) => {
         const o = a.payload?.order ?? a.payload;
         if (o && o.id) ordersAdapter.upsertOne(s, o);
-});
+})
   },
 });
 
