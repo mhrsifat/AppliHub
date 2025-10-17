@@ -7,7 +7,7 @@ import Navbar from "../components/Navbar";
 import HeroSection from "../components/HeroSection";
 import ServiceHighlights from "../components/ServiceHighlights";
 import { createPusherBroadcaster } from "@/features/chat/broadcaster/pusherBroadcaster";
-import UserChatWidget from "@/features/chat/components/UserChatWidget";
+import UserChatWidget from "@/features/chat/components/UserComponents";
 import useTokenListener from "@/features/chat/useTokenListener";
 
 
