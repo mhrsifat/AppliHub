@@ -8,6 +8,8 @@ Route::get('/public/track-order', [OrderController::class, 'publicTrack']);
 
 Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
 
+Route::get('/{id}/full-details-test', [OrderController::class, 'getFullOrderDetails']);
+
 Route::prefix('orders')->middleware(['multi-auth'])->group(function () {
     Route::get('/{id}/full-details', [OrderController::class, 'getFullOrderDetails']);
   
