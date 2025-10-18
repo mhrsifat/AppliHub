@@ -1,6 +1,6 @@
 // filepath: src/features/chat/slices/chatSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import api, { setAccessToken } from "src/services/api";
+import api, { setAccessToken } from "@/services/api";
 
 // Async thunks
 export const createOrResumeConversation = createAsyncThunk(
