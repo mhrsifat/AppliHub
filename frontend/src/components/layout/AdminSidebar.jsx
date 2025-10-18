@@ -12,7 +12,6 @@ import {
   CogIcon,
   Bars3Icon,
   PencilSquareIcon,
-  ChatIcon
 } from "@heroicons/react/24/outline";
 
 const navItems = [
@@ -22,8 +21,8 @@ const navItems = [
   { name: "Orders", path: "/admin/orders", icon: ShoppingCartIcon },
   { name: "Invoices", path: "/admin/invoices", icon: DocumentTextIcon },
   // { name: "Blogs", path: "/admin/blogs", icon: PencilSquareIcon },
-  // { name: "Messages", path: "/admin/messages", icon: BellIcon },  
-   { name:"Message", path: '/admin/chat', icon: ChatIcon },
+  // { name: "Messages", path: "/admin/messages", icon: BellIcon },
+  { name: "Message", path: "/admin/messages", icon: BellIcon },
   { name: "Reports", path: "/admin/reports", icon: ChartBarIcon },
   { name: "Settings", path: "/admin/settings", icon: CogIcon },
 ];
@@ -46,7 +45,9 @@ export default function AdminSidebar() {
   return (
     <aside
       aria-expanded={!collapsed}
-      className={`${collapsed ? "w-20" : "w-64"} bg-background dark:bg-surface text-text h-screen shadow-md flex flex-col transition-all duration-300`}
+      className={`${
+        collapsed ? "w-20" : "w-64"
+      } bg-background dark:bg-surface text-text h-screen shadow-md flex flex-col transition-all duration-300`}
     >
       {/* Top / Logo & Toggle */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border relative">
@@ -75,7 +76,11 @@ export default function AdminSidebar() {
             className={({ isActive }) =>
               `relative group flex items-center gap-3 px-3 py-2 rounded-lg transition-colors duration-150
                hover:bg-primary/10 dark:hover:bg-primary/20
-               ${isActive ? "bg-primary/20 dark:bg-primary/30 font-semibold text-primary" : "text-muted-foreground"}`
+               ${
+                 isActive
+                   ? "bg-primary/20 dark:bg-primary/30 font-semibold text-primary"
+                   : "text-muted-foreground"
+               }`
             }
           >
             <item.icon className="w-5 h-5 shrink-0" />
