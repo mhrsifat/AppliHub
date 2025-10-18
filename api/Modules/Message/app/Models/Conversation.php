@@ -15,7 +15,7 @@ class Conversation extends Model
     protected $fillable = [
         'uuid', 'subject',
         'created_by_name', 'created_by_contact',
-        'assigned_to', 'status',
+        'assigned_to', 'status', 'closed_by', 'closed_at',
         'last_message_preview', 'last_message_at',
     ];
     

@@ -139,7 +139,7 @@ public function addNote(Request $request, $uuid)
         'sender_name' => $user->name,
         'body' => $request->body,
         'is_staff' => true,
-        'is_internal' => true, // নতুন কলাম দরকার হলে migration এ যোগ করো
+        'is_internal' => true, 
     ]);
 
     return response()->json([

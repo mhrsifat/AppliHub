@@ -22,19 +22,19 @@ Route::prefix('message')->group(function () {
         Route::get('/attachments/{attachment}', [AttachmentController::class, 'show']);
 
 
-    Route::post('/message/conversations/{uuid}/close', [ConversationController::class, 'close'])
+    Route::post('/conversations/{uuid}/close', [ConversationController::class, 'close'])
         ->name('message.conversations.close');
 
-    Route::post('/message/conversations/{uuid}/read', [ConversationController::class, 'markAsRead'])
+    Route::post('/conversations/{uuid}/read', [ConversationController::class, 'markAsRead'])
         ->name('message.conversations.read');
 
-    Route::post('/message/conversations/{uuid}/notes', [ConversationController::class, 'addNote'])
+    Route::post('/conversations/{uuid}/notes', [ConversationController::class, 'addNote'])
         ->name('message.conversations.notes');
 
-    Route::post('/message/conversations/{uuid}/typing/stop', [ConversationController::class, 'typingStop'])
+    Route::post('/conversations/{uuid}/typing/stop', [ConversationController::class, 'typingStop'])
         ->name('message.conversations.typing.stop');
 
-    Route::delete('/message/attachments/{id}', [AttachmentController::class, 'destroy'])
+    Route::delete('/attachments/{id}', [AttachmentController::class, 'destroy'])
         ->name('message.attachments.destroy');
     
     });

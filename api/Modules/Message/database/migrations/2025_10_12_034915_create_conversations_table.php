@@ -14,9 +14,11 @@ class CreateConversationsTable extends Migration
             $table->string('subject')->nullable();
             $table->string('created_by_name')->nullable();
             $table->string('created_by_contact')->nullable();
-            $table->unsignedBigInteger('assigned_to')->nullable(); // user_id
-            $table->enum('status', ['open', 'closed'])->default('open');
+            $table->unsignedBigInteger('assigned_to')->nullable(); 
+            $table->unsignedBigInteger('closed_by')->nullable(); 
+            $table->enum('status', ['open', 'pending',  'closed'])->default('open');
             $table->text('last_message_preview')->nullable();
+            $table->timestamp('closed_at')->nullable();
             $table->timestamp('last_message_at')->nullable();
             $table->timestamps();
         });

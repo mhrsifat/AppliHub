@@ -1,169 +1,136 @@
-// src/features/chat/slices/chatSlice.js
-import { createSlice } from '@reduxjs/toolkit';
+// filepath: src/features/chat/slices/chatSlice.js
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import api, { setAccessToken } from "src/services/api";
 
-// Helper to get user info from localStorage
-const getUserInfoFromStorage = () => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const stored = localStorage.getItem('chatUserInfo');
-    return stored ? JSON.parse(stored) : null;
-  } catch (error) {
-    console.error('Error reading chat user info from storage:', error);
-    return null;
-  }
-};
-
-// Helper to get widget state from localStorage
-const getWidgetStateFromStorage = () => {
-  if (typeof window === 'undefined') return { isOpen: false, isMinimized: true };
-  try {
-    const stored = localStorage.getItem('chatWidgetState');
-    return stored ? JSON.parse(stored) : { isOpen: false, isMinimized: true };
-  } catch (error) {
-    console.error('Error reading widget state from storage:', error);
-    return { isOpen: false, isMinimized: true };
-  }
-};
-
-const initialState = {
-  userInfo: getUserInfoFromStorage(),
-  currentConversation: null,
-  conversations: [],
-  messages: [],
-  isLoading: false,
-  isSubmitting: false,
-  error: null,
-  typingUsers: [],
-  activeConversations: [],
-  widgetState: getWidgetStateFromStorage(),
-  unreadCount: 0,
-  connectionStatus: 'disconnected', // 'connected', 'connecting', 'disconnected', 'error'
-  lastActivity: null
-};
-
-const chatSlice = createSlice({
-  name: 'chat',
-  initialState,
-  reducers: {
-    setUserInfo: (state, action) => {
-      state.userInfo = action.payload;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('chatUserInfo', JSON.stringify(action.payload));
+// Async thunks
+export const createOrResumeConversation = createAsyncThunk(
+  "chat/createOrResumeConversation",
+  async ({ name, contact, existingUuid }, { rejectWithValue }) => {
+    try {
+      if (existingUuid) {
+        // try to fetch to validate
+        const res = await api.get(`/message/conversations/${existingUuid}`);
+        return { conversation: res.data.data };
       }
-    },
-    setCurrentConversation: (state, action) => {
-      state.currentConversation = action.payload;
-    },
-    setConversations: (state, action) => {
-      state.conversations = action.payload;
-    },
-    setMessages: (state, action) => {
-      state.messages = action.payload;
-    },
-    addMessage: (state, action) => {
-      state.messages.push(action.payload);
-      state.lastActivity = new Date().toISOString();
-    },
-    prependMessages: (state, action) => {
-      state.messages.unshift(...action.payload);
-    },
-    setLoading: (state, action) => {
-      state.isLoading = action.payload;
-    },
-    setSubmitting: (state, action) => {
-      state.isSubmitting = action.payload;
-    },
-    setError: (state, action) => {
-      state.error = action.payload;
-      state.lastActivity = new Date().toISOString();
-    },
-    addTypingUser: (state, action) => {
-      const { userName, isStaff } = action.payload;
-      const existingIndex = state.typingUsers.findIndex(
-        user => user.userName === userName && user.isStaff === isStaff
-      );
-      
-      if (existingIndex >= 0) {
-        state.typingUsers[existingIndex].timestamp = Date.now();
-      } else {
-        state.typingUsers.push({ 
-          userName, 
-          isStaff, 
-          timestamp: Date.now() 
-        });
-      }
-    },
-    removeTypingUser: (state, action) => {
-      state.typingUsers = state.typingUsers.filter(user => 
-        !(user.userName === action.payload.userName && user.isStaff === action.payload.isStaff)
-      );
-    },
-    clearTypingUsers: (state) => {
-      state.typingUsers = [];
-    },
-    clearChatState: (state) => {
-      state.currentConversation = null;
-      state.messages = [];
-      state.typingUsers = [];
-      state.error = null;
-    },
-    clearError: (state) => {
-      state.error = null;
-    },
-    setWidgetState: (state, action) => {
-      state.widgetState = { ...state.widgetState, ...action.payload };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('chatWidgetState', JSON.stringify(state.widgetState));
-      }
-    },
-    setUnreadCount: (state, action) => {
-      state.unreadCount = action.payload;
-    },
-    incrementUnreadCount: (state) => {
-      state.unreadCount += 1;
-    },
-    resetUnreadCount: (state) => {
-      state.unreadCount = 0;
-    },
-    setConnectionStatus: (state, action) => {
-      state.connectionStatus = action.payload;
-    },
-    updateLastActivity: (state) => {
-      state.lastActivity = new Date().toISOString();
-    },
-    markMessagesAsRead: (state, action) => {
-      // Implementation for marking messages as read
-      state.messages.forEach(message => {
-        if (!message.readAt && message.sender_user_id !== state.userInfo?.id) {
-          message.readAt = new Date().toISOString();
-        }
+      const res = await api.post("/message/conversations", {
+        name,
+        contact,
+        subject: "Web widget",
       });
+      return { conversation: res.data.data };
+    } catch (err) {
+      return rejectWithValue(err.response?.data || { message: err.message });
     }
   }
+);
+
+export const fetchMessages = createAsyncThunk(
+  "chat/fetchMessages",
+  async ({ uuid, page = 1 }, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/message/conversations/${uuid}/messages?page=${page}`);
+      return { messages: res.data.data };
+    } catch (err) {
+      return rejectWithValue(err.response?.data || { message: err.message });
+    }
+  }
+);
+
+export const sendMessageApi = createAsyncThunk(
+  "chat/sendMessageApi",
+  async ({ uuid, body, files = [] }, { rejectWithValue }) => {
+    try {
+      const fd = new FormData();
+      if (body) fd.append("body", body);
+      files.forEach((f) => fd.append("attachments[]", f));
+      const res = await api.post(`/message/conversations/${uuid}/messages`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (ev) => {
+          // upload progress handled in component via event (not here)
+        },
+      });
+      return { message: res.data.data };
+    } catch (err) {
+      return rejectWithValue(err.response?.data || { message: err.message });
+    }
+  }
+);
+
+const chatSlice = createSlice({
+  name: "chat",
+  initialState: {
+    conversation: null,
+    messages: [],
+    typing: {},
+    loading: false,
+    error: null,
+  },
+  reducers: {
+    addMessage(state, action) {
+      state.messages.push(action.payload);
+    },
+    replaceMessage(state, action) {
+      const idx = state.messages.findIndex((m) => m.temp_id === action.payload.temp_id);
+      if (idx !== -1) state.messages[idx] = action.payload;
+    },
+    setTyping(state, action) {
+      state.typing = { ...state.typing, ...action.payload };
+    },
+    clearTyping(state, action) {
+      state.typing = {};
+    },
+    optimisticAdd(state, action) {
+      state.messages.push(action.payload);
+    },
+    removeMessageByTempId(state, action) {
+      state.messages = state.messages.filter((m) => m.temp_id !== action.payload);
+    },
+    setConversation(state, action) {
+      state.conversation = action.payload;
+    },
+    clearChat(state) {
+      state.conversation = null;
+      state.messages = [];
+      state.typing = {};
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(createOrResumeConversation.pending, (s) => {
+        s.loading = true;
+        s.error = null;
+      })
+      .addCase(createOrResumeConversation.fulfilled, (s, a) => {
+        s.loading = false;
+        s.conversation = a.payload.conversation;
+      })
+      .addCase(createOrResumeConversation.rejected, (s, a) => {
+        s.loading = false;
+        s.error = a.payload;
+      })
+      .addCase(fetchMessages.fulfilled, (s, a) => {
+        s.messages = a.payload.messages;
+      })
+      .addCase(sendMessageApi.fulfilled, (s, a) => {
+        // server returned saved message, append or replace based on id
+        // naive append:
+        s.messages.push(a.payload.message);
+      })
+      .addCase(sendMessageApi.rejected, (s, a) => {
+        s.error = a.payload;
+      });
+  },
 });
 
 export const {
-  setUserInfo,
-  setCurrentConversation,
-  setConversations,
-  setMessages,
   addMessage,
-  prependMessages,
-  setLoading,
-  setSubmitting,
-  setError,
-  addTypingUser,
-  removeTypingUser,
-  clearTypingUsers,
-  clearChatState,
-  clearError,
-  setWidgetState,
-  setUnreadCount,
-  incrementUnreadCount,
-  resetUnreadCount,
-  setConnectionStatus,
-  updateLastActivity,
-  markMessagesAsRead
+  setTyping,
+  clearTyping,
+  optimisticAdd,
+  removeMessageByTempId,
+  replaceMessage,
+  setConversation,
+  clearChat,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

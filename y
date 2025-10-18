@@ -9,14 +9,11 @@ php artisan test --filter=MessageTest
 
 
 
-
-src/features/chat/
-    components/
-        all components here
-    pages/
-        all pages here with prefix admin or user
-    chatServices.js
-    chatSlices.js
-    pusherBroadcaster.js
-    usehooks.js
-    index.js
+src/
+ └── features/
+     └── chat/
+           ├── components/
+           ├── pages/
+           ├── services/
+           ├── slices/
+           └── hooks/

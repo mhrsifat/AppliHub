@@ -1,4 +1,3 @@
-// src/components/chat/index.js
-export { default as ChatWidget } from './ChatWidget';
-export { default as AdminChat } from '@/features/chat/pages/AdminChat';
-export { default as AdminDashboard } from '@/features/chat/pages/AdminDashboard';
+// filepath: src/features/chat/index.js
+export { default as ChatWidget } from "./components/ChatWidget";
+export { default as AdminChatDashboard } from "./pages/AdminChatDashboard";

@@ -347,5 +347,120 @@ const channel = pusher.subscribe('conversation.'+conversationUuid);
 channel.bind('MessageSent', data => { /* append message */ });
 channel.bind('UserTyping', data => { /* show typing indicator */ });
 
+11) Close Conversation (staff)
+
+Route: POST /message/conversations/{uuid}/close
+Name: message.conversations.close
+What for: conversation বন্ধ করা — যখন staff final reply শেষ করে, চ্যাট স্টেটাস “closed” করে দেয়।
+
+Request:
+Headers: Authorization: Bearer <staff_token>
+Body: none
+
+Success Response (200 OK):
+
+{
+  "data": {
+    "uuid": "897c0fba-...",
+    "status": "closed",
+    "closed_at": "2025-10-18T11:12:44.000000Z"
+  }
+}
+
+
+---
+
+12) Mark as Read (staff)
+
+Route: POST /message/conversations/{uuid}/read
+Name: message.conversations.read
+What for: conversation-এর সব মেসেজ staff দ্বারা read হিসেবে মার্ক করা।
+
+Request:
+Headers: Authorization: Bearer <staff_token>
+Body: none
+
+Success Response (200 OK):
+
+{ "ok": true, "unread_count": 0 }
+
+
+---
+
+13) Add Internal Note (staff)
+
+Route: POST /message/conversations/{uuid}/notes
+Name: message.conversations.notes.store
+What for: conversation-এর মধ্যে staff-only internal note যোগ করা — এই নোট public ইউজার দেখতে পাবে না।
+
+Request:
+Headers: Authorization: Bearer <staff_token>
+Body (JSON):
+
+{
+  "body": "Customer mentioned slow response from server."
+}
+
+Success Response (201 Created):
+
+{
+  "data": {
+    "id": 14,
+    "conversation_id": 2,
+    "is_note": true,
+    "body": "Customer mentioned slow response from server.",
+    "created_by": "Admin",
+    "created_at": "2025-10-18T11:30:00Z"
+  }
+}
+
+
+---
+
+14) Typing Stop (broadcast)
+
+Route: POST /message/conversations/{uuid}/typing/stop
+Name: message.conversations.typing.stop
+What for: “typing stopped” ইভেন্ট broadcast করা — যাতে front-end এ টাইপিং ইন্ডিকেটর অদৃশ্য হয়।
+
+Request:
+Headers: optional Authorization: Bearer <staff_token>
+Body (JSON):
+
+{ "name": "John Doe" }
+
+Success Response (200 OK):
+
+{ "status": "ok" }
+
+Broadcast:
+Event: App\Events\UserTypingStopped
+Channel: conversation.{conversationUuid}
+Payload:
+
+{
+  "conversationUuid": "897c0fba-...",
+  "userName": "John Doe",
+  "isStaff": true
+}
+
+
+---
+
+15) Delete Attachment (staff)
+
+Route: DELETE /message/attachments/{id}
+Name: message.attachments.destroy
+What for: নির্দিষ্ট attachment ফাইল ডিলিট করা — শুধুমাত্র staff পারে।
+
+Request:
+Headers: Authorization: Bearer <staff_token>
+Body: none
+
+Success Response (200 OK):
+
+{ "ok": true }
+
+
 
 ---

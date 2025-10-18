@@ -15,6 +15,8 @@ class CreateMessagesTable extends Migration
             $table->string('sender_name');
             $table->string('sender_contact')->nullable();
             $table->boolean('is_staff')->default(false);
+            $table->boolean('is_internal')->default(false);
+            $table->boolean('is_read')->default(false);
             $table->text('body')->nullable();
             $table->boolean('has_attachments')->default(false);
             $table->timestamps();
