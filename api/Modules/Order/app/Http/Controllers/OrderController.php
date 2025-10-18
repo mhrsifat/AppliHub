@@ -197,10 +197,10 @@ public function store(StoreOrderRequest $request)
         // ✅ Direct Email পাঠানো
         if ($order->customer_email) {
             try {
-                $subject = 'Order Confirmation #' . $order->id;
+                $subject = 'Order Confirmation #' . $order->order_number;
                 $message = "Hello {$order->customer_name},\n\n"
                     . "Your order has been placed successfully.\n"
-                    . "Order ID: {$order->id}\n"
+                    . "Order ID: {$order->order_number}\n"
                     . "Total Amount: {$order->grand_total}\n\n"
                     . "We’ll contact you soon.\n\n"
                     . config('app.name');
