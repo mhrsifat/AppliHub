@@ -190,6 +190,7 @@ export default function TrackOrder() {
       const res = await api.post("/payments/initiate", {
         invoice_id: payInvoice.id,
         gateway: payGateway,
+        frontend_url: window.location.origin,
       });
 
       const checkoutUrl = res.data.checkout_url || res.data.data?.checkout_url;
