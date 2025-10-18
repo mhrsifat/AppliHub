@@ -23,7 +23,7 @@ export const changeOrderStatus = createAsyncThunk(
   "order/changeStatus",
   async ({ orderId, status }, { rejectWithValue }) => {
     try {
-      const res = await api.post(`/orders/${orderId}/status`, { status });
+      const res = await changeStatus(orderId, { status });
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);

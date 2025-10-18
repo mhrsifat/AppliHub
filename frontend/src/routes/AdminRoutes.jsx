@@ -15,7 +15,7 @@ const Employees = lazy(() => import("../features/employee/pages/EmployeeListPage
 const Services = lazy(() => import("../features/service/pages/ServicesPage"));
 const Orders = lazy(() => import("../features/order/pages/OrderListPage"));
 const Invoices = lazy(() => import("../features/invoice/pages/InvoiceListPage"));
-const Messages = lazy(() => import("@/features/chat/pages/AdminChatPage"));
+//const Messages = lazy(() => import("@/features/chat/pages/AdminDashboard"));
 const Permissions = lazy(() => import("../pages/admin/Permissions"));
 const Reports = lazy(() => import("../pages/admin/Reports"));
 const Settings = lazy(() => import("../pages/admin/Settings"));
@@ -48,7 +48,7 @@ export default function AdminRoutes() {
          {OrderRoutes}
          {InvoiceRoutes}
          {BlogRoutes}
-        <Route path="messages" element={<Messages />} />
+        {/* <Route path="messages" element={<Messages />} /> */}
         <Route path="permissions" element={<Permissions />} />
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />

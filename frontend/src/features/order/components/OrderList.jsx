@@ -1,13 +1,3 @@
-// src/features/order/components/OrderList.jsx
-/**
- * Fully dynamic OrderList with:
- * - Admin/Employee routing
- * - View/Edit/Invoice navigation via React Router Link
- * - MUI buttons with icons
- * - Pagination, search, per-page selection
- * - Assign order dialog
- */
-
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -34,7 +24,6 @@ import {
 } from "@mui/material";
 import {
   EyeIcon,
-  PencilSquareIcon,
   ReceiptPercentIcon,
   UserIcon,
 } from "@heroicons/react/24/outline";
@@ -65,12 +54,7 @@ export default function OrderList() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState(null);
 
-  // Dynamic base path
-  const reflink = () => {
-    if (admin) return `/admin/`;
-    if (employee) return `/employee/`;
-    return '/';
-  }
+  const reflink = () => (admin ? "/admin/" : employee ? "/employee/" : "/");
 
   useEffect(() => {
     load();
@@ -112,11 +96,7 @@ export default function OrderList() {
             <MenuItem value={25}>25 / page</MenuItem>
             <MenuItem value={50}>50 / page</MenuItem>
           </Select>
-          <Button
-            component={Link}
-            to={`${reflink()}orders/create`}
-            variant="contained"
-          >
+          <Button component={Link} to={`${reflink()}orders/create`} variant="contained">
             New Order
           </Button>
         </Stack>
@@ -142,7 +122,14 @@ export default function OrderList() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(list || []).map((o) => (
+                {list.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <Typography color="textSecondary">No orders found.</Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {list.map((o) => (
                   <TableRow key={o.id} hover>
                     <TableCell>
                       <Typography variant="body2" fontWeight={600}>{o.order_number}</Typography>
@@ -188,11 +175,10 @@ export default function OrderList() {
                       </Box>
                     </TableCell>
 
-                    <TableCell>{o.status ?? "-"}
-                    <StatusButton order={o} />
+                    <TableCell>
+                      <StatusButton order={o} />
                     </TableCell>
 
-                    {/* Actions */}
                     <TableCell align="center">
                       <Stack direction="row" spacing={1} justifyContent="center">
                         <Button
@@ -203,15 +189,6 @@ export default function OrderList() {
                         >
                           View
                         </Button>
-
-                       {/* <Button
-                          component={Link}
-                          to={`${reflink()}orders/${o.id}/edit`}
-                          startIcon={<PencilSquareIcon style={{ width: 18, height: 18 }} />}
-                          size="small"
-                        >
-                          Edit
-                        </Button> */}
 
                         <Button
                           component={Link}
@@ -237,14 +214,6 @@ export default function OrderList() {
                     </TableCell>
                   </TableRow>
                 ))}
-
-                {(!list || list.length === 0) && (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                      <Typography color="textSecondary">No orders found.</Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -253,14 +222,12 @@ export default function OrderList() {
         {/* Pagination */}
         <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="body2">Total: {meta?.total ?? list.length}</Typography>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Pagination
-              count={meta?.last_page ?? Math.max(1, Math.ceil((meta?.total ?? list.length) / (meta?.per_page ?? perPage)))}
-              page={meta?.current_page ?? page}
-              onChange={(_, p) => setPage(p)}
-              size="small"
-            />
-          </Stack>
+          <Pagination
+            count={meta?.last_page ?? Math.max(1, Math.ceil((meta?.total ?? list.length) / (meta?.per_page ?? perPage)))}
+            page={meta?.current_page ?? page}
+            onChange={(_, p) => setPage(p)}
+            size="small"
+          />
         </Box>
       </Paper>
 

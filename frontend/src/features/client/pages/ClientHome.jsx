@@ -6,9 +6,9 @@ import Loader from "../../../components/common/Loader";
 import Navbar from "../components/Navbar";
 import HeroSection from "../components/HeroSection";
 import ServiceHighlights from "../components/ServiceHighlights";
-//import { createPusherBroadcaster } from "@/features/chat/broadcaster/pusherBroadcaster";
-//import UserChatWidget from "@/features/chat/components/UserComponents";
-//import useTokenListener from "@/features/chat/useTokenListener";
+
+import { ChatWidget } from '@/features/chat';
+
 
 
 
@@ -23,16 +23,6 @@ const ContactForm = lazy(() => import("../components/ContactForm"));
 const Footer = lazy(() => import("../components/Footer"));
 
 const ClientHome = () => {
-  /* const authHeader = useTokenListener();
-
-  const pb = useMemo(() => {
-    if (!authHeader) return null;
-    return createPusherBroadcaster({
-      key: import.meta.env.VITE_PUSHER_KEY,
-      cluster: import.meta.env.VITE_PUSHER_CLUSTER,
-      authHeaders: { Authorization: authHeader },
-    });
-  }, [authHeader]); */
   
   return (
     <>
@@ -52,8 +42,10 @@ const ClientHome = () => {
         <ContactForm />
         <Footer />
       </Suspense>
-      
-       {/* <UserChatWidget broadcaster={pb} /> */}
+
+
+       <ChatWidget />
+
     </>
   );
 };

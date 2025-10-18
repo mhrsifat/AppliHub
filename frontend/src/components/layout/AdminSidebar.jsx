@@ -11,17 +11,19 @@ import {
   ChartBarIcon,
   CogIcon,
   Bars3Icon,
-  PencilSquareIcon
+  PencilSquareIcon,
+  ChatIcon
 } from "@heroicons/react/24/outline";
 
 const navItems = [
   { name: "Dashboard", path: "/admin", icon: HomeIcon },
   { name: "Employees", path: "/admin/employees", icon: UsersIcon },
-  { name: "Services", path: "/admin/services", icon: ClipboardDocumentListIcon },
+  // { name: "Services", path: "/admin/services", icon: ClipboardDocumentListIcon },
   { name: "Orders", path: "/admin/orders", icon: ShoppingCartIcon },
   { name: "Invoices", path: "/admin/invoices", icon: DocumentTextIcon },
-  { name: "Blogs", path: "/admin/blogs", icon: PencilSquareIcon },
-  { name: "Messages", path: "/admin/messages", icon: BellIcon },
+  // { name: "Blogs", path: "/admin/blogs", icon: PencilSquareIcon },
+  // { name: "Messages", path: "/admin/messages", icon: BellIcon },  
+   { name:"Message", path: '/admin/chat', icon: ChatIcon },
   { name: "Reports", path: "/admin/reports", icon: ChartBarIcon },
   { name: "Settings", path: "/admin/settings", icon: CogIcon },
 ];

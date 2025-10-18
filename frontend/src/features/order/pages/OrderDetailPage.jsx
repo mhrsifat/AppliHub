@@ -161,7 +161,7 @@ export default function OrderDetailPage() {
       const invoice = (res && (res.invoice ?? res)) || null;
       const invoiceId = invoice?.id ?? invoice?.data?.id ?? null;
       if (invoiceId) {
-        navigate(`invoices/${invoiceId}`);
+        navigate(`../invoices/${invoiceId}`);
       } else {
         await refresh();
         alert("Invoice created");

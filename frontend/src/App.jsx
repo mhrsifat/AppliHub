@@ -11,7 +11,6 @@ import { store } from "./app/store";
 import PrivateRoute from "./routes/PrivateRoute";
 import AdminPrivateRoute from "./routes/AdminPrivateRoute";
 import EmployeePrivateRoute from "./routes/EmployeePrivateRoute";
-import useAuthCheck from "./hooks/useAuthCheck";
 import AppThemeProvider from "./services/AppThemeProvider";
 import DarkModeProvider from "./context/DarkModeProvider";
 import CssBaseline from "@mui/material/CssBaseline";

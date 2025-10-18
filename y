@@ -12,12 +12,11 @@ php artisan test --filter=MessageTest
 
 src/features/chat/
     components/
-        UserComponent.jsx
-        AdminComponent.jsx
+        all components here
     pages/
-        Page.jsx
-        AdminPage.jsx
-    services.js
-    slices.js
+        all pages here with prefix admin or user
+    chatServices.js
+    chatSlices.js
+    pusherBroadcaster.js
     usehooks.js
     index.js

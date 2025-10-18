@@ -16,12 +16,12 @@ import {
 } from "@heroicons/react/24/outline";
 
 const navItems = [
-  { name: "Dashboard", path: "/employee", icon: HomeIcon },
+  // { name: "Dashboard", path: "/employee", icon: HomeIcon },
   { name: "Orders", path: "/employee/orders", icon: ShoppingCartIcon },
   { name: "Invoices", path: "/employee/invoices", icon: DocumentTextIcon },
   { name: "Messages", path: "/employee/messages", icon: BellIcon },
-  { name: "Reports", path: "/employee/reports", icon: ChartBarIcon },
-  { name: "Settings", path: "/employee/settings", icon: CogIcon },
+  // { name: "Reports", path: "/employee/reports", icon: ChartBarIcon },
+  // { name: "Settings", path: "/employee/settings", icon: CogIcon },
 ];
 
 export default function EmployeeSidebar() {
@@ -46,7 +46,7 @@ export default function EmployeeSidebar() {
     >
       {/* Top / Logo & Toggle */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border relative">
-        {!collapsed && <span className="text-xl font-bold">Admin Panel</span>}
+        {!collapsed && <span className="text-xl font-bold">Employee Panel</span>}
 
         {/* Improved Toggle button */}
         <button
@@ -67,7 +67,7 @@ export default function EmployeeSidebar() {
           <NavLink
             key={item.name}
             to={item.path}
-            end={item.path === "/admin"}
+            end={item.path === "/employee"}
             className={({ isActive }) =>
               `relative group flex items-center gap-3 px-3 py-2 rounded-lg transition-colors duration-150
                hover:bg-primary/10 dark:hover:bg-primary/20

@@ -1,3 +1,4 @@
+// src/app/store.js
 import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "../features/auth/slices/authSlice";
 import employeeReducer from "../features/employee/slices/employeeSlice";
@@ -7,9 +8,9 @@ import serviceReducer from "../features/service/slices/serviceSlice";
 import blogsReducer from "../features/blog/slices/blogSlice";
 import clientBlogsReducer from "../features/client/slices/clientBlogSlice";
 import dashboardReducer from "../features/dashboard/dashboardSlice";
-import chatReducer from '../features/chat/chatSlices';
+import chatReducer from "../features/chat/slices/chatSlice";
 
-// Create store instance
+// ✅ Unified Redux Store
 export const store = configureStore({
   reducer: {
     auth: authReducer,
@@ -24,7 +25,10 @@ export const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: false, // allow non-serializable items like cookies
+      serializableCheck: {
+        ignoredActions: ["chat/setUserInfo", "chat/setWidgetState"],
+        ignoredPaths: ["chat.userInfo", "chat.widgetState"],
+      },
     }),
 });
 

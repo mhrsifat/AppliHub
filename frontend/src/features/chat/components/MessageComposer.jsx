@@ -3,7 +3,7 @@ import React, { useState, useRef } from "react";
 import { Send, Paperclip, Smile, Loader2 } from "lucide-react";
 import { useTyping } from "../hooks/useTyping";
 import { useUpload } from "../hooks/useUpload";
-import AttachmentPreview from "./AttachmentPreview";
+import AttachmentPreview from "./MessageInput";
 
 const MessageComposer = ({
   onSend,
