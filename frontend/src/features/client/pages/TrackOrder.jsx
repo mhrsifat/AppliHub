@@ -40,10 +40,14 @@ export default function TrackOrder() {
   // fetch track data
   const search = async (e) => {
     if (e && typeof e.preventDefault === "function") e.preventDefault();
-    if (!query.trim()) {
-      setError("Please enter order number, invoice number, email or phone.");
-      return;
-    }
+if (!query.trim()) {
+  const params = new URLSearchParams(window.location.search);
+  const payment = params.get("payment");
+  if (!payment) {
+    setError("Please enter order number, invoice number, email or phone.");
+  }
+  return;
+}
     setError(null);
     setLoading(true);
     setData(null);
@@ -108,6 +112,7 @@ export default function TrackOrder() {
         // re-fetch
         search();
         setNotice("Payment successful. Updated information shown below.");
+        setError(null);
         setProcessingPay(false);
         setPayInvoice(null);
       }
