@@ -20,6 +20,7 @@ use Modules\Order\Http\Requests\OrderItemRequest;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Modules\Invoice\Models\InvoicePayment;
 use Modules\Invoice\Models\Refund;
+use Illuminate\Support\Facades\Mail;
 
 class OrderController extends Controller
 {
@@ -114,89 +115,111 @@ class OrderController extends Controller
     /**
      * Create an order and associated invoice
      */
-    public function store(StoreOrderRequest $request)
-    {
-        $data = $request->only([
-            'customer_id',
-            'customer_name',
-            'customer_email',
-            'customer_phone',
-            'customer_address',
-            'customer_note',
-            'vat_percent',
-            'coupon_code',
-            'coupon_discount',
-            'items'
+
+
+public function store(StoreOrderRequest $request)
+{
+    $data = $request->only([
+        'customer_id',
+        'customer_name',
+        'customer_email',
+        'customer_phone',
+        'customer_address',
+        'customer_note',
+        'vat_percent',
+        'coupon_code',
+        'coupon_discount',
+        'items'
+    ]);
+
+    return DB::transaction(function () use ($data) {
+        $order = Order::create([
+            'customer_id' => $data['customer_id'] ?? null,
+            'customer_name' => $data['customer_name'] ?? 'Guest',
+            'customer_email' => $data['customer_email'] ?? null,
+            'customer_phone' => $data['customer_phone'] ?? null,
+            'customer_address' => $data['customer_address'] ?? null,
+            'customer_note' => $data['customer_note'] ?? null,
+            'vat_percent' => $data['vat_percent'] ?? 0,
+            'coupon_code' => $data['coupon_code'] ?? null,
+            'coupon_discount' => $data['coupon_discount'] ?? 0,
+            'payment_status' => 'unpaid',
+            'status' => 'pending',
+            'created_by' => Auth::id(),
         ]);
 
-        return DB::transaction(function () use ($data) {
-            $order = Order::create([
-                'customer_id' => $data['customer_id'] ?? null,
-                'customer_name' => $data['customer_name'] ?? 'Guest',
-                'customer_email' => $data['customer_email'] ?? null,
-                'customer_phone' => $data['customer_phone'] ?? null,
-                'customer_address' => $data['customer_address'] ?? null,
-                'customer_note' => $data['customer_note'] ?? null,
-                'vat_percent' => $data['vat_percent'] ?? 0,
-                'coupon_code' => $data['coupon_code'] ?? null,
-                'coupon_discount' => $data['coupon_discount'] ?? 0,
-                'payment_status' => 'unpaid',
-                'status' => 'pending',
-                'created_by' => Auth::id(),
+        $items = $data['items'] ?? [];
+        if (!is_array($items)) {
+            throw new \InvalidArgumentException('items must be an array');
+        }
+
+        foreach ($items as $i) {
+            $order->items()->create([
+                'service_id' => $i['service_id'] ?? null,
+                'service_name' => $i['service_name'] ?? ($i['description'] ?? null),
+                'service_description' => $i['service_description'] ?? ($i['description'] ?? null),
+                'unit_price' => $i['unit_price'] ?? ($i['price'] ?? 0),
+                'quantity' => $i['quantity'] ?? 1,
+                'added_by' => Auth::id(),
             ]);
+        }
 
-            $items = $data['items'] ?? [];
-            if (!is_array($items)) {
-                throw new \InvalidArgumentException('items must be an array');
+        $order->load('items');
+        $order->total = $order->items->sum('total_price');
+        $order->vat_amount = round(($order->vat_percent / 100) * $order->total, 2);
+        $order->grand_total = round($order->total + $order->vat_amount - $order->coupon_discount, 2);
+        $order->save();
+
+        // invoice তৈরি
+        $invoicePayload = [
+            'order_id' => $order->id,
+            'vat_percent' => $order->vat_percent,
+            'coupon_discount' => $order->coupon_discount,
+            'items' => $order->items->map(function ($it) {
+                return [
+                    'service_id' => $it->service_id,
+                    'service_name' => $it->service_name,
+                    'description' => $it->service_description,
+                    'unit_price' => $it->unit_price,
+                    'quantity' => $it->quantity,
+                    'meta' => null,
+                ];
+            })->toArray(),
+        ];
+
+        $invoice = $this->invoiceService->createFromPayload($invoicePayload);
+
+        $order->payment_status = $invoice->status === 'paid'
+            ? 'paid'
+            : ($invoice->status === 'partially_paid' ? 'partially_paid' : $order->payment_status);
+        $order->save();
+
+        // ✅ Direct Email পাঠানো
+        if ($order->customer_email) {
+            try {
+                $subject = 'Order Confirmation #' . $order->id;
+                $message = "Hello {$order->customer_name},\n\n"
+                    . "Your order has been placed successfully.\n"
+                    . "Order ID: {$order->id}\n"
+                    . "Total Amount: {$order->grand_total}\n\n"
+                    . "We’ll contact you soon.\n\n"
+                    . config('app.name');
+
+                Mail::raw($message, function ($mail) use ($order, $subject) {
+                    $mail->to($order->customer_email)
+                         ->subject($subject);
+                });
+            } catch (\Exception $e) {
+                \Log::error("Order email failed: " . $e->getMessage());
             }
+        }
 
-            foreach ($items as $i) {
-                $order->items()->create([
-                    'service_id' => $i['service_id'] ?? null,
-                    'service_name' => $i['service_name'] ?? ($i['description'] ?? null),
-                    'service_description' => $i['service_description'] ?? ($i['description'] ?? null),
-                    'unit_price' => $i['unit_price'] ?? ($i['price'] ?? 0),
-                    'quantity' => $i['quantity'] ?? 1,
-                    'added_by' => Auth::id(),
-                ]);
-            }
-
-            $order->load('items');
-            $order->total = $order->items->sum('total_price');
-            $order->vat_amount = round(($order->vat_percent / 100) * $order->total, 2);
-            $order->grand_total = round($order->total + $order->vat_amount - $order->coupon_discount, 2);
-            $order->save();
-
-            // Create invoice
-            $invoicePayload = [
-                'order_id' => $order->id,
-                'vat_percent' => $order->vat_percent,
-                'coupon_discount' => $order->coupon_discount,
-                'items' => $order->items->map(function ($it) {
-                    return [
-                        'service_id' => $it->service_id,
-                        'service_name' => $it->service_name,
-                        'description' => $it->service_description,
-                        'unit_price' => $it->unit_price,
-                        'quantity' => $it->quantity,
-                        'meta' => null,
-                    ];
-                })->toArray(),
-            ];
-
-            $invoice = $this->invoiceService->createFromPayload($invoicePayload);
-
-            $order->payment_status = $invoice->status === 'paid'
-                ? 'paid'
-                : ($invoice->status === 'partially_paid' ? 'partially_paid' : $order->payment_status);
-            $order->save();
-
-            return response()->json([
-                'order' => new OrderResource($order->fresh('items')),
-                'invoice' => $invoice,
-            ], 201);
-        });
-    }
+        return response()->json([
+            'order' => new OrderResource($order->fresh('items')),
+            'invoice' => $invoice,
+        ], 201);
+    });
+}
 
     /**
      * Update order (including optional items payload)
