@@ -1,5 +1,5 @@
 // filepath: src/features/chat/services/adminService.js
-import api from "src/services/api";
+import api from "@/services/api";
 
 export const listConversations = (params = {}) => {
   // params: page, per_page, filters

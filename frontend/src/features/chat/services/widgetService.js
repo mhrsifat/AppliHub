@@ -1,5 +1,5 @@
 // filepath: src/features/chat/services/widgetService.js
-import api from "src/services/api";
+import api from "@/services/api";
 
 export const startConversation = async ({ name, contact }) => {
   return api.post("/message/conversations", { name, contact, subject: "Web widget" });
