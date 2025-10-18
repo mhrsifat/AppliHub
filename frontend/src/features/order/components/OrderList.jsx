@@ -1,13 +1,15 @@
 // src/features/order/components/OrderList.jsx
 /**
- * Minimal, feature-rich order list using MUI + heroicons.
- * - Removed bulk selection features.
- * - Per-row actions: View, Edit, Invoice, Assign (opens OrderAssignment dialog).
- * - Uses useOrders() hook for data + actions.
+ * Fully dynamic OrderList with:
+ * - Admin/Employee routing
+ * - View/Edit/Invoice navigation via React Router Link
+ * - MUI buttons with icons
+ * - Pagination, search, per-page selection
+ * - Assign order dialog
  */
 
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Box,
   Paper,
@@ -22,9 +24,8 @@ import {
   Select,
   MenuItem,
   Button,
-  IconButton,
-  CircularProgress,
   Stack,
+  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -39,10 +40,10 @@ import {
 } from "@heroicons/react/24/outline";
 import useOrders from "../hooks/useOrders";
 import OrderAssignment from "./OrderAssignment";
+import StatusButton from "./StatusButton";
 import { useSelector } from "react-redux";
 
 export default function OrderList() {
-  const navigate = useNavigate();
   const {
     list = [],
     meta,
@@ -55,23 +56,27 @@ export default function OrderList() {
     load,
     search,
     q,
-    assign,
-    unassign,
     getOne,
   } = useOrders({ initialPage: 1, perPage: 10 });
 
   const isLoading = Boolean(loading?.list ?? loading);
   const [searchTerm, setSearchTerm] = useState(q ?? "");
-  const { admin } = useSelector((state) => state.auth);
+  const { admin, employee } = useSelector((state) => state.auth);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState(null);
 
+  // Dynamic base path
+  const reflink = () => {
+    if (admin) return `/admin/`;
+    if (employee) return `/employee/`;
+    return '/';
+  }
+
   useEffect(() => {
-    load(); /* initial load handled in hook too */
+    load();
   }, []); // eslint-disable-line
 
   const openAssign = async (order) => {
-    // make sure we have freshest order in store
     await getOne(order.id);
     setActiveOrder(order);
     setAssignDialogOpen(true);
@@ -89,15 +94,9 @@ export default function OrderList() {
 
   return (
     <Box p={3}>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={3}
-        gap={2}
-      >
+      {/* Header */}
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} gap={2}>
         <Typography variant="h6">Orders</Typography>
-
         <Stack direction="row" spacing={2} alignItems="center">
           <TextField
             size="small"
@@ -113,16 +112,17 @@ export default function OrderList() {
             <MenuItem value={25}>25 / page</MenuItem>
             <MenuItem value={50}>50 / page</MenuItem>
           </Select>
-
           <Button
+            component={Link}
+            to={`${reflink()}orders/create`}
             variant="contained"
-            onClick={() => navigate("/admin/orders/create")}
           >
             New Order
           </Button>
         </Stack>
       </Stack>
 
+      {/* Table */}
       <Paper variant="outlined">
         {isLoading ? (
           <Box p={6} display="flex" justifyContent="center">
@@ -141,35 +141,26 @@ export default function OrderList() {
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
-
               <TableBody>
                 {(list || []).map((o) => (
                   <TableRow key={o.id} hover>
                     <TableCell>
-                      <Typography variant="body2" fontWeight={600}>
-                        {o.order_number}
-                      </Typography>
+                      <Typography variant="body2" fontWeight={600}>{o.order_number}</Typography>
                       <Typography variant="caption" color="textSecondary">
-                        {o.created_at
-                          ? new Date(o.created_at).toLocaleDateString()
-                          : ""}
+                        {o.created_at ? new Date(o.created_at).toLocaleDateString() : ""}
                       </Typography>
                     </TableCell>
 
                     <TableCell>
                       <div style={{ display: "flex", flexDirection: "column" }}>
-                        <span style={{ fontWeight: 600 }}>
-                          {o.customer_name ?? "Guest"}
-                        </span>
+                        <span style={{ fontWeight: 600 }}>{o.customer_name ?? "Guest"}</span>
                         <span style={{ fontSize: 12, color: "#6b7280" }}>
                           {o.customer_phone ?? o.customer_email}
                         </span>
                       </div>
                     </TableCell>
 
-                    <TableCell align="right">
-                      {Number(o.grand_total ?? 0).toFixed(2)}
-                    </TableCell>
+                    <TableCell align="right">{Number(o.grand_total ?? 0).toFixed(2)}</TableCell>
 
                     <TableCell>
                       <Box
@@ -197,52 +188,47 @@ export default function OrderList() {
                       </Box>
                     </TableCell>
 
-                    <TableCell>{o.status ?? "-"}</TableCell>
+                    <TableCell>{o.status ?? "-"}
+                    <StatusButton order={o} />
+                    </TableCell>
 
+                    {/* Actions */}
                     <TableCell align="center">
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        justifyContent="center"
-                      >
-                        <IconButton
+                      <Stack direction="row" spacing={1} justifyContent="center">
+                        <Button
+                          component={Link}
+                          to={`${reflink()}orders/${o.id}`}
+                          startIcon={<EyeIcon style={{ width: 18, height: 18 }} />}
                           size="small"
-                          onClick={() => navigate(`/admin/orders/${o.id}`)}
-                          title="View"
                         >
-                          <EyeIcon style={{ width: 18, height: 18 }} />
-                        </IconButton>
+                          View
+                        </Button>
 
-                        <IconButton
+                       {/* <Button
+                          component={Link}
+                          to={`${reflink()}orders/${o.id}/edit`}
+                          startIcon={<PencilSquareIcon style={{ width: 18, height: 18 }} />}
                           size="small"
-                          onClick={() => navigate(`/admin/orders/${o.id}/edit`)}
-                          title="Edit"
                         >
-                          <PencilSquareIcon style={{ width: 18, height: 18 }} />
-                        </IconButton>
+                          Edit
+                        </Button> */}
 
-                        <IconButton
+                        <Button
+                          component={Link}
+                          to={`${reflink()}invoices/create`}
+                          state={{ fromOrderId: o.id }}
+                          startIcon={<ReceiptPercentIcon style={{ width: 18, height: 18 }} />}
                           size="small"
-                          onClick={() =>
-                            navigate("/admin/invoices/create", {
-                              state: { fromOrderId: o.id },
-                            })
-                          }
-                          title="Create Invoice"
                         >
-                          <ReceiptPercentIcon
-                            style={{ width: 18, height: 18 }}
-                          />
-                        </IconButton>
+                          Invoice
+                        </Button>
 
                         {admin && (
                           <Button
                             size="small"
                             variant="outlined"
                             onClick={() => openAssign(o)}
-                            startIcon={
-                              <UserIcon style={{ width: 16, height: 16 }} />
-                            }
+                            startIcon={<UserIcon style={{ width: 16, height: 16 }} />}
                           >
                             {o.assigned_to ? "Reassign" : "Assign"}
                           </Button>
@@ -255,9 +241,7 @@ export default function OrderList() {
                 {(!list || list.length === 0) && (
                   <TableRow>
                     <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                      <Typography color="textSecondary">
-                        No orders found.
-                      </Typography>
+                      <Typography color="textSecondary">No orders found.</Typography>
                     </TableCell>
                   </TableRow>
                 )}
@@ -266,27 +250,12 @@ export default function OrderList() {
           </TableContainer>
         )}
 
-        <Box
-          p={2}
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          <Typography variant="body2">
-            Total: {meta?.total ?? list.length}
-          </Typography>
-
+        {/* Pagination */}
+        <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
+          <Typography variant="body2">Total: {meta?.total ?? list.length}</Typography>
           <Stack direction="row" spacing={2} alignItems="center">
             <Pagination
-              count={
-                meta?.last_page ??
-                Math.max(
-                  1,
-                  Math.ceil(
-                    (meta?.total ?? list.length) / (meta?.per_page ?? perPage)
-                  )
-                )
-              }
+              count={meta?.last_page ?? Math.max(1, Math.ceil((meta?.total ?? list.length) / (meta?.per_page ?? perPage)))}
               page={meta?.current_page ?? page}
               onChange={(_, p) => setPage(p)}
               size="small"
@@ -295,28 +264,20 @@ export default function OrderList() {
         </Box>
       </Paper>
 
-      <Dialog
-        open={assignDialogOpen}
-        onClose={closeAssign}
-        fullWidth
-        maxWidth="sm"
-      >
+      {/* Assign Dialog */}
+      <Dialog open={assignDialogOpen} onClose={closeAssign} fullWidth maxWidth="sm">
         <DialogTitle>
-          {activeOrder
-            ? `Assign Order #${activeOrder.order_number ?? activeOrder.id}`
-            : "Assign Order"}
+          {activeOrder ? `Assign Order #${activeOrder.order_number ?? activeOrder.id}` : "Assign Order"}
         </DialogTitle>
         <DialogContent dividers>
-          {/* Reuse your existing OrderAssignment component which handles fetching employees, assign/unassign */}
-          {activeOrder && (
-            <OrderAssignment order={activeOrder} onClose={closeAssign} />
-          )}
+          {activeOrder && <OrderAssignment order={activeOrder} onClose={closeAssign} />}
         </DialogContent>
         <DialogActions>
           <Button onClick={closeAssign}>Close</Button>
         </DialogActions>
       </Dialog>
 
+      {/* Error */}
       {error && (
         <Box mt={2}>
           <Typography color="error">{String(error)}</Typography>

@@ -60,7 +60,9 @@ export default function LoginPage() {
       if (user) dispatch(setUser(user));
       if (employee) dispatch(setEmployee(employee));
       if (admin) dispatch(setAdmin(admin));
-      if (token) setAccessToken(token);
+      if (token) {
+  await Promise.resolve(setAccessToken(token));
+}
     } catch (err) {
       setError(err?.response?.data?.message || "Login failed. Check credentials.");
     } finally {

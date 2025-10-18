@@ -29,7 +29,6 @@ const Register = lazy(() => import("./features/auth/pages/Register"));
 function AppWrapper() {
   return (
     <Router>
-      <Suspense fallback={<Loader size="large" global={true} />}>
         <Routes>
           {/* Public routes */}
           {ClientRoutes.map((route, idx) => (
@@ -71,7 +70,6 @@ function AppWrapper() {
           {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
-      </Suspense>
     </Router>
   );
 }

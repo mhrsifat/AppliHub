@@ -44,4 +44,15 @@ class Employee extends Authenticatable
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    public function getAvatarAttribute($value)
+{
+    if (! $value) {
+        return null;
+    }
+
+    // Always absolute https:// URL
+    $url = asset('storage/' . ltrim($value, '/'));
+    return str_replace('http://', 'https://', $url);
+}
 }

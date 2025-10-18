@@ -1,4 +1,4 @@
-// src/services/api.js
+// filepath: src/services/api.js
 import axios from "axios";
 import store from "../app/store";
 import { setUser, clearUser } from "../features/auth/slices/authSlice";
@@ -14,8 +14,15 @@ const api = axios.create({
 
 // Helper to set/remove access token in memory
 export const setAccessToken = (token) => {
-  if (token) api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-  else delete api.defaults.headers.common["Authorization"];
+  if (token) {
+    const headerValue = `Bearer ${token}`;
+    api.defaults.headers.common["Authorization"] = headerValue;
+    // 🔔 Broadcast with full header string
+    window.dispatchEvent(new CustomEvent("tokenChanged", { detail: headerValue }));
+  } else {
+    delete api.defaults.headers.common["Authorization"];
+    window.dispatchEvent(new CustomEvent("tokenChanged", { detail: null }));
+  }
 };
 
 // Separate Axios instance for refresh to avoid interceptor recursion
@@ -37,6 +44,32 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+// Graceful logout utility — clears token, redux state and redirects to /login.
+// Also attempts to call server logout endpoint if available.
+export const logout = async (redirect = true) => {
+  try {
+    // Attempt server-side logout to clear cookies (if your backend exposes this)
+    await refreshClient.post("/auth/logout", {}, { withCredentials: true }).catch(() => {});
+  } catch (e) {
+    // ignore network errors here — continue with client-side cleanup
+  }
+
+  // Clear client-side auth data
+  setAccessToken(null);
+  try {
+    store.dispatch(clearUser());
+  } catch (e) {
+    // in case store isn't available for some reason, proceed
+    console.error("Failed to dispatch clearUser:", e);
+  }
+
+  if (redirect) {
+    // Force a reload to the login route to ensure app state reset.
+    // Use absolute path so it works from anywhere.
+    window.location.href = "/login";
+  }
+};
+
 // Response interceptor
 api.interceptors.response.use(
   (response) => response,
@@ -44,9 +77,9 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     if (!originalRequest) return Promise.reject(error);
 
-    // If refresh endpoint itself fails, logout immediately
+    // If refresh endpoint itself fails, perform full logout
     if (originalRequest.url?.includes("/auth/refresh")) {
-      store.dispatch(clearUser());
+      await logout(true);
       return Promise.reject(error);
     }
 
@@ -57,10 +90,9 @@ api.interceptors.response.use(
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((token) => {
-          if (token)
-            originalRequest.headers["Authorization"] = `Bearer ${token}`;
+          if (token) originalRequest.headers["Authorization"] = `Bearer ${token}`;
           return api(originalRequest);
-        });
+        }).catch((err) => Promise.reject(err));
       }
 
       originalRequest._retry = true;
@@ -75,7 +107,7 @@ api.interceptors.response.use(
         const newToken = refreshRes.data?.access_token;
         const user = refreshRes.data?.user;
 
-        if (!newToken) throw new Error("No token returned");
+        if (!newToken) throw new Error("No token returned during refresh");
 
         // Set new token in Axios default headers
         setAccessToken(newToken);
@@ -90,8 +122,9 @@ api.interceptors.response.use(
         originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (err) {
+        // Reject queued requests and perform full logout
         processQueue(err);
-        store.dispatch(clearUser());
+        await logout(true);
         return Promise.reject(err);
       } finally {
         isRefreshing = false;

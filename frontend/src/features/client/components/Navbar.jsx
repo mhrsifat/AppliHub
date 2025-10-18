@@ -8,6 +8,7 @@ import {
   Drawer,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   Box,
 } from "@mui/material";
@@ -19,10 +20,10 @@ import { NavLink } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import useDarkMode from "../../../hooks/useDarkMode";
 
-const Navbar = () => {
-  const [dropdownOpen, setDropdownOpen] = useState(false); // Desktop
-  const [mobileOpen, setMobileOpen] = useState(false); // Mobile drawer
-  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false); // Mobile dropdown
+export default function Navbar() {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
   const { darkMode, toggleDarkMode } = useDarkMode();
 
   const navLinks = [
@@ -32,99 +33,58 @@ const Navbar = () => {
     { label: "About Us", path: "/about" },
   ];
 
-  const handleMenuToggle = () => setDropdownOpen((prev) => !prev);
   const toggleDrawer = (open) => () => setMobileOpen(open);
 
   return (
-    <AppBar
-      position="fixed"
-      elevation={0}
-      sx={{
-        backgroundColor: "var(--color-background)",
-        color: "var(--color-text)",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-      }}
-    >
+    <AppBar position="fixed" elevation={0} sx={{ backgroundColor: "var(--color-background)", color: "var(--color-text)" }}>
       <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
         {/* Logo */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          style={{ display: "flex", alignItems: "center", gap: "8px" }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width={32}
-            height={32}
-            fill="var(--color-primary)"
-            viewBox="0 0 24 24"
-          >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <svg width={32} height={32} fill="var(--color-primary)" viewBox="0 0 24 24">
             <path d="M12 2L2 7l10 5 10-5-10-5zm0 7l10-5v10l-10 5-10-5V4l10 5z" />
           </svg>
-          <span style={{ fontWeight: "bold", fontSize: "18px" }}>AppliHub</span>
-        </motion.div>
+          <span style={{ fontWeight: 700 }}>AppliHub</span>
+        </Box>
 
-        {/* Desktop Menu */}
-        <Box
-          sx={{
-            display: { xs: "none", md: "flex" },
-            gap: 2,
-            alignItems: "center",
-          }}
-        >
+        {/* Desktop Links */}
+        <Box sx={{ display: { xs: "none", md: "flex" }, gap: 2, alignItems: "center" }}>
           {navLinks.map((link) =>
             link.dropdown ? (
               <Box key={link.label} sx={{ position: "relative" }}>
-                <Button
-                  onClick={handleMenuToggle}
-                  endIcon={<ArrowDropDownIcon />}
-                  sx={{
-                    textTransform: "none",
-                    color: "var(--color-text)",
-                    "&:hover": { color: "var(--color-primary)" },
-                  }}
-                >
+                <Button onClick={() => setDropdownOpen((p) => !p)} endIcon={<ArrowDropDownIcon />} sx={{ textTransform: "none" }}>
                   {link.label}
                 </Button>
-
                 <AnimatePresence>
                   {dropdownOpen && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
                       style={{
                         position: "absolute",
                         top: "100%",
                         left: 0,
-                        marginTop: "8px",
-                        width: "160px",
+                        marginTop: 8,
+                        width: 160,
                         background: "var(--color-surface)",
-                        borderRadius: "6px",
+                        borderRadius: 6,
                         boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                        zIndex: 1200,
                       }}
                     >
-                      <Box sx={{ py: 1 }}>
-                        {["repair", "installation", "maintenance"].map(
-                          (service) => (
-                            <NavLink
-                              key={service}
-                              to={`/services/${service}`}
-                              style={{
-                                display: "block",
-                                padding: "8px 16px",
-                                fontSize: "14px",
-                                color: "var(--color-text)",
-                              }}
-                              onClick={() => setDropdownOpen(false)}
-                            >
-                              {service.charAt(0).toUpperCase() +
-                                service.slice(1)}
-                            </NavLink>
-                          )
-                        )}
-                      </Box>
+                      <List>
+                        {["repair", "installation", "maintenance"].map((service) => (
+                          <ListItemButton
+                            key={service}
+                            component={NavLink}
+                            to={`/services/${service}`}
+                            onClick={() => setDropdownOpen(false)}
+                            sx={{ px: 2 }}
+                          >
+                            <ListItemText primary={service.charAt(0).toUpperCase() + service.slice(1)} />
+                          </ListItemButton>
+                        ))}
+                      </List>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -135,13 +95,9 @@ const Navbar = () => {
                 to={link.path}
                 style={({ isActive }) => ({
                   padding: "6px 12px",
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                  fontWeight: isActive ? "600" : "400",
-                  color: isActive
-                    ? "var(--color-primary)"
-                    : "var(--color-text)",
-                  transition: "0.2s",
+                  borderRadius: 6,
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? "var(--color-primary)" : "var(--color-text)",
                 })}
               >
                 {link.label}
@@ -149,42 +105,23 @@ const Navbar = () => {
             )
           )}
 
-          {/* Request Order Button */}
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button
-              component={NavLink}
-              to="/request-service"
-              sx={{
-                textTransform: "none",
-                backgroundColor: "var(--color-primary)",
-                color: "#fff",
-                borderRadius: "8px",
-                px: 2,
-                "&:hover": { opacity: 0.9 },
-              }}
-            >
-              Request Order
-            </Button>
-          </motion.div>
+          <Button
+            component={NavLink}
+            to="/request-service"
+            sx={{ textTransform: "none", backgroundColor: "var(--color-primary)", color: "#fff", borderRadius: 1, px: 2 }}
+          >
+            Request Order
+          </Button>
 
-          {/* Theme Toggle */}
           <IconButton onClick={toggleDarkMode} sx={{ ml: 1 }}>
-            {darkMode ? (
-              <LightModeIcon sx={{ color: "#facc15" }} />
-            ) : (
-              <DarkModeIcon sx={{ color: "var(--color-text)" }} />
-            )}
+            {darkMode ? <LightModeIcon sx={{ color: "#facc15" }} /> : <DarkModeIcon sx={{ color: "var(--color-text)" }} />}
           </IconButton>
         </Box>
 
         {/* Mobile Hamburger */}
         <Box sx={{ display: { xs: "flex", md: "none" }, alignItems: "center" }}>
           <IconButton onClick={toggleDarkMode} sx={{ mr: 1 }}>
-            {darkMode ? (
-              <LightModeIcon sx={{ color: "#facc15" }} />
-            ) : (
-              <DarkModeIcon sx={{ color: "var(--color-text)" }} />
-            )}
+            {darkMode ? <LightModeIcon sx={{ color: "#facc15" }} /> : <DarkModeIcon sx={{ color: "var(--color-text)" }} />}
           </IconButton>
           <IconButton onClick={toggleDrawer(true)}>
             <MenuIcon sx={{ color: "var(--color-text)" }} />
@@ -194,27 +131,16 @@ const Navbar = () => {
 
       {/* Mobile Drawer */}
       <Drawer anchor="right" open={mobileOpen} onClose={toggleDrawer(false)}>
-        <List
-          sx={{
-            width: 260,
-            height: "100%",
-            backgroundColor: "var(--color-surface)",
-            color: "var(--color-text)",
-          }}
-        >
+        <List sx={{ width: 260, height: "100%", backgroundColor: "var(--color-surface)", color: "var(--color-text)" }}>
           {navLinks.map((link) =>
             link.dropdown ? (
               <Box key={link.label}>
                 <ListItem button onClick={() => setMobileDropdownOpen((p) => !p)}>
                   <ListItemText primary={link.label} />
                   <ArrowDropDownIcon
-                    sx={{
-                      transform: mobileDropdownOpen ? "rotate(180deg)" : "rotate(0)",
-                      transition: "0.3s",
-                    }}
+                    sx={{ transform: mobileDropdownOpen ? "rotate(180deg)" : "rotate(0)", transition: "0.3s" }}
                   />
                 </ListItem>
-
                 <AnimatePresence>
                   {mobileDropdownOpen && (
                     <motion.div
@@ -224,53 +150,33 @@ const Navbar = () => {
                       transition={{ duration: 0.3 }}
                       style={{ overflow: "hidden" }}
                     >
-                      {["repair", "installation", "maintenance"].map(
-                        (service) => (
-                          <ListItem
-                            key={service}
-                            button
-                            component={NavLink}
-                            to={`/services/${service}`}
-                            onClick={toggleDrawer(false)}
-                            sx={{ pl: 4 }}
-                          >
-                            <ListItemText
-                              primary={
-                                service.charAt(0).toUpperCase() + service.slice(1)
-                              }
-                            />
-                          </ListItem>
-                        )
-                      )}
+                      {["repair", "installation", "maintenance"].map((service) => (
+                        <ListItemButton
+                          key={service}
+                          component={NavLink}
+                          to={`/services/${service}`}
+                          onClick={toggleDrawer(false)}
+                          sx={{ pl: 4 }}
+                        >
+                          <ListItemText primary={service.charAt(0).toUpperCase() + service.slice(1)} />
+                        </ListItemButton>
+                      ))}
                     </motion.div>
                   )}
                 </AnimatePresence>
               </Box>
             ) : (
-              <ListItem
-                key={link.label}
-                button
-                component={NavLink}
-                to={link.path}
-                onClick={toggleDrawer(false)}
-              >
+              <ListItemButton key={link.label} component={NavLink} to={link.path} onClick={toggleDrawer(false)}>
                 <ListItemText primary={link.label} />
-              </ListItem>
+              </ListItemButton>
             )
           )}
 
-          <ListItem
-            button
-            component={NavLink}
-            to="/request"
-            onClick={toggleDrawer(false)}
-          >
+          <ListItemButton component={NavLink} to="/request" onClick={toggleDrawer(false)}>
             <ListItemText primary="Request Order" />
-          </ListItem>
+          </ListItemButton>
         </List>
       </Drawer>
     </AppBar>
   );
-};
-
-export default Navbar;
+}

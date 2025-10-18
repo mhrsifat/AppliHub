@@ -21,10 +21,10 @@ class MessageSent implements ShouldBroadcast
         $this->conversationId = $message->conversation_id;
     }
 
-    public function broadcastOn()
-    {
-        return new Channel('conversation.' . $this->conversationId);
-    }
+public function broadcastOn()
+{
+    return new Channel('conversation.' . $this->message->conversation->uuid);
+}
 
     public function broadcastWith()
     {

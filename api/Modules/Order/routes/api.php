@@ -24,5 +24,7 @@ Route::prefix('orders')->middleware(['multi-auth'])->group(function () {
     Route::post('/{id}/assign', [OrderController::class, 'assign'])->name('orders.assign');
     Route::post('/{id}/unassign', [OrderController::class, 'unassign'])->name('orders.unassign');
     
+    Route::post('/{order}/status', [OrderController::class, 'changeStatus'])->name('orders.change.status');
+    
     Route::post('/{order}/invoices', [\Modules\Invoice\Http\Controllers\InvoiceController::class, 'createFromOrder']);
 });

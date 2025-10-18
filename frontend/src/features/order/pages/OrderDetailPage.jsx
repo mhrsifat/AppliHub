@@ -9,6 +9,8 @@ import {
   createInvoiceFromOrder as createInvoiceFromOrderThunk,
 } from "../slices/orderSlice";
 
+import StatusButton from "../components/StatusButton";
+
 function blankItem() {
   return { service_name: "", unit_price: 0, quantity: 1 };
 }
@@ -24,7 +26,6 @@ export default function OrderDetailPage() {
   const { current: order, getOne } = useOrders();
   // Normalize API responses that may be wrapped as { data: {...} }
   const ord = order?.data ?? order;
-  console.log("res", ord);
   const [adding, setAdding] = useState(false);
   const [newItem, setNewItem] = useState(blankItem());
   const [editingItemId, setEditingItemId] = useState(null);
@@ -160,7 +161,7 @@ export default function OrderDetailPage() {
       const invoice = (res && (res.invoice ?? res)) || null;
       const invoiceId = invoice?.id ?? invoice?.data?.id ?? null;
       if (invoiceId) {
-        navigate(`/admin/invoices/${invoiceId}`);
+        navigate(`invoices/${invoiceId}`);
       } else {
         await refresh();
         alert("Invoice created");
@@ -272,6 +273,7 @@ export default function OrderDetailPage() {
         <div className="text-right">
           <div className="mb-2">
             Status: <span className="font-medium">{ord.status ?? "-"}</span>
+            <StatusButton order={ord} />
           </div>
           <div className="mb-2">
             Payment:{" "}
@@ -307,7 +309,7 @@ export default function OrderDetailPage() {
             </button>
 
             <button
-              onClick={() => navigate(`/admin/orders/${ord.id}/edit`)}
+              onClick={() => navigate(`orders/${ord.id}/edit`)}
               className="px-3 py-1 border rounded"
             >
               Edit Order
@@ -587,7 +589,7 @@ export default function OrderDetailPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() =>
-                              navigate(`/admin/invoices/${inv.id}`)
+                              navigate(`invoices/${inv.id}`)
                             }
                             className="text-blue-600"
                           >

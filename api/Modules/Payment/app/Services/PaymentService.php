@@ -198,7 +198,7 @@ class PaymentService
 
         // Redirect the user back to the public track page so the frontend can re-load and show status
         $invoiceNumber = $invoice->invoice_number ?? $invoice->id ?? '';
-        return redirect(config('app.frontend_url') . "/track?q=" . urlencode($invoiceNumber) . "&payment=success");
+        return redirect(config('app.frontend_url') . "/track?q=" . urlencode($invoiceNumber) . "&payment=success&popup=1");
     }
 
     public function handleFail($request)
@@ -207,7 +207,8 @@ class PaymentService
         Payment::where('transaction_id', $tranId)->update(['status' => 'failed']);
         $invoice = Payment::where('transaction_id', $tranId)->first()?->invoice;
         $q = $invoice?->invoice_number ?? '';
-        return redirect(config('app.frontend_url') . "/track?q=" . urlencode($q) . "&payment=failed");
+        
+        return redirect(config('app.frontend_url') . "/track?q=" . urlencode($q) . "&payment=failed&popup=1");
     }
 
     public function handleCancel($request)
@@ -216,7 +217,8 @@ class PaymentService
         Payment::where('transaction_id', $tranId)->update(['status' => 'cancelled']);
         $invoice = Payment::where('transaction_id', $tranId)->first()?->invoice;
         $q = $invoice?->invoice_number ?? '';
-        return redirect(config('app.frontend_url') . "/track?q=" . urlencode($q) . "&payment=cancelled");
+       
+        return redirect(config('app.frontend_url') . "/track?q=" . urlencode($q) . "&payment=cancelled&popup=1");
     }
 
     public function handleIpn($request)

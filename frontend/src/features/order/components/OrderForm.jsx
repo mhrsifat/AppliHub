@@ -112,7 +112,7 @@ export default function OrderForm({ initial = null }) {
     setSaving(true);
     try {
       await create(payload).unwrap();
-      navigate('/admin/orders');
+      navigate('orders');
     } catch (err) {
       const msg = err?.message || err?.data?.message || JSON.stringify(err) || 'Save failed';
       setError(msg);
@@ -214,7 +214,7 @@ export default function OrderForm({ initial = null }) {
 
             <Box>
               <Stack direction="row" spacing={1}>
-                <Button variant="text" onClick={() => navigate('/admin/orders')}>Cancel</Button>
+                <Button variant="text" onClick={() => navigate('orders')}>Cancel</Button>
                 <Button variant="contained" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Order'}</Button>
               </Stack>
             </Box>
