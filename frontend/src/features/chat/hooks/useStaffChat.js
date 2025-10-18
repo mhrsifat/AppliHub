@@ -1,16 +1,14 @@
 // src/features/chat/hooks/useStaffChat.js
 import { useCallback } from 'react';
 import { useStaffChat as useBaseStaffChat } from './useChat';
+import { staffChatServices } from '../services/staffChatServices';
 
 export const useStaffChat = () => {
   const baseChat = useBaseStaffChat();
 
   const updateConversationStatus = useCallback(async (conversationUuid, status) => {
-    // This would call your API to update conversation status
-    // For now, we'll simulate the API call
     try {
-      console.log(`Updating conversation ${conversationUuid} status to ${status}`);
-      // await staffChatServices.updateConversationStatus(conversationUuid, status);
+      await staffChatServices.updateConversationStatus(conversationUuid, status);
       
       // Update local state
       if (baseChat.currentConversation?.uuid === conversationUuid) {
@@ -36,10 +34,8 @@ export const useStaffChat = () => {
   }, [baseChat]);
 
   const addNoteToConversation = useCallback(async (conversationUuid, note) => {
-    // Implementation for adding internal notes to conversation
     try {
-      console.log(`Adding note to conversation ${conversationUuid}:`, note);
-      // await staffChatServices.addNote(conversationUuid, note);
+      await staffChatServices.addNote(conversationUuid, note);
     } catch (error) {
       baseChat.setError('Failed to add note');
       throw error;
@@ -47,10 +43,8 @@ export const useStaffChat = () => {
   }, [baseChat]);
 
   const transferConversation = useCallback(async (conversationUuid, targetAgentId) => {
-    // Implementation for transferring conversation to another agent
     try {
-      console.log(`Transferring conversation ${conversationUuid} to agent ${targetAgentId}`);
-      // await staffChatServices.transferConversation(conversationUuid, targetAgentId);
+      await staffChatServices.transferConversation(conversationUuid, targetAgentId);
     } catch (error) {
       baseChat.setError('Failed to transfer conversation');
       throw error;
@@ -58,26 +52,71 @@ export const useStaffChat = () => {
   }, [baseChat]);
 
   const getConversationMetrics = useCallback(async (conversationUuid) => {
-    // Implementation for getting conversation metrics
     try {
-      // return await staffChatServices.getMetrics(conversationUuid);
-      return {
-        responseTime: '2m 34s',
-        customerSatisfaction: 4.5,
-        messagesCount: 24,
-        resolutionTime: '15m 22s'
-      };
+      return await staffChatServices.getMetrics(conversationUuid);
     } catch (error) {
       baseChat.setError('Failed to load conversation metrics');
       throw error;
     }
   }, [baseChat]);
 
+  const bulkAssignConversations = useCallback(async (conversationUuids, agentId) => {
+    try {
+      await staffChatServices.bulkAssign(conversationUuids, agentId);
+      baseChat.loadConversations(); // Refresh the list
+    } catch (error) {
+      baseChat.setError('Failed to bulk assign conversations');
+      throw error;
+    }
+  }, [baseChat]);
+
+  const bulkUpdateConversationStatus = useCallback(async (conversationUuids, status) => {
+    try {
+      await staffChatServices.bulkUpdateStatus(conversationUuids, status);
+      baseChat.loadConversations(); // Refresh the list
+    } catch (error) {
+      baseChat.setError('Failed to bulk update conversation status');
+      throw error;
+    }
+  }, [baseChat]);
+
+  const getDashboardStats = useCallback(async (params = {}) => {
+    try {
+      return await staffChatServices.getDashboardStats(params);
+    } catch (error) {
+      baseChat.setError('Failed to load dashboard stats');
+      throw error;
+    }
+  }, []);
+
+  const getAgents = useCallback(async () => {
+    try {
+      return await staffChatServices.getAgents();
+    } catch (error) {
+      baseChat.setError('Failed to load agents');
+      throw error;
+    }
+  }, []);
+
+  const getTemplates = useCallback(async () => {
+    try {
+      return await staffChatServices.getTemplates();
+    } catch (error) {
+      baseChat.setError('Failed to load templates');
+      throw error;
+    }
+  }, []);
+
   return {
     ...baseChat,
     updateConversationStatus,
     addNoteToConversation,
     transferConversation,
-    getConversationMetrics
+    getConversationMetrics,
+    bulkAssignConversations,
+    bulkUpdateConversationStatus,
+    getDashboardStats,
+    getAgents,
+    getTemplates
   };
 };

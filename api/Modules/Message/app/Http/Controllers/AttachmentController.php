@@ -26,4 +26,30 @@ class AttachmentController extends Controller
             'size' => $attachment->size,
         ]);
     }
+    
+    
+public function destroy(Request $request, $id)
+{
+    $user = $request->user();
+    if (!$user) {
+        return response()->json(['error' => 'Unauthorized'], 401);
+    }
+
+    $attachment = \Modules\Message\Models\Attachment::findOrFail($id);
+
+    // Optional: check if staff owns conversation
+    $conversation = $attachment->conversation;
+    if ($conversation && $conversation->assigned_to && $conversation->assigned_to !== $user->id) {
+        return response()->json(['error' => 'Forbidden'], 403);
+    }
+
+    // Delete file from storage
+    if (\Storage::disk('public')->exists($attachment->path)) {
+        \Storage::disk('public')->delete($attachment->path);
+    }
+
+    $attachment->delete();
+
+    return response()->json(['ok' => true, 'message' => 'Attachment deleted.']);
+}
 }

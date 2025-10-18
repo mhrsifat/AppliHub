@@ -5,16 +5,31 @@ const AdminChatHeader = ({
   onRefresh, 
   autoRefresh, 
   onAutoRefreshChange, 
-  conversationCount 
+  conversationCount,
+  selectedConversation,
+  onFocusMode,
+  onBack,
+  title
 }) => {
   return (
     <div className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+          )}
+          
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Customer Support</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{title || 'Customer Support'}</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Manage customer conversations and provide support
+              {selectedConversation ? 'Active conversation' : 'Manage customer conversations and provide support'}
             </p>
           </div>
           
@@ -27,6 +42,20 @@ const AdminChatHeader = ({
         </div>
 
         <div className="flex items-center space-x-4">
+          {/* Focus Mode Button */}
+          {selectedConversation && onFocusMode && (
+            <button
+              onClick={onFocusMode}
+              className="flex items-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span>Focus Mode</span>
+            </button>
+          )}
+
           {/* Auto Refresh Toggle */}
           <label className="flex items-center space-x-2 text-sm text-gray-600">
             <input

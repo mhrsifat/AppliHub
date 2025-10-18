@@ -97,4 +97,84 @@ class ConversationController extends Controller
 
         return new ConversationResource($conversation);
     }
+    
+    
+    
+    
+    
+    
+
+public function typingStop(Request $request, $uuid)
+{
+    $user = $request->user();
+    $conversation = \Modules\Message\Models\Conversation::where('uuid', $uuid)->firstOrFail();
+
+    $userName = $user ? $user->name : $request->input('name', 'Guest');
+
+    broadcast(new \Modules\Message\Events\UserTypingStopped(
+        $conversation->uuid,
+        $userName,
+        (bool)$user
+    ))->toOthers();
+
+    return response()->json(['status' => 'ok']);
+}
+
+public function addNote(Request $request, $uuid)
+{
+    $user = $request->user();
+    if (!$user) {
+        return response()->json(['error' => 'Unauthorized'], 401);
+    }
+
+    $request->validate([
+        'body' => 'required|string|max:2000',
+    ]);
+
+    $conversation = \Modules\Message\Models\Conversation::where('uuid', $uuid)->firstOrFail();
+
+    $note = \Modules\Message\Models\Message::create([
+        'conversation_id' => $conversation->id,
+        'sender_user_id' => $user->id,
+        'sender_name' => $user->name,
+        'body' => $request->body,
+        'is_staff' => true,
+        'is_internal' => true, // নতুন কলাম দরকার হলে migration এ যোগ করো
+    ]);
+
+    return response()->json([
+        'data' => new \Modules\Message\Transformers\MessageResource($note),
+        'message' => 'Internal note added.'
+    ]);
+}
+
+public function markAsRead(Request $request, $uuid)
+{
+    $conversation = \Modules\Message\Models\Conversation::where('uuid', $uuid)->firstOrFail();
+
+    \Modules\Message\Models\Message::where('conversation_id', $conversation->id)
+        ->where('is_read', false)
+        ->update(['is_read' => true]);
+
+    return response()->json(['ok' => true, 'message' => 'Conversation marked as read']);
+}
+
+public function close(Request $request, $uuid)
+{
+    $user = $request->user();
+    if (!$user) {
+        return response()->json(['error' => 'Unauthorized'], 401);
+    }
+
+    $conversation = \Modules\Message\Models\Conversation::where('uuid', $uuid)->firstOrFail();
+    $conversation->status = 'closed';
+    $conversation->closed_by = $user->id;
+    $conversation->closed_at = now();
+    $conversation->save();
+
+    return response()->json([
+        'data' => new \Modules\Message\Transformers\ConversationResource($conversation),
+        'message' => 'Conversation closed successfully.'
+    ]);
+}
 }

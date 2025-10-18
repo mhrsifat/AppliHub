@@ -6,6 +6,7 @@ import { staffChatServices } from '../services/staffChatServices';
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [recentConversations, setRecentConversations] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -14,13 +15,15 @@ const AdminDashboard = () => {
 
   const loadDashboardData = async () => {
     try {
-      const [statsResponse, conversationsResponse] = await Promise.all([
+      const [statsResponse, conversationsResponse, analyticsResponse] = await Promise.all([
         staffChatServices.getDashboardStats(),
-        staffChatServices.getConversations({ per_page: 5 })
+        staffChatServices.getConversations({ per_page: 5, status: 'open' }),
+        staffChatServices.getConversationAnalytics()
       ]);
       
       setStats(statsResponse.data);
       setRecentConversations(conversationsResponse.data);
+      setAnalytics(analyticsResponse.data);
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -146,7 +149,10 @@ const AdminDashboard = () => {
               </div>
             </Link>
             
-            <button className="w-full flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left">
+            <Link
+              to="/admin/reports"
+              className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-200 transition-colors"
+            >
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                 <span className="text-lg">📊</span>
               </div>
@@ -154,9 +160,12 @@ const AdminDashboard = () => {
                 <div className="font-medium text-gray-900">View Reports</div>
                 <div className="text-sm text-gray-500">Analytics and performance</div>
               </div>
-            </button>
+            </Link>
 
-            <button className="w-full flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left">
+            <Link
+              to="/admin/employees"
+              className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-purple-50 hover:border-purple-200 transition-colors"
+            >
               <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                 <span className="text-lg">👥</span>
               </div>
@@ -164,10 +173,49 @@ const AdminDashboard = () => {
                 <div className="font-medium text-gray-900">Manage Agents</div>
                 <div className="text-sm text-gray-500">Team settings and permissions</div>
               </div>
-            </button>
+            </Link>
           </div>
         </div>
       </div>
+
+      {/* Analytics Section */}
+      {analytics && (
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Conversation Trends</h3>
+            <div className="space-y-4">
+              {analytics.daily_conversations?.slice(-7).map((day, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">{day.date}</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full" 
+                        style={{ width: `${(day.count / 30) * 100}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 w-8 text-right">
+                      {day.count}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Response Times</h3>
+            <div className="space-y-4">
+              {analytics.response_times?.slice(-5).map((time, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">{time.hour}</span>
+                  <span className="text-sm font-medium text-gray-900">{time.time}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -190,7 +238,7 @@ const StatCard = ({ title, value, change, changeType, icon, link }) => {
 
   if (link) {
     return (
-      <Link to={link}>
+      <Link to={link} className="block">
         {content}
       </Link>
     );

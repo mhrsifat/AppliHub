@@ -1,6 +1,6 @@
 // src/features/chat/components/AdminConversationsList.jsx
 import React from 'react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 
 const AdminConversationsList = ({ 
   conversations, 
@@ -20,6 +20,13 @@ const AdminConversationsList = ({
     if (!conversation.assigned_to) return 'Unassigned';
     if (conversation.unread_count > 0) return 'Unread';
     return 'Active';
+  };
+
+  const getPriorityColor = (conversation) => {
+    const hoursAgo = (new Date() - new Date(conversation.last_message_at)) / (1000 * 60 * 60);
+    if (hoursAgo < 1) return 'border-l-4 border-l-red-500';
+    if (hoursAgo < 4) return 'border-l-4 border-l-orange-500';
+    return 'border-l-4 border-l-green-500';
   };
 
   if (isLoading) {
@@ -64,7 +71,7 @@ const AdminConversationsList = ({
         <div
           key={conversation.uuid}
           onClick={() => onSelectConversation(conversation.uuid)}
-          className={`p-4 border-b border-gray-200 cursor-pointer transition-all duration-200 hover:bg-gray-50 ${
+          className={`p-4 border-b border-gray-200 cursor-pointer transition-all duration-200 hover:bg-gray-50 group ${getPriorityColor(conversation)} ${
             selectedConversation === conversation.uuid 
               ? 'bg-blue-50 border-blue-200' 
               : 'bg-white'
@@ -82,9 +89,9 @@ const AdminConversationsList = ({
           </div>
           
           <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
-            <span className="font-medium">👤 {conversation.created_by_name}</span>
+            <span className="font-medium truncate">👤 {conversation.created_by_name}</span>
             <span>•</span>
-            <span className="truncate">{conversation.created_by_contact}</span>
+            <span className="truncate flex-1">{conversation.created_by_contact}</span>
           </div>
           
           <p className="text-sm text-gray-500 truncate mb-3">
