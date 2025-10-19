@@ -7,31 +7,28 @@ use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use Modules\Message\Models\Message;
-use Modules\Message\Transformers\MessageResource;
 
-class MessageSent implements ShouldBroadcast
+class UserTypingStopped implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $message;
     public $conversationUuid;
+    public $userName;
+    public $isStaff;
 
     /**
      * Create a new event instance.
      */
-    public function __construct(Message $message)
+    public function __construct(string $conversationUuid, string $userName, bool $isStaff = false)
     {
-        // Load relationships
-        $message->load(['conversation', 'attachments']);
+        $this->conversationUuid = $conversationUuid;
+        $this->userName = $userName;
+        $this->isStaff = $isStaff;
         
-        $this->message = new MessageResource($message);
-        $this->conversationUuid = $message->conversation->uuid;
-        
-        \Log::info('MessageSent Event Created', [
-            'conversation_uuid' => $this->conversationUuid,
-            'message_id' => $message->id,
-            'channel' => 'conversation.' . $this->conversationUuid
+        \Log::info('UserTypingStopped Event Created', [
+            'conversation_uuid' => $conversationUuid,
+            'user_name' => $userName,
+            'is_staff' => $isStaff,
         ]);
     }
 
@@ -42,9 +39,8 @@ class MessageSent implements ShouldBroadcast
     {
         $channelName = 'conversation.' . $this->conversationUuid;
         
-        \Log::info('Broadcasting on channel: ' . $channelName);
+        \Log::info('Broadcasting UserTypingStopped on channel: ' . $channelName);
         
-        // Use public channel for anonymous access
         return [
             new Channel($channelName),
         ];
@@ -55,7 +51,7 @@ class MessageSent implements ShouldBroadcast
      */
     public function broadcastAs(): string
     {
-        return 'MessageSent';
+        return 'UserTypingStopped';
     }
 
     /**
@@ -64,8 +60,9 @@ class MessageSent implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'message' => $this->message,
             'conversationUuid' => $this->conversationUuid,
+            'userName' => $this->userName,
+            'isStaff' => $this->isStaff,
         ];
     }
 }

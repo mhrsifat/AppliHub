@@ -177,4 +177,22 @@ public function close(Request $request, $uuid)
         'message' => 'Conversation closed successfully.'
     ]);
 }
+
+public function typing(Request $request, $uuid)
+    {
+        $user = $request->user();
+        $conversation = Conversation::where('uuid', $uuid)->firstOrFail();
+
+        $userName = $user ? $user->name : $request->input('name', 'Guest');
+        $isStaff = $user ? true : false;
+
+        broadcast(new \Modules\Message\Events\UserTyping(
+            $conversation->uuid,
+            $userName,
+            $isStaff
+        ))->toOthers();
+
+        return response()->json(['status' => 'ok']);
+    }
+
 }
