@@ -3,14 +3,16 @@
 namespace Modules\Blog\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Modules\Blog\Models\Tag;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Modules\Blog\Models\Tag;
+use Modules\Blog\Transformers\TagResource;
 
 class TagController extends Controller
 {
     public function index()
     {
-        return \Modules\Blog\Transformers\TagResource::collection(Tag::all());
+        return TagResource::collection(Tag::all());
     }
 
     public function store(Request $request)
@@ -20,7 +22,18 @@ class TagController extends Controller
             'slug' => 'nullable|string|unique:tags,slug',
         ]);
 
+        if (empty($data['slug'])) {
+            $base = Str::slug($data['name']);
+            $slug = $base;
+            $i = 1;
+            while (Tag::where('slug', $slug)->exists()) {
+                $slug = $base . '-' . $i++;
+            }
+            $data['slug'] = $slug;
+        }
+
         $tag = Tag::create($data);
-        return new \Modules\Blog\Transformers\TagResource($tag);
+
+        return new TagResource($tag);
     }
 }

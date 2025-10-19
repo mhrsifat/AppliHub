@@ -1,36 +1,52 @@
 // filepath: src/features/chat/components/ChatInput.jsx
-import React, { useState, useRef } from "react";
+import React, { useState } from 'react';
 
-export default function ChatInput({ onSend }) {
-  const [text, setText] = useState("");
-  const [files, setFiles] = useState([]);
-  const fileRef = useRef();
+const ChatInput = ({ onSend }) => {
+  const [message, setMessage] = useState('');
+  const [file, setFile] = useState(null);
 
-  const submit = async (e) => {
-    e?.preventDefault();
-    if (!text.trim() && files.length === 0) return;
-    try {
-      await onSend({ body: text.trim(), files });
-      setText("");
-      setFiles([]);
-      if (fileRef.current) fileRef.current.value = null;
-    } catch (e) {
-      console.error("send failed", e);
-    }
+  const handleSend = () => {
+    if (!message.trim() && !file) return;
+    onSend({ message, file });
+    setMessage('');
+    setFile(null);
   };
 
   return (
-    <form onSubmit={submit} className="p-3 border-t dark:border-gray-700 bg-white dark:bg-gray-800">
-      <div className="flex gap-2 items-center">
+    <div className="border-t pt-4">
+      {file && (
+        <div className="mb-2 text-sm text-gray-600">
+          Selected file: {file.name}
+          <button
+            className="ml-2 text-red-500"
+            onClick={() => setFile(null)}
+          >
+            Remove
+          </button>
+        </div>
+      )}
+      <div className="flex items-center">
         <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+          type="text"
+          className="flex-1 border rounded px-3 py-2 mr-2"
           placeholder="Type a message..."
-          className="flex-1 px-3 py-2 rounded-md border dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
         />
-        <input ref={fileRef} type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files))} />
-        <button type="submit" className="bg-indigo-600 text-white px-3 py-2 rounded-md">Send</button>
+        <input
+          type="file"
+          className="mr-2"
+          onChange={(e) => setFile(e.target.files[0])}
+        />
+        <button
+          onClick={handleSend}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          Send
+        </button>
       </div>
-    </form>
+    </div>
   );
-}
+};
+
+export default ChatInput;

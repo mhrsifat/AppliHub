@@ -3,14 +3,16 @@
 namespace Modules\Blog\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Modules\Blog\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Modules\Blog\Models\Category;
+use Modules\Blog\Transformers\CategoryResource;
 
 class CategoryController extends Controller
 {
     public function index()
     {
-        return \Modules\Blog\Transformers\CategoryResource::collection(Category::all());
+        return CategoryResource::collection(Category::all());
     }
 
     public function store(Request $request)
@@ -21,7 +23,18 @@ class CategoryController extends Controller
             'description' => 'nullable|string',
         ]);
 
+        if (empty($data['slug'])) {
+            $base = Str::slug($data['name']);
+            $slug = $base;
+            $i = 1;
+            while (Category::where('slug', $slug)->exists()) {
+                $slug = $base . '-' . $i++;
+            }
+            $data['slug'] = $slug;
+        }
+
         $category = Category::create($data);
-        return new \Modules\Blog\Transformers\CategoryResource($category);
+
+        return new CategoryResource($category);
     }
 }

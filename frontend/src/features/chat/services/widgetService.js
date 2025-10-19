@@ -1,20 +1,40 @@
 // filepath: src/features/chat/services/widgetService.js
-import api from "@/services/api";
+import axios from 'axios';
 
-export const startConversation = async ({ name, contact }) => {
-  return api.post("/message/conversations", { name, contact, subject: "Web widget" });
+const API_URL = process.env.REACT_APP_API_URL || '';
+
+const startConversation = async ({ name, email, phone, message }) => {
+  const payload = { name, email, phone, message };
+  const response = await axios.post(`${API_URL}/widget/conversations`, payload);
+  return response.data;
 };
 
-export const getMessages = async (uuid, page = 1) => {
-  return api.get(`/message/conversations/${uuid}/messages?page=${page}`);
+const sendMessage = async ({ conversationId, message, file }) => {
+  const formData = new FormData();
+  formData.append('message', message);
+  if (file) {
+    formData.append('file', file);
+  }
+  const response = await axios.post(
+    `${API_URL}/widget/conversations/${conversationId}/messages`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return response.data;
 };
 
-export const sendMessage = async (uuid, body, files = [], onUploadProgress) => {
-  const fd = new FormData();
-  if (body) fd.append("body", body);
-  files.forEach((f) => fd.append("attachments[]", f));
-  return api.post(`/message/conversations/${uuid}/messages`, fd, {
-    headers: { "Content-Type": "multipart/form-data" },
-    onUploadProgress,
-  });
+const fetchConversation = async (conversationId) => {
+  const response = await axios.get(`${API_URL}/widget/conversations/${conversationId}`);
+  return response.data;
+};
+
+const sendTyping = async (conversationId) => {
+  await axios.post(`${API_URL}/widget/conversations/${conversationId}/typing`);
+};
+
+export const widgetService = {
+  startConversation,
+  sendMessage,
+  fetchConversation,
+  sendTyping,
 };

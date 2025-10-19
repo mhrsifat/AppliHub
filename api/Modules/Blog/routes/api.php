@@ -1,22 +1,40 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\Blog\Http\Controllers\BlogController;
-use Modules\Blog\Http\Controllers\CategoryController;
-use Modules\Blog\Http\Controllers\TagController;
+use Modules\Blog\Http\Controllers\{
+    BlogController,
+    CategoryController,
+    TagController
+};
 
-Route::get('blogs', [BlogController::class, 'index']);
-Route::get('blogs/{slug}', [BlogController::class, 'show']);
-Route::post('blogs', [BlogController::class, 'store']); // protect with auth middleware in real app
-Route::put('blogs/{blog}', [BlogController::class, 'update']); // auth
+// ---------- Public Routes ----------
+Route::prefix('blogs')->group(function () {
+    // Blog listing + details
+    Route::get('/', [BlogController::class, 'index']);
+    Route::get('/{slug}', [BlogController::class, 'show']);
 
-Route::post('blogs/{id}/vote', [BlogController::class, 'vote']);
-Route::post('blogs/{id}/comment', [BlogController::class, 'comment']);
-Route::post('comments/{id}/reply', [BlogController::class, 'adminReply']); // admin reply to comment
+    // Blog interactions
+    Route::post('/{id}/vote', [BlogController::class, 'vote']);
+    Route::post('/{id}/comment', [BlogController::class, 'comment']);
+    Route::post('/comments/{commentId}/reply', [BlogController::class, 'reply']);
 
-Route::get('categories', [CategoryController::class, 'index']);
-Route::post('categories', [CategoryController::class, 'store']); // auth
+    // Categories & Tags (public)
+    Route::get('/categories', [CategoryController::class, 'index']);
+    Route::get('/tags', [TagController::class, 'index']);
+});
 
-Route::get('tags', [TagController::class, 'index']);
-Route::post('tags', [TagController::class, 'store']); // auth
+// ---------- Protected Routes (staff/admin only) ----------
+Route::prefix('blogs')
+    ->middleware(['multi-auth'])
+    ->group(function () {
+        // Blog management
+        Route::post('/', [BlogController::class, 'store']);
+        Route::put('/{blog}', [BlogController::class, 'update']);
 
+        // Admin reply to comment
+        Route::post('/comments/{id}/admin-reply', [BlogController::class, 'adminReply']);
+
+        // Category & Tag creation
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::post('/tags', [TagController::class, 'store']);
+    });
