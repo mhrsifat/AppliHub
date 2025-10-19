@@ -18,7 +18,7 @@ const AboutUs = lazy(() => import("../components/AboutUs"));
 const CallToAction = lazy(() => import("../components/CallToAction"));
 const Testimonials = lazy(() => import("../components/Testimonials"));
 const ProcessSteps = lazy(() => import("../components/ProcessSteps"));
-const BlogSection = lazy(() => import("../components/BlogSection"));
+// const BlogSection = lazy(() => import("../components/BlogSection"));
 const ContactForm = lazy(() => import("../components/ContactForm"));
 const Footer = lazy(() => import("../components/Footer"));
 
@@ -38,7 +38,7 @@ const ClientHome = () => {
 
       {/* Lazy-load the rest */}
       <Suspense fallback={<Loader size="medium" />}>
-        <BlogSection />
+        {/* <BlogSection /> */}
         <ContactForm />
         <Footer />
       </Suspense>

@@ -19,12 +19,12 @@ const ChatInput = ({ onSend, isLoading = false }) => {
     if (file) {
       onSend({ message: message.trim(), file });
       setMessage('');
-      // Reset file input
       e.target.value = '';
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e) => {
+    // Use Enter to send, Shift+Enter to newline
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -38,14 +38,14 @@ const ChatInput = ({ onSend, isLoading = false }) => {
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             disabled={isLoading}
             placeholder="Type your message..."
             className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none disabled:opacity-50"
             rows="1"
-            style={{ minHeight: '48px', maxHeight: '120px' }}
+            style={{ minHeight: '48px', maxHeight: '160px' }}
           />
-          
+
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -55,7 +55,7 @@ const ChatInput = ({ onSend, isLoading = false }) => {
           >
             <Paperclip size={18} />
           </button>
-          
+
           <input
             type="file"
             ref={fileInputRef}
@@ -64,7 +64,7 @@ const ChatInput = ({ onSend, isLoading = false }) => {
             accept="image/*,application/pdf,.doc,.docx"
           />
         </div>
-        
+
         <button
           type="submit"
           disabled={!message.trim() || isLoading}

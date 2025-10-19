@@ -16,7 +16,7 @@ import { useChat } from '../hooks/useChat';
 import ChatMessage from '../components/ChatMessage';
 import ChatInput from '../components/ChatInput';
 import TypingIndicator from '../components/TypingIndicator';
-import { Search, Filter, MessageCircle, User, Clock, Trash2, XCircle, RefreshCw } from 'lucide-react';
+import { Search, MessageCircle, User, Clock, Trash2, XCircle, RefreshCw } from 'lucide-react';
 
 const AdminChatDashboard = () => {
   const dispatch = useDispatch();
@@ -28,16 +28,16 @@ const AdminChatDashboard = () => {
     filters,
     pagination
   } = useSelector((state) => state.chat.admin);
-  
+
   const isTyping = useSelector((state) => state.chat.isTyping);
   const [noteText, setNoteText] = useState('');
-  const [searchTerm, setSearchTerm] = useState(filters.search);
-  const [statusFilter, setStatusFilter] = useState(filters.status);
+  const [searchTerm, setSearchTerm] = useState(filters.search || '');
+  const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
 
-  // Use real-time updates for selected conversation
+  // Subscribe to real-time updates for selected conversation
   useChat(selectedConversation?.uuid);
 
-  // Load conversations on mount and when filters change
+  // Load conversations on mount and when relevant filter/pagination changes
   useEffect(() => {
     dispatch(fetchConversations({
       search: filters.search,
@@ -45,14 +45,14 @@ const AdminChatDashboard = () => {
       page: pagination.page,
       limit: pagination.limit
     }));
-  }, [dispatch, filters, pagination.page, pagination.limit]);
+  }, [dispatch, filters.search, filters.status, pagination.page, pagination.limit]);
 
-  // Debounced search
+  // Debounced search (keeps existing logic)
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchTerm !== filters.search) {
         dispatch(updateAdminFilters({ search: searchTerm }));
-        dispatch(updateAdminPagination({ page: 1 })); // Reset to first page
+        dispatch(updateAdminPagination({ page: 1 }));
       }
     }, 500);
 
@@ -64,41 +64,38 @@ const AdminChatDashboard = () => {
   }, [dispatch]);
 
   const handleAdminSend = useCallback(({ message, file }) => {
-  if (!selectedConversation) return;
-  dispatch(sendAdminReply({ 
-    conversationUuid: selectedConversation.uuid, 
-    message, 
-    file 
-  }));
-}, [dispatch, selectedConversation]);
-
+    if (!selectedConversation) return;
+    dispatch(sendAdminReply({
+      conversationUuid: selectedConversation.uuid,
+      message,
+      file
+    }));
+  }, [dispatch, selectedConversation]);
 
   const handleAddNote = useCallback(() => {
-  if (!selectedConversation || !noteText.trim()) return;
-  dispatch(addAdminNote({ 
-    conversationUuid: selectedConversation.uuid, 
-    note: noteText 
-  }));
-  setNoteText('');
-}, [dispatch, selectedConversation, noteText]);
-
+    if (!selectedConversation || !noteText.trim()) return;
+    dispatch(addAdminNote({
+      conversationUuid: selectedConversation.uuid,
+      note: noteText
+    }));
+    setNoteText('');
+  }, [dispatch, selectedConversation, noteText]);
 
   const handleDelete = useCallback(() => {
     if (!selectedConversation) return;
-    
+
     if (window.confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
       dispatch(deleteConversation(selectedConversation.uuid));
     }
   }, [dispatch, selectedConversation]);
 
   const handleClose = useCallback(() => {
-  if (!selectedConversation) return;
-  
-  if (window.confirm('Are you sure you want to close this conversation?')) {
-    dispatch(closeConversation(selectedConversation.uuid));
-  }
-}, [dispatch, selectedConversation]);
+    if (!selectedConversation) return;
 
+    if (window.confirm('Are you sure you want to close this conversation?')) {
+      dispatch(closeConversation(selectedConversation.uuid));
+    }
+  }, [dispatch, selectedConversation]);
 
   const handleRefresh = useCallback(() => {
     dispatch(fetchConversations({
@@ -107,7 +104,7 @@ const AdminChatDashboard = () => {
       page: pagination.page,
       limit: pagination.limit
     }));
-  }, [dispatch, filters, pagination]);
+  }, [dispatch, filters.search, filters.status, pagination.page, pagination.limit]);
 
   const handleStatusFilterChange = useCallback((newStatus) => {
     setStatusFilter(newStatus);
@@ -118,9 +115,9 @@ const AdminChatDashboard = () => {
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -169,17 +166,17 @@ const AdminChatDashboard = () => {
 
           {/* Status Filters */}
           <div className="flex space-x-2 mb-3">
-            {['all', 'open', 'closed'].map((status) => (
+            {['all', 'open', 'closed'].map((s) => (
               <button
-                key={status}
-                onClick={() => handleStatusFilterChange(status)}
+                key={s}
+                onClick={() => handleStatusFilterChange(s)}
                 className={`flex-1 px-3 py-1 text-sm rounded-full capitalize ${
-                  statusFilter === status
+                  statusFilter === s
                     ? 'bg-blue-500 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                {status}
+                {s}
               </button>
             ))}
           </div>
@@ -221,15 +218,15 @@ const AdminChatDashboard = () => {
                       </span>
                     )}
                   </div>
-                  
+
                   <div className="text-sm text-gray-600 mb-1">
                     {conversation.contact}
                   </div>
-                  
+
                   <div className="text-sm text-gray-500 line-clamp-2 mb-2">
                     {getLastMessagePreview(conversation)}
                   </div>
-                  
+
                   <div className="flex items-center justify-between text-xs text-gray-400">
                     <div className="flex items-center space-x-1">
                       <Clock size={12} />
@@ -262,8 +259,8 @@ const AdminChatDashboard = () => {
                   <p className="text-sm text-gray-600">{selectedConversation.contact}</p>
                   {selectedConversation.status && (
                     <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
-                      selectedConversation.status === 'open' 
-                        ? 'bg-green-100 text-green-800' 
+                      selectedConversation.status === 'open'
+                        ? 'bg-green-100 text-green-800'
                         : 'bg-gray-100 text-gray-800'
                     }`}>
                       {selectedConversation.status}
@@ -298,7 +295,8 @@ const AdminChatDashboard = () => {
                   <ChatMessage
                     key={msg.id}
                     message={msg}
-                    currentUser={selectedConversation.name}
+                    // For admin dashboard, currentUser can be omitted or explicitly set to 'admin'
+                    currentUser="admin"
                   />
                 ))}
                 {isTyping && <TypingIndicator />}
@@ -332,12 +330,12 @@ const AdminChatDashboard = () => {
                     Add Note
                   </button>
                 </div>
-                
+
                 {/* Notes List */}
                 <div className="space-y-2">
                   {(selectedConversation.notes || []).map((note) => (
-                    <div 
-                      key={note.id} 
+                    <div
+                      key={note.id}
                       className="bg-yellow-50 border border-yellow-200 rounded-lg p-3"
                     >
                       <div className="flex justify-between items-start mb-1">

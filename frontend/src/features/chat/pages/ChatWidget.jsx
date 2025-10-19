@@ -6,6 +6,8 @@ import {
   fetchConversation,
   sendMessage,
   clearError,
+  // NOTE: implement this in your slice:
+  endConversation,
 } from "../slices/chatSlice";
 import { useChat } from "../hooks/useChat";
 import ChatStartForm from "../components/ChatStartForm";
@@ -27,6 +29,10 @@ const ChatWidget = () => {
   const errorTimeoutRef = useRef(null);
   const hasFetchedRef = useRef(false);
 
+  // touch handling for swipe-to-close on mobile
+  const touchStartYRef = useRef(null);
+  const touchMovedRef = useRef(false);
+
   // Redux state selectors
   const conversationUuid = useSelector((state) => state.chat.conversationUuid);
   const user = useSelector((state) => state.chat.user);
@@ -37,13 +43,13 @@ const ChatWidget = () => {
 
   // Debug: Log state changes
   useEffect(() => {
-    console.log('ChatWidget State:', {
+    console.log("ChatWidget State:", {
       conversationUuid,
       messagesCount: messages.length,
       isLoading,
       user,
       error,
-      hasFetched: hasFetchedRef.current
+      hasFetched: hasFetchedRef.current,
     });
   }, [conversationUuid, messages, isLoading, user, error]);
 
@@ -53,7 +59,7 @@ const ChatWidget = () => {
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current);
       }
-      
+
       errorTimeoutRef.current = setTimeout(() => {
         dispatch(clearError());
       }, 5000);
@@ -69,11 +75,11 @@ const ChatWidget = () => {
   // Fetch conversation ONCE when conversationUuid exists and we haven't fetched yet
   useEffect(() => {
     if (conversationUuid && messages.length === 0 && !isLoading && !hasFetchedRef.current) {
-      console.log('Fetching conversation once:', conversationUuid);
+      console.log("Fetching conversation once:", conversationUuid);
       hasFetchedRef.current = true;
       dispatch(fetchConversation(conversationUuid));
     }
-  }, [conversationUuid, dispatch]); // Remove messages.length and isLoading from deps
+  }, [conversationUuid, dispatch]); // intentionally minimal deps
 
   // Reset fetch flag when conversation changes
   useEffect(() => {
@@ -105,12 +111,15 @@ const ChatWidget = () => {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none"; // avoid background touch scroll on mobile
     } else {
       document.body.style.overflow = "";
+      document.body.style.touchAction = "";
     }
 
     return () => {
       document.body.style.overflow = "";
+      document.body.style.touchAction = "";
     };
   }, [isOpen]);
 
@@ -120,7 +129,7 @@ const ChatWidget = () => {
   // Memoized event handlers
   const handleStart = useCallback(
     async ({ name, contact, message }) => {
-      console.log('Starting conversation with:', { name, contact, message });
+      console.log("Starting conversation with:", { name, contact, message });
       hasFetchedRef.current = false; // Reset for new conversation
       dispatch(startConversation({ name, contact, message }));
     },
@@ -133,7 +142,7 @@ const ChatWidget = () => {
         console.error("No active conversation");
         return;
       }
-      console.log('Sending message:', { conversationUuid, message, file });
+      console.log("Sending message:", { conversationUuid, message, file });
       dispatch(sendMessage({ conversationUuid, message, file }));
     },
     [conversationUuid, dispatch]
@@ -156,6 +165,61 @@ const ChatWidget = () => {
     }
   }, []);
 
+  // End conversation handler (stop session)
+  const handleEndConversation = useCallback(async () => {
+    if (!conversationUuid) {
+      setIsOpen(false);
+      return;
+    }
+
+    try {
+      // dispatch action that your slice should implement to tell server to close conversation
+      // If you don't have this action, implement it or handle cleanup in the slice.
+      await dispatch(endConversation(conversationUuid));
+    } catch (err) {
+      // best-effort: still close UI even if server fails
+      console.warn("endConversation failed:", err);
+    } finally {
+      setIsOpen(false);
+    }
+  }, [conversationUuid, dispatch]);
+
+  // touch handlers for swipe-to-close (mobile)
+  const handleTouchStart = (e) => {
+    touchMovedRef.current = false;
+    if (e.touches && e.touches.length === 1) {
+      touchStartYRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    touchMovedRef.current = true;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!touchStartYRef.current || !touchMovedRef.current) {
+      touchStartYRef.current = null;
+      touchMovedRef.current = false;
+      return;
+    }
+
+    const endY = (e.changedTouches && e.changedTouches[0].clientY) || null;
+    if (!endY) {
+      touchStartYRef.current = null;
+      touchMovedRef.current = false;
+      return;
+    }
+
+    const deltaY = endY - touchStartYRef.current;
+    // if user swiped down far enough, close the modal
+    if (deltaY > 120) {
+      setIsOpen(false);
+    }
+
+    touchStartYRef.current = null;
+    touchMovedRef.current = false;
+  };
+
   // Calculate unread message count
   const unreadCount = messages.length > 0 && !isOpen ? messages.length : 0;
 
@@ -171,7 +235,7 @@ const ChatWidget = () => {
         onClick={toggleModal}
         aria-label={isOpen ? "Close chat" : "Open chat"}
         aria-expanded={isOpen}
-        className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-all duration-200 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:scale-95"
+        className="fixed bottom-5 right-4 z-50 flex items-center justify-center w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-all duration-200 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:scale-95 sm:right-6 sm:bottom-6"
       >
         <MessageCircle size={26} />
         {unreadCount > 0 && (
@@ -222,50 +286,64 @@ const ChatWidget = () => {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={handleBackdropClick}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center sm:justify-end z-50 p-0 sm:p-4"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end sm:items-center sm:justify-end z-50 p-0 sm:p-4"
             role="dialog"
             aria-modal="true"
             aria-labelledby="chat-title"
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              initial={{ scale: 0.98, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              exit={{ scale: 0.98, opacity: 0, y: 20 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full h-[100dvh] sm:w-full sm:max-w-md sm:h-[600px] bg-white dark:bg-gray-900 rounded-none sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              className="relative w-full h-full sm:w-full sm:max-w-md sm:h-[600px] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+              style={{ maxHeight: "100dvh" }}
             >
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-white dark:from-gray-800 dark:to-gray-900">
+              <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-white dark:from-gray-800 dark:to-gray-900">
                 <div className="flex items-center space-x-3">
                   <div className="relative">
                     <div className="w-3 h-3 bg-green-500 rounded-full" />
                     <div className="absolute inset-0 w-3 h-3 bg-green-500 rounded-full animate-ping opacity-75" />
                   </div>
-                  <h2
-                    id="chat-title"
-                    className="text-lg font-semibold text-gray-900 dark:text-white"
-                  >
+                  <h2 id="chat-title" className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                     {conversationUuid ? "Live Chat" : "Start Conversation"}
                   </h2>
                 </div>
-                <button
-                  onClick={toggleModal}
-                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
-                  aria-label="Close chat"
-                >
-                  <X size={20} />
-                </button>
+
+                <div className="flex items-center space-x-2">
+                  {/* End Chat (stop conversation) */}
+                  <button
+                    onClick={handleEndConversation}
+                    className="hidden sm:inline-flex items-center px-3 py-1.5 text-sm font-medium bg-red-50 text-red-700 border border-red-200 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-300"
+                    aria-label="End conversation"
+                    title="End conversation"
+                  >
+                    End Chat
+                  </button>
+
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
+                    aria-label="Close chat"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
-              {/* Chat Content */}
-              <div className="flex flex-col flex-1 overflow-hidden">
+              {/* Mobile sticky footer with End Chat quick action */}
+              <div className="flex-1 overflow-hidden flex flex-col">
                 {showLoadingState ? (
                   <div className="flex-1 flex items-center justify-center p-4">
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-blue-600 mx-auto mb-3" />
                       <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                        {conversationUuid ? 'Loading conversation...' : 'Starting conversation...'}
+                        {conversationUuid ? "Loading conversation..." : "Starting conversation..."}
                       </p>
                     </div>
                   </div>
@@ -287,11 +365,32 @@ const ChatWidget = () => {
                       )}
                       {isTyping && <MemoizedTypingIndicator />}
                     </div>
+
                     <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
                       <MemoizedChatInput onSend={handleSendMessage} isLoading={isLoading} />
                     </div>
                   </>
                 ) : null}
+              </div>
+
+              {/* Mobile bottom bar: quick actions visible on small screens */}
+              <div className="sm:hidden absolute left-0 right-0 bottom-0 p-3 bg-gradient-to-t from-white/90 dark:from-black/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800">
+                <div className="flex items-center justify-between space-x-3">
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="flex-1 py-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-medium"
+                    aria-label="Close"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={handleEndConversation}
+                    className="flex-1 py-2 rounded-md bg-red-600 text-white text-sm font-medium"
+                    aria-label="End conversation"
+                  >
+                    End Chat
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
