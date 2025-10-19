@@ -32,7 +32,7 @@ export default function AboutUs() {
             className="rounded-xl overflow-hidden shadow-lg bg-surface p-4"
           >
             <img
-              src="https://via.placeholder.com/640x420?text=About+Us"
+              src="https://picsum.photos/600/400?random=3"
               alt="About us"
               className="w-full h-auto rounded-md"
             />

@@ -1,34 +1,34 @@
-// BlogListPage.jsx
-import React, { useState } from "react";
-import useBlogs from "../hooks/useBlogs";
-import BlogTable from "../components/BlogTable";
-import BlogForm from "../components/BlogForm";
-import { useDispatch } from "react-redux";
-import { createBlog, updateBlog } from "../slices/blogSlice";
+// filepath: src/features/blog/pages/BlogListPage.jsx
+import React, { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchPosts } from '../slices/blogSlice';
+import { Link } from 'react-router-dom';
 
 export default function BlogListPage() {
-  const { list, loading, categories, tags, onDelete } = useBlogs();
-  const [selected, setSelected] = useState(null);
   const dispatch = useDispatch();
+  const posts = useSelector((s) => s.blog.posts || []);
+  const status = useSelector((s) => s.blog.status);
 
-  const handleSave = (form) => {
-    if (form.id) dispatch(updateBlog({ id: form.id, payload: form }));
-    else dispatch(createBlog(form));
-    setSelected(null);
-  };
+  useEffect(() => {
+    dispatch(fetchPosts());
+  }, [dispatch]);
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Blogs</h1>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <BlogForm initial={selected || {}} onSave={handleSave} />
-        </div>
-
-        <div>
-          <BlogTable blogs={list} loading={loading} onEdit={setSelected} onDelete={onDelete} onPreview={(b) => window.open(`/blogs/${b.slug}`, "_blank")} />
-        </div>
+    <div className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Blog</h1>
+      {status === 'loading' && <div>Loading...</div>}
+      <div className="space-y-6">
+        {posts.map((post) => (
+          <article key={post.id} className="p-4 bg-white rounded shadow-sm">
+            <Link to={`/blog/${post.slug ?? post.id}`} className="text-lg font-semibold text-blue-600">
+              {post.title}
+            </Link>
+            <p className="mt-2 text-gray-600">{post.excerpt}</p>
+            <div className="mt-2 text-sm text-gray-500">
+              {post.category?.name || 'Uncategorized'} · {post.tags?.map(t => t.name).join(', ')} · {post.views ?? 0} views
+            </div>
+          </article>
+        ))}
       </div>
     </div>
   );

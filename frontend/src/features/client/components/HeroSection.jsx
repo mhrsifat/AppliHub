@@ -25,13 +25,13 @@ export default function HeroSection() {
 
             <div className="flex items-center space-x-4">
               <NavLink
-                to="/request"
+                to="/request-service"
                 className="inline-block px-6 py-3 rounded-lg bg-primary text-white font-medium shadow-md transition-transform hover:scale-[1.02]"
               >
                 Request Service
               </NavLink>
               <NavLink
-                to="/services"
+                to="/request-service"
                 className="inline-block px-4 py-3 rounded-lg border border-current text-text"
               >
                 Our Services
@@ -47,7 +47,7 @@ export default function HeroSection() {
           >
             <div className="w-full rounded-xl overflow-hidden shadow-lg bg-surface p-6">
               <img
-                src="https://via.placeholder.com/720x420?text=Service+Preview"
+                src="https://images.unsplash.com/photo-1504384308090-c894fdcc538d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8dGVjaG5vbG9neSUyMHJlcGFpcnxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&w=800&q=60"
                 alt="Service preview"
                 className="w-full h-auto rounded-md"
               />

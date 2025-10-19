@@ -1,175 +1,100 @@
-// blogSlice.js
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { blogService } from "../services/blogService";
+// filepath: src/features/blog/slices/blogSlice.js
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import api from '@/services/api';
+import blogService from '../services/blogService';
 
-export const fetchBlogs = createAsyncThunk(
-  "blog/fetchList",
-  async (params = {}) => {
-    const res = await blogService.list(params);
-    return res.data; // { data: [...], meta: {...} } expected
-  }
-);
-
-export const fetchBlog = createAsyncThunk("blog/fetchOne", async (slugOrId) => {
-  const res = await blogService.get(slugOrId);
-  return res.data;
+// Async thunks (thunk = অ্যাসিঙ্ক একশন)
+export const fetchPosts = createAsyncThunk('blog/fetchPosts', async (params = {}) => {
+  const res = await blogService.getPosts(params);
+  return res.data || res;
 });
 
-export const createBlog = createAsyncThunk("blog/create", async (payload) => {
-  const res = await blogService.create(payload);
-  return res.data;
+export const fetchPost = createAsyncThunk('blog/fetchPost', async (slug) => {
+  const res = await blogService.getPost(slug);
+  return res.data || res;
 });
 
-export const updateBlog = createAsyncThunk(
-  "blog/update",
-  async ({ id, payload }) => {
-    const res = await blogService.update(id, payload);
-    return res.data;
-  }
-);
-
-export const deleteBlog = createAsyncThunk("blog/delete", async (id) => {
-  await blogService.remove(id);
-  return id;
+export const createPost = createAsyncThunk('blog/createPost', async (payload) => {
+  const res = await blogService.createPost(payload);
+  return res.data || res;
 });
 
-export const fetchCategories = createAsyncThunk(
-  "blog/fetchCategories",
-  async () => {
-    const res = await blogService.categories();
-    return res.data;
-  }
-);
-
-export const fetchTags = createAsyncThunk("blog/fetchTags", async () => {
-  const res = await blogService.tags();
-  return res.data;
+export const updatePost = createAsyncThunk('blog/updatePost', async ({ id, payload }) => {
+  const res = await blogService.updatePost(id, payload);
+  return res.data || res;
 });
 
-export const voteBlog = createAsyncThunk(
-  "blog/vote",
-  async ({ id, voteType }) => {
-    const res = await blogService.vote(id, voteType);
-    return { id, ...res.data };
-  }
-);
+export const votePost = createAsyncThunk('blog/votePost', async ({ id, vote }) => {
+  const res = await blogService.votePost(id, vote);
+  return res.data || res;
+});
 
-export const commentBlog = createAsyncThunk(
-  "blog/comment",
-  async ({ id, payload }) => {
-    const res = await blogService.comment(id, payload);
-    return { blogId: id, ...res.data };
-  }
-);
+const initialState = {
+  posts: [],
+  current: null,
+  categories: [],
+  tags: [],
+  status: 'idle',
+  error: null,
+};
 
-export const replyToComment = createAsyncThunk(
-  "blog/reply",
-  async ({ blogId, payload }) => {
-    const res = await blogService.adminReply(blogId, payload);
-    return { blogId, ...res.data };
-  }
-);
-
-const slice = createSlice({
-  name: "blog",
-  initialState: {
-    list: [],
-    meta: {},
-    current: null,
-    loading: false,
-    error: null,
-    categories: [],
-    tags: [],
-  },
+const blogSlice = createSlice({
+  name: 'blog',
+  initialState,
   reducers: {
-    clearCurrent(state) {
-      state.current = null;
+    addCategory(state, action) {
+      state.categories.push(action.payload);
+    },
+    addTag(state, action) {
+      state.tags.push(action.payload);
+    },
+    // local optimistic update for votes
+    upvoteLocal(state, action) {
+      const id = action.payload;
+      const p = state.posts.find((x) => x.id === id);
+      if (p) p.upvotes = (p.upvotes || 0) + 1;
+      if (state.current && state.current.id === id) state.current.upvotes = (state.current.upvotes || 0) + 1;
+    },
+    downvoteLocal(state, action) {
+      const id = action.payload;
+      const p = state.posts.find((x) => x.id === id);
+      if (p) p.downvotes = (p.downvotes || 0) + 1;
+      if (state.current && state.current.id === id) state.current.downvotes = (state.current.downvotes || 0) + 1;
     },
   },
-  extraReducers: (builder) => {
+  extraReducers(builder) {
     builder
-      .addCase(fetchBlogs.pending, (s) => {
-        s.loading = true;
+      .addCase(fetchPosts.pending, (s) => { s.status = 'loading'; })
+      .addCase(fetchPosts.fulfilled, (s, a) => {
+        s.status = 'succeeded';
+        s.posts = a.payload.data ? a.payload.data : a.payload;
       })
-      .addCase(fetchBlogs.fulfilled, (s, a) => {
-        s.loading = false;
-        s.list = a.payload.data || a.payload; // support both shapes
-        s.meta = a.payload.meta || {};
-      })
-      .addCase(fetchBlogs.rejected, (s, a) => {
-        s.loading = false;
-        s.error = a.error.message;
+      .addCase(fetchPosts.rejected, (s, a) => { s.status = 'failed'; s.error = a.error.message; })
+
+      .addCase(fetchPost.pending, (s) => { s.status = 'loading'; })
+      .addCase(fetchPost.fulfilled, (s, a) => { s.status = 'succeeded'; s.current = a.payload; })
+      .addCase(fetchPost.rejected, (s, a) => { s.status = 'failed'; s.error = a.error.message; })
+
+      .addCase(createPost.fulfilled, (s, a) => {
+        // backend returns created resource
+        s.posts.unshift(a.payload);
       })
 
-      .addCase(fetchBlog.pending, (s) => {
-        s.loading = true;
-      })
-      .addCase(fetchBlog.fulfilled, (s, a) => {
-        s.loading = false;
-        s.current = a.payload;
-      })
-      .addCase(fetchBlog.rejected, (s, a) => {
-        s.loading = false;
-        s.error = a.error.message;
+      .addCase(updatePost.fulfilled, (s, a) => {
+        const idx = s.posts.findIndex((p) => p.id === a.payload.id);
+        if (idx > -1) s.posts[idx] = a.payload;
+        if (s.current && s.current.id === a.payload.id) s.current = a.payload;
       })
 
-      .addCase(createBlog.fulfilled, (s, a) => {
-        // optionally push to list
-        s.list.unshift(a.payload.data || a.payload);
-      })
-
-      .addCase(updateBlog.fulfilled, (s, a) => {
-        // replace in list
-        const updated = a.payload.data || a.payload;
-        s.list = s.list.map((it) => (it.id === updated.id ? updated : it));
-        if (s.current && s.current.id === updated.id) s.current = updated;
-      })
-
-      .addCase(deleteBlog.fulfilled, (s, a) => {
-        s.list = s.list.filter((b) => b.id !== a.payload);
-      })
-
-      .addCase(fetchCategories.fulfilled, (s, a) => {
-        s.categories = a.payload;
-      })
-      .addCase(fetchTags.fulfilled, (s, a) => {
-        s.tags = a.payload;
-      })
-
-      .addCase(voteBlog.fulfilled, (s, a) => {
-        const { id, upvotes, downvotes } = a.payload;
-        // Update both list and current if they exist
-        s.list = s.list.map((b) =>
-          b.id === id ? { ...b, upvotes, downvotes } : b
-        );
-        if (s.current?.id === id) {
-          s.current = { ...s.current, upvotes, downvotes };
-        }
-      })
-
-      .addCase(commentBlog.fulfilled, (s, a) => {
-        const { blogId, ...comment } = a.payload;
-        // Add comment to current blog if it's loaded
-        if (s.current?.id === blogId) {
-          s.current.comments = [...(s.current.comments || []), comment];
-        }
-      })
-
-      .addCase(replyToComment.fulfilled, (s, a) => {
-        const { blogId, ...reply } = a.payload;
-        // Add reply to the appropriate comment if blog is loaded
-        if (s.current?.id === blogId) {
-          const comments = s.current.comments.map((c) => {
-            if (c.id === reply.parent_id) {
-              return { ...c, replies: [...(c.replies || []), reply] };
-            }
-            return c;
-          });
-          s.current.comments = comments;
+      .addCase(votePost.fulfilled, (s, a) => {
+        // payload expected: { upvotes, downvotes } and backend does not always return full post
+        if (s.current) {
+          s.current.upvotes = a.payload.upvotes ?? s.current.upvotes;
+          s.current.downvotes = a.payload.downvotes ?? s.current.downvotes;
         }
       });
   },
 });
 
-export const { clearCurrent } = slice.actions;
-export default slice.reducer;
+export const { addCategory, addTag, upvoteLocal, downvoteLocal } = blogSlice.actions;
+export default blogSlice.reducer;

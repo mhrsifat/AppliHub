@@ -1,27 +1,62 @@
 // filepath: src/features/chat/hooks/useChat.js
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import Pusher from 'pusher-js';
 import { receiveMessage, setTyping } from '../slices/chatSlice';
 
-export const useChat = (conversationId) => {
+const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY;
+const PUSHER_CLUSTER = import.meta.env.VITE_PUSHER_CLUSTER;
+
+export const useChat = (conversationUuid) => {
   const dispatch = useDispatch();
+  const pusherRef = useRef(null);
+  const channelRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   useEffect(() => {
-    if (!conversationId) return;
-    const pusher = new Pusher(process.env.REACT_APP_PUSHER_KEY, {
-      cluster: process.env.REACT_APP_PUSHER_CLUSTER,
+    if (!conversationUuid) return;
+
+    // Initialize Pusher (Cloud)
+    if (!pusherRef.current) {
+      Pusher.logToConsole = true; // Optional: see logs in console
+      pusherRef.current = new Pusher(PUSHER_KEY, {
+        cluster: PUSHER_CLUSTER,
+        forceTLS: true, // Cloud Pusher always uses WSS
+      });
+    }
+
+    const channelName = `conversation.${conversationUuid}`;
+    channelRef.current = pusherRef.current.subscribe(channelName);
+
+    // Listen for messages
+    channelRef.current.bind('MessageSent', (data) => {
+      if (data.message) dispatch(receiveMessage(data.message));
     });
-    const channel = pusher.subscribe(`conversation-${conversationId}`);
-    channel.bind('new-message', (data) => {
-      dispatch(receiveMessage(data));
+
+    // Listen for typing events
+    channelRef.current.bind('UserTyping', () => {
+      dispatch(setTyping(true));
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => dispatch(setTyping(false)), 3000);
     });
-    channel.bind('typing', (data) => {
-      dispatch(setTyping(data.isTyping));
+
+    channelRef.current.bind('UserTypingStopped', () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      dispatch(setTyping(false));
     });
+
     return () => {
-      channel.unbind_all();
-      pusher.unsubscribe(`conversation-${conversationId}`);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (channelRef.current) {
+        channelRef.current.unbind_all();
+        pusherRef.current.unsubscribe(channelName);
+        channelRef.current = null;
+      }
     };
-  }, [conversationId, dispatch]);
+  }, [conversationUuid, dispatch]);
+
+  return {
+    isConnected: pusherRef.current?.connection?.state === 'connected',
+    pusher: pusherRef.current,
+  };
 };

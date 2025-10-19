@@ -8,13 +8,9 @@ import { Outlet } from "react-router-dom";
 import OrderRoutes from "@/features/order/Routes";
 import InvoiceRoutes from "@/features/invoice/Routes";
 import ServiceRoutes from "@/features/service/Routes";
-import BlogRoutes from "@/features/blog/Routes";
 
 const Dashboard = lazy(() => import("@/features/dashboard/DashboardRouter"));
 const Employees = lazy(() => import("../features/employee/pages/EmployeeListPage"));
-const Services = lazy(() => import("../features/service/pages/ServicesPage"));
-const Orders = lazy(() => import("../features/order/pages/OrderListPage"));
-const Invoices = lazy(() => import("../features/invoice/pages/InvoiceListPage"));
 const Messages = lazy(() => import("@/features/chat/pages/AdminChatDashboard"));
 const Permissions = lazy(() => import("../pages/admin/Permissions"));
 const Reports = lazy(() => import("../pages/admin/Reports"));
@@ -47,7 +43,6 @@ export default function AdminRoutes() {
          {ServiceRoutes}
          {OrderRoutes}
          {InvoiceRoutes}
-         {BlogRoutes}
         <Route path="messages" element={<Messages />} />
         <Route path="permissions" element={<Permissions />} />
         <Route path="reports" element={<Reports />} />

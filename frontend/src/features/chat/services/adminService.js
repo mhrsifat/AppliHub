@@ -1,44 +1,62 @@
 // filepath: src/features/chat/services/adminService.js
-import axios from 'axios';
+import api from '@/services/api';
 
-const API_URL = process.env.REACT_APP_API_URL || '';
-
-const getConversations = async () => {
-  const response = await axios.get(`${API_URL}/admin/conversations`);
+const getConversations = async (params = {}) => {
+  const response = await api.get(`/message/conversations`, { params });
   return response.data;
 };
 
-const getConversationById = async (conversationId) => {
-  const response = await axios.get(`${API_URL}/admin/conversations/${conversationId}`);
+const getConversationById = async (conversationUuid) => {
+  if (!conversationUuid) {
+    throw new Error('Conversation ID is required');
+  }
+  
+  const response = await api.get(`/message/conversations/${conversationUuid}`);
   return response.data;
 };
 
-const sendReply = async ({ conversationId, message, file }) => {
+const sendReply = async ({ conversationUuid, message, file }) => {
   const formData = new FormData();
   formData.append('message', message);
   if (file) {
     formData.append('file', file);
   }
-  const response = await axios.post(
-    `${API_URL}/admin/conversations/${conversationId}/reply`,
+  
+  const response = await api.post(
+    `/message/admin/conversations/${conversationUuid}/reply`,
     formData,
-    { headers: { 'Content-Type': 'multipart/form-data' } }
+    { 
+      headers: { 
+        'Content-Type': 'multipart/form-data' 
+      } 
+    }
   );
   return response.data;
 };
 
-const addNote = async (conversationId, note) => {
-  const response = await axios.post(`${API_URL}/admin/conversations/${conversationId}/notes`, { note });
+const addNote = async (conversationUuid, note) => {
+  const response = await api.post(
+    `/message/conversations/${conversationUuid}/notes`, 
+    { note }
+  );
   return response.data;
 };
 
-const deleteConversation = async (conversationId) => {
-  const response = await axios.delete(`${API_URL}/admin/conversations/${conversationId}`);
+const deleteConversation = async (conversationUuid) => {
+  const response = await api.delete(`/message/conversations/${conversationUuid}`);
   return response.data;
 };
 
-const closeConversation = async (conversationId) => {
-  const response = await axios.post(`${API_URL}/admin/conversations/${conversationId}/close`);
+const closeConversation = async (conversationUuid) => {
+  const response = await api.post(`/message/conversations/${conversationUuid}/close`);
+  return response.data;
+};
+
+const updateConversationStatus = async (conversationUuid, status) => {
+  const response = await api.patch(
+    `/message/conversations/${conversationUuid}/status`, 
+    { status }
+  );
   return response.data;
 };
 
@@ -49,4 +67,5 @@ export const adminService = {
   addNote,
   deleteConversation,
   closeConversation,
+  updateConversationStatus,
 };
