@@ -8,17 +8,25 @@ class StoreMessageRequest extends FormRequest
 {
     public function authorize()
     {
-        return true;
+        return true; // Allow both authenticated and anonymous users
     }
 
     public function rules()
     {
         return [
-            'name' => 'sometimes|required|string|max:191',
-            'contact' => 'sometimes|required|string|max:191',
-            'body' => 'nullable|string',
-            'attachments' => 'nullable|array|max:5',        // attachments array enforced
-            'attachments.*' => 'file|mimes:jpg,jpeg,png,gif,pdf,doc,docx,txt|max:10240',
+            'body' => 'required_without:attachments|string|max:5000',
+            'attachments' => 'nullable|array',
+            'attachments.*' => 'file|max:10240', // 10MB max per file
+            'name' => 'sometimes|string|max:255', // For anonymous users
+            'contact' => 'sometimes|string|max:255', // For anonymous users
+        ];
+    }
+
+    public function messages()
+    {
+        return [
+            'body.required_without' => 'Please enter a message or attach a file',
+            'attachments.*.max' => 'File size must be less than 10MB',
         ];
     }
 }

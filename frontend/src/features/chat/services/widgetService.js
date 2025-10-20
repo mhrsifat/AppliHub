@@ -1,21 +1,25 @@
-// filepath: src/features/chat/services/widgetService.js
 import api from '@/services/api';
 
-const startConversation = async ({ name, contact, message }) => {
-  const payload = { name, contact, message };
+const startConversation = async ({ name, contact, message, subject }) => {
+  const payload = { name, contact, message, subject };
   const response = await api.post(`/message/conversations`, payload);
   return response.data;
 };
 
-const sendMessage = async ({ conversationUuid, message, file }) => {
+const sendMessage = async ({ conversationUuid, body, attachments }) => {
   const formData = new FormData();
   
-  if (message) {
-    formData.append('body', message);
+  if (body) {
+    formData.append('body', body);
   }
   
-  if (file) {
-    formData.append('attachments[]', file);
+  if (attachments) {
+    // Handle single file or array of files
+    if (Array.isArray(attachments)) {
+      attachments.forEach(file => formData.append('attachments[]', file));
+    } else {
+      formData.append('attachments[]', attachments);
+    }
   }
   
   const response = await api.post(
@@ -30,45 +34,51 @@ const sendMessage = async ({ conversationUuid, message, file }) => {
   return response.data;
 };
 
-// Fetch conversation messages (public route - uses UUID)
+// Fetch conversation with messages
 const fetchConversation = async (conversationUuid) => {
   if (!conversationUuid) {
     throw new Error('Conversation UUID is required');
   }
   
   try {
-    // Use the public messages endpoint instead of the conversation endpoint
-    const response = await api.get(`/message/conversations/${conversationUuid}/messages`);
-    
-    // Return in expected format with conversation data
-    return {
-      data: {
-        uuid: conversationUuid,
-        id: conversationUuid,
-        messages: response.data.data || response.data || []
-      }
-    };
+    const response = await api.get(`/message/conversations/${conversationUuid}`);
+    return response.data;
   } catch (error) {
     console.error('fetchConversation error:', error);
     throw error;
   }
 };
 
-const sendTyping = async (conversationUuid) => {
+// Fetch only messages for a conversation
+const fetchConversationMessages = async (conversationUuid) => {
+  if (!conversationUuid) {
+    throw new Error('Conversation UUID is required');
+  }
+  
+  try {
+    const response = await api.get(`/message/conversations/${conversationUuid}/messages`);
+    return response.data;
+  } catch (error) {
+    console.error('fetchConversationMessages error:', error);
+    throw error;
+  }
+};
+
+const sendTyping = async (conversationUuid, name = 'Guest') => {
   if (!conversationUuid) return;
   
   try {
-    await api.post(`/message/conversations/${conversationUuid}/typing`);
+    await api.post(`/message/conversations/${conversationUuid}/typing`, { name });
   } catch (error) {
     console.warn('Failed to send typing indicator:', error);
   }
 };
 
-const sendTypingStop = async (conversationUuid) => {
+const sendTypingStop = async (conversationUuid, name = 'Guest') => {
   if (!conversationUuid) return;
   
   try {
-    await api.post(`/message/conversations/${conversationUuid}/typing/stop`);
+    await api.post(`/message/conversations/${conversationUuid}/typing/stop`, { name });
   } catch (error) {
     console.warn('Failed to send typing stop indicator:', error);
   }
@@ -78,6 +88,7 @@ export const widgetService = {
   startConversation,
   sendMessage,
   fetchConversation,
+  fetchConversationMessages,
   sendTyping,
   sendTypingStop,
 };

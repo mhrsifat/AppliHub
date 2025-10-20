@@ -1,4 +1,3 @@
-// filepath: src/features/chat/hooks/useChat.js
 import { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import Pusher from 'pusher-js';
@@ -6,143 +5,193 @@ import { receiveMessage, setTyping } from '../slices/chatSlice';
 
 const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY;
 const PUSHER_CLUSTER = import.meta.env.VITE_PUSHER_CLUSTER;
-const API_BASE = import.meta.env.VITE_API_BASE; // must be absolute origin like https://api.example.com
+const API_BASE = import.meta.env.VITE_API_BASE;
 
-export const useChat = (conversationUuid) => {
+export const useChat = (conversationUuid, isAnonymous = false) => {
   const dispatch = useDispatch();
   const pusherRef = useRef(null);
   const channelRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-  const currentAuthHeaderRef = useRef(null);
 
-  // helper to build channel name
-  const privateChannelName = (uuid) => `private-conversation.${uuid}`;
+  const privateChannel = (uuid) => `private-conversation.${uuid}`;
 
-  // initialize pusher (idempotent)
+  const getAnonymousAuthData = () => {
+    try {
+      const chatUser = localStorage.getItem('chat_user');
+      if (chatUser) {
+        const userData = JSON.parse(chatUser);
+        return {
+          contact: userData.contact || ''
+        };
+      }
+    } catch (error) {
+      console.warn('Failed to get chat user from localStorage:', error);
+    }
+    return { contact: '' };
+  };
+
   const initPusher = () => {
     if (pusherRef.current) return;
 
-    // create pusher with auth endpoint
-    pusherRef.current = new Pusher(PUSHER_KEY, {
-      cluster: PUSHER_CLUSTER,
-      forceTLS: true,
-      authEndpoint: `${API_BASE.replace(/\/$/, '')}/broadcasting/auth`,
-      auth: {
-        headers: {
-          Authorization: currentAuthHeaderRef.current || '',
+    if (isAnonymous) {
+      const authData = getAnonymousAuthData();
+      
+      console.log('Initializing Pusher for anonymous user with:', authData);
+
+      pusherRef.current = new Pusher(PUSHER_KEY, {
+        cluster: PUSHER_CLUSTER,
+        forceTLS: true,
+        authEndpoint: `${API_BASE.replace(/\/$/, '')}/broadcasting/auth/anonymous`,
+        auth: {
+          params: authData
         },
-      },
+        logToConsole: import.meta.env.DEV,
+      });
+    } else {
+      // Staff authentication
+      const authToken = localStorage.getItem('auth_token');
+      console.log('Initializing Pusher for staff with token:', !!authToken);
+      
+      pusherRef.current = new Pusher(PUSHER_KEY, {
+        cluster: PUSHER_CLUSTER,
+        forceTLS: true,
+        authEndpoint: `${API_BASE.replace(/\/$/, '')}/broadcasting/auth`,
+        auth: {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        },
+        logToConsole: import.meta.env.DEV,
+      });
+    }
+
+    // Handle connection events
+    pusherRef.current.connection.bind('connected', () => {
+      console.log('Pusher connected successfully');
     });
 
-    // optional debug in dev
-    if (import.meta.env.DEV) {
-      Pusher.logToConsole = true;
-    }
+    pusherRef.current.connection.bind('error', (err) => {
+      console.error('Pusher connection error:', err);
+    });
+
+    pusherRef.current.connection.bind('state_change', (states) => {
+      console.log('Pusher state changed:', states);
+    });
   };
 
-  // subscribe to a private channel (handles re-subscribe safely)
-  const subscribeToChannel = (uuid) => {
-    if (!pusherRef.current) return;
-    const chan = privateChannelName(uuid);
+  const subscribe = (uuid) => {
+    if (!pusherRef.current) {
+      console.error('Pusher not initialized');
+      return;
+    }
 
-    // if already subscribed to same channel, return it
-    if (channelRef.current && channelRef.current.name === chan) return;
+    const chanName = privateChannel(uuid);
 
-    // unsubscribe previous if any
+    // If already subscribed to this channel, return
+    if (channelRef.current && channelRef.current.name === chanName) {
+      console.log('Already subscribed to:', chanName);
+      return;
+    }
+
+    // Clean up previous subscription
     if (channelRef.current) {
+      console.log('Unsubscribing from previous channel:', channelRef.current.name);
       channelRef.current.unbind_all();
-      try {
-        pusherRef.current.unsubscribe(channelRef.current.name);
-      } catch (e) {
-        // ignore
+      try { 
+        pusherRef.current.unsubscribe(channelRef.current.name); 
+      } catch (error) {
+        console.warn('Error unsubscribing from channel:', error);
       }
       channelRef.current = null;
     }
 
-    channelRef.current = pusherRef.current.subscribe(chan);
+    try {
+      console.log('Attempting to subscribe to channel:', chanName);
+      channelRef.current = pusherRef.current.subscribe(chanName);
 
-    // bind events
-    channelRef.current.bind('MessageSent', (data) => {
-      if (data?.message) dispatch(receiveMessage(data.message));
-    });
+      channelRef.current.bind('pusher:subscription_error', (status) => {
+        console.error('Pusher subscription error:', status);
+      });
 
-    channelRef.current.bind('UserTyping', () => {
-      dispatch(setTyping(true));
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => dispatch(setTyping(false)), 3000);
-    });
+      channelRef.current.bind('pusher:subscription_succeeded', () => {
+        console.log('Successfully subscribed to:', chanName);
+      });
 
-    channelRef.current.bind('UserTypingStopped', () => {
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      dispatch(setTyping(false));
-    });
-  };
+      // Handle message events from backend
+      channelRef.current.bind('message.sent', (data) => {
+        console.log('Received message event:', data);
+        if (data?.message) {
+          dispatch(receiveMessage(data.message));
+        }
+      });
 
-  // update auth header (token) used by pusher and resubscribe
-  const updateAuthHeader = (authHeader) => {
-    currentAuthHeaderRef.current = authHeader || null;
+      // Handle the Laravel-specific event name
+      channelRef.current.bind('MessageSent', (data) => {
+        console.log('Received MessageSent event:', data);
+        if (data?.message) {
+          dispatch(receiveMessage(data.message));
+        }
+      });
 
-    if (!pusherRef.current) return;
+      // Handle typing indicators
+      channelRef.current.bind('user.typing', (data) => {
+        console.log('User typing event:', data);
+        dispatch(setTyping(true));
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => dispatch(setTyping(false)), 3000);
+      });
 
-    // update config for future auth requests
-    if (!pusherRef.current.config) pusherRef.current.config = {};
-    if (!pusherRef.current.config.auth) pusherRef.current.config.auth = {};
-    if (!pusherRef.current.config.auth.headers) pusherRef.current.config.auth.headers = {};
+      channelRef.current.bind('user.typing.stopped', (data) => {
+        console.log('User stopped typing event:', data);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        dispatch(setTyping(false));
+      });
 
-    pusherRef.current.config.auth.headers.Authorization = currentAuthHeaderRef.current || '';
+      // Handle the Laravel-specific typing event names
+      channelRef.current.bind('UserTyping', (data) => {
+        console.log('Received UserTyping event:', data);
+        dispatch(setTyping(true));
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => dispatch(setTyping(false)), 3000);
+      });
 
-    // if already subscribed, force a resubscribe to pick new auth header
-    if (channelRef.current) {
-      const name = channelRef.current.name;
-      channelRef.current.unbind_all();
-      try {
-        pusherRef.current.unsubscribe(name);
-      } catch (e) {
-        // ignore
-      }
-      channelRef.current = null;
-      // re-subscribe
-      const uuid = name.replace(/^private-conversation\./, '');
-      subscribeToChannel(uuid);
+      channelRef.current.bind('UserTypingStopped', (data) => {
+        console.log('Received UserTypingStopped event:', data);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        dispatch(setTyping(false));
+      });
+
+    } catch (error) {
+      console.error('Failed to subscribe to channel:', error);
     }
   };
 
   useEffect(() => {
-    if (!conversationUuid) return;
+    if (!conversationUuid) {
+      console.log('No conversation UUID provided, skipping Pusher initialization');
+      return;
+    }
 
+    console.log('Initializing Pusher for conversation:', conversationUuid, 'isAnonymous:', isAnonymous);
     initPusher();
-
-    // read any existing token from window (your api.js broadcasts tokenChanged events)
-    const initialEvent = (window.__INITIAL_AUTH_HEADER && window.__INITIAL_AUTH_HEADER) || null;
-    if (initialEvent) updateAuthHeader(initialEvent);
-
-    // listen for token changes dispatched from your api helper
-    const onTokenChanged = (e) => {
-      // e.detail expected to be full header string: "Bearer x.y.z" or null
-      updateAuthHeader(e?.detail || null);
-    };
-    window.addEventListener('tokenChanged', onTokenChanged);
-
-    // subscribe to the private channel
-    subscribeToChannel(conversationUuid);
+    subscribe(conversationUuid);
 
     return () => {
-      // cleanup
-      window.removeEventListener('tokenChanged', onTokenChanged);
+      console.log('Cleaning up Pusher subscription for:', conversationUuid);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       if (channelRef.current) {
         channelRef.current.unbind_all();
-        try {
-          pusherRef.current.unsubscribe(channelRef.current.name);
-        } catch (e) {
-          // ignore
+        try { 
+          pusherRef.current.unsubscribe(channelRef.current.name); 
+        } catch (error) {
+          console.warn('Error unsubscribing from channel:', error);
         }
         channelRef.current = null;
       }
-      // We don't disconnect pusher instance here to allow reuse across routes.
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationUuid, dispatch]);
+  }, [conversationUuid, isAnonymous]);
 
   return {
     isConnected: !!pusherRef.current && pusherRef.current.connection?.state === 'connected',

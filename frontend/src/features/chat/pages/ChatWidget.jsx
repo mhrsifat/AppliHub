@@ -1,125 +1,104 @@
-// filepath: src/features/chat/pages/ChatWidget.jsx
-import React, { useEffect, useState, useCallback, memo, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, memo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
   startConversation,
   fetchConversation,
   sendMessage,
   clearError,
-  closeConversation,
+  resetChat,
 } from "../slices/chatSlice";
 import { useChat } from "../hooks/useChat";
 import ChatStartForm from "../components/ChatStartForm";
 import MessageList from "../components/MessageList";
 import ChatInput from "../components/ChatInput";
 import TypingIndicator from "../components/TypingIndicator";
-import { MessageCircle, X, AlertCircle } from "lucide-react";
+import { MessageCircle, X, AlertCircle, Minimize2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-// Memoize child components to prevent unnecessary re-renders
-const MemoizedChatStartForm = memo(ChatStartForm);
-const MemoizedMessageList = memo(MessageList);
-const MemoizedChatInput = memo(ChatInput);
-const MemoizedTypingIndicator = memo(TypingIndicator);
 
 const ChatWidget = () => {
   const dispatch = useDispatch();
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const errorTimeoutRef = useRef(null);
-  const hasFetchedRef = useRef(false);
+  const fetchedOnceRef = useRef(false);
+  const modalRef = useRef(null);
 
-  // touch handling for swipe-to-close on mobile
-  const touchStartYRef = useRef(null);
-  const touchMovedRef = useRef(false);
+  // Redux state
+  const conversationUuid = useSelector((s) => s.chat.conversationUuid);
+  const user = useSelector((s) => s.chat.user);
+  const messages = useSelector((s) => s.chat.messages);
+  const isTyping = useSelector((s) => s.chat.isTyping);
+  const error = useSelector((s) => s.chat.error);
+  const isLoading = useSelector((s) => s.chat.isLoading);
 
-  // Redux state selectors
-  const conversationUuid = useSelector((state) => state.chat.conversationUuid);
-  const user = useSelector((state) => state.chat.user);
-  const messages = useSelector((state) => state.chat.messages || []);
-  const isTyping = useSelector((state) => state.chat.isTyping);
-  const error = useSelector((state) => state.chat.error);
-  const isLoading = useSelector((state) => state.chat.isLoading);
-  const isSending = useSelector((state) => state.chat.isSending);
+  // hook: realtime - pass true for anonymous users
+  useChat(conversationUuid, true);
 
-  // Debug: Log state changes
+  // auto-open if there is an ongoing conversation
   useEffect(() => {
-    console.log("ChatWidget State:", {
-      conversationUuid,
-      messagesCount: messages.length,
-      isLoading,
-      isSending,
-      user,
-      error,
-      hasFetched: hasFetchedRef.current,
-    });
-  }, [conversationUuid, messages, isLoading, isSending, user, error]);
-
-  // Auto-dismiss error after 5 seconds
-  useEffect(() => {
-    if (error) {
-      if (errorTimeoutRef.current) {
-        clearTimeout(errorTimeoutRef.current);
-      }
-      errorTimeoutRef.current = setTimeout(() => {
-        dispatch(clearError());
-      }, 5000);
+    if (conversationUuid) {
+      setIsOpen(true);
     }
-    return () => {
-      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
-    };
-  }, [error, dispatch]);
+  }, [conversationUuid]);
 
-  // Fetch conversation ONCE when conversationUuid exists and we haven't fetched yet
+  // fetch conversation once when opening if messages empty
   useEffect(() => {
-    if (conversationUuid && messages.length === 0 && !isLoading && !hasFetchedRef.current) {
-      hasFetchedRef.current = true;
+    if (isOpen && conversationUuid && messages.length === 0 && !isLoading && !fetchedOnceRef.current) {
+      fetchedOnceRef.current = true;
       dispatch(fetchConversation(conversationUuid));
     }
-  }, [conversationUuid, messages.length, isLoading, dispatch]);
+  }, [isOpen, conversationUuid, messages.length, isLoading, dispatch]);
 
-  // Reset fetch flag when conversation changes
+  // reset fetch flag when conversation changes/cleared
   useEffect(() => {
-    if (!conversationUuid) {
-      hasFetchedRef.current = false;
-    }
+    if (!conversationUuid) fetchedOnceRef.current = false;
   }, [conversationUuid]);
 
-  // Auto open if conversation exists
+  // dismiss error after a while
   useEffect(() => {
-    if (conversationUuid) setIsOpen(true);
-  }, [conversationUuid]);
+    if (!error) return;
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    errorTimeoutRef.current = setTimeout(() => dispatch(clearError()), 5000);
+    return () => clearTimeout(errorTimeoutRef.current);
+  }, [error, dispatch]);
 
-  // Close modal on Escape key
+  // Handle mobile back button and escape key
   useEffect(() => {
-    const handleEscape = (event) => {
-      if (event.key === "Escape" && isOpen) setIsOpen(false);
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
     };
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [isOpen]);
 
-  // Prevent body scroll when modal is open
-  useEffect(() => {
+    const handleBackButton = () => {
+      if (isOpen) {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    
+    // Add popstate for mobile back button
     if (isOpen) {
-      document.body.style.overflow = "hidden";
-      document.body.style.touchAction = "none";
-    } else {
-      document.body.style.overflow = "";
-      document.body.style.touchAction = "";
+      window.history.pushState({ chatOpen: true }, '');
+      window.addEventListener('popstate', handleBackButton);
     }
+
     return () => {
-      document.body.style.overflow = "";
-      document.body.style.touchAction = "";
+      window.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('popstate', handleBackButton);
+      
+      // Clean up history state when component unmounts
+      if (isOpen && window.history.state?.chatOpen) {
+        window.history.back();
+      }
     };
   }, [isOpen]);
 
-  // Subscribe to real-time updates (Pusher)
-  useChat(conversationUuid);
-
-  // Memoized event handlers
+  // handlers
   const handleStart = useCallback(
     ({ name, contact, message }) => {
-      hasFetchedRef.current = false; // Reset for new conversation
+      fetchedOnceRef.current = false;
       dispatch(startConversation({ name, contact, message }));
     },
     [dispatch]
@@ -128,93 +107,140 @@ const ChatWidget = () => {
   const handleSendMessage = useCallback(
     ({ message, file }) => {
       if (!conversationUuid) {
-        console.error("No active conversation");
+        console.error("No active conversation to send a message");
         return;
       }
-      dispatch(sendMessage({ conversationUuid, message, file }));
+      dispatch(sendMessage({ conversationUuid, body: message, attachments: file }));
     },
     [conversationUuid, dispatch]
   );
 
-  const toggleModal = useCallback(() => setIsOpen((p) => !p), []);
-
-  const handleCloseError = useCallback(() => {
-    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
-    dispatch(clearError());
+  const handleEndChat = useCallback(() => {
+    // For anonymous users, just reset the chat state and close the widget
+    dispatch(resetChat());
+    setIsOpen(false);
+    setIsMinimized(false);
   }, [dispatch]);
 
-  const handleBackdropClick = useCallback((e) => {
-    if (e.target === e.currentTarget) setIsOpen(false);
+  const toggleModal = useCallback(() => {
+    setIsOpen(prev => !prev);
+    if (isOpen) {
+      setIsMinimized(false);
+    }
+  }, [isOpen]);
+
+  const handleMinimize = useCallback(() => {
+    setIsMinimized(true);
   }, []);
 
-  // End conversation handler (stop session)
-  const handleCloseConversation = useCallback(async () => {
-    if (!conversationUuid) {
-      setIsOpen(false);
-      return;
-    }
-    try {
-      await dispatch(closeConversation(conversationUuid));
-    } catch (err) {
-      console.warn("closeConversation failed:", err);
-    } finally {
-      setIsOpen(false);
-    }
-  }, [conversationUuid, dispatch]);
+  const handleExpand = useCallback(() => {
+    setIsMinimized(false);
+  }, []);
 
-  // touch handlers for swipe-to-close (mobile)
-  const handleTouchStart = (e) => {
-    touchMovedRef.current = false;
-    if (e.touches && e.touches.length === 1) touchStartYRef.current = e.touches[0].clientY;
-  };
-  const handleTouchMove = () => { touchMovedRef.current = true; };
-  const handleTouchEnd = (e) => {
-    if (!touchStartYRef.current || !touchMovedRef.current) {
-      touchStartYRef.current = null;
-      touchMovedRef.current = false;
-      return;
-    }
-    const endY = (e.changedTouches && e.changedTouches[0].clientY) || null;
-    if (!endY) { touchStartYRef.current = null; touchMovedRef.current = false; return; }
-    const deltaY = endY - touchStartYRef.current;
-    if (deltaY > 120) setIsOpen(false);
-    touchStartYRef.current = null;
-    touchMovedRef.current = false;
-  };
+  const handleClose = useCallback(() => {
+    setIsOpen(false);
+    setIsMinimized(false);
+  }, []);
 
-  // UI decisions
   const unreadCount = messages.length > 0 && !isOpen ? messages.length : 0;
-  const showLoadingState = isLoading && messages.length === 0;
+  const showLoading = isLoading && messages.length === 0;
   const showStartForm = !conversationUuid && !isLoading;
-  const showChatInterface = conversationUuid && !showLoadingState;
+  const showChatInterface = !!conversationUuid && !showLoading;
+
+  // Minimized state UI
+  if (isMinimized && isOpen) {
+    return (
+      <>
+        {/* Minimized Chat Bar */}
+        <div className="fixed bottom-4 right-4 z-50 sm:bottom-6 sm:right-6">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center justify-between p-3 min-w-[280px]">
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    Live Chat
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {messages.length > 0 ? `${messages.length} messages` : 'Chat is active'}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={handleExpand}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                  aria-label="Expand chat"
+                >
+                  <MessageCircle size={18} />
+                </button>
+                <button
+                  onClick={handleClose}
+                  className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+                  aria-label="Close chat"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Floating button remains visible but less prominent */}
+        <button
+          onClick={handleExpand}
+          aria-label="Expand chat"
+          className="fixed bottom-5 left-4 z-40 flex items-center justify-center w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200"
+        >
+          <MessageCircle size={20} />
+        </button>
+      </>
+    );
+  }
 
   return (
     <>
-      {/* Floating Chat Button */}
+      {/* Floating button */}
       <button
         onClick={toggleModal}
         aria-label={isOpen ? "Close chat" : "Open chat"}
-        aria-expanded={isOpen}
-        className="fixed bottom-5 right-4 z-50 flex items-center justify-center w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg"
+        className="fixed bottom-5 right-4 z-50 flex items-center justify-center w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:bottom-6 sm:right-6"
       >
-        <MessageCircle size={26} />
+        <MessageCircle size={24} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Error Toast */}
+      {/* Error toast */}
       <AnimatePresence>
         {error && (
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="fixed top-4 right-4 z-[60] bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded-lg shadow-lg max-w-sm">
-            <div className="flex items-start space-x-3">
-              <AlertCircle size={20} className="mt-0.5 flex-shrink-0 text-red-500" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium break-words">{error}</p>
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.95 }}
+            className="fixed top-4 left-4 right-4 z-60 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl shadow-lg sm:left-auto sm:right-4 sm:max-w-sm"
+            role="alert"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 flex-1">
+                <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
+                <div className="text-sm font-medium pr-2">{String(error)}</div>
               </div>
-              <button onClick={handleCloseError} className="text-red-500 hover:text-red-700"><X size={18} /></button>
+              <button 
+                onClick={() => dispatch(clearError())} 
+                className="text-red-500 hover:text-red-700 transition-colors flex-shrink-0"
+                aria-label="Dismiss error"
+              >
+                <X size={16} />
+              </button>
             </div>
           </motion.div>
         )}
@@ -223,71 +249,143 @@ const ChatWidget = () => {
       {/* Modal */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleBackdropClick} className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end sm:items-center sm:justify-end z-50 p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="chat-title">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center sm:justify-end p-0 sm:p-4"
+            onClick={handleClose}
+            role="dialog"
+            aria-modal="true"
+          >
             <motion.div
-              initial={{ scale: 0.98, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.98, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
               onClick={(e) => e.stopPropagation()}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              className="relative w-full h-full sm:w-full sm:max-w-md sm:h-[600px] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-              style={{ maxHeight: "100dvh" }}
+              ref={modalRef}
+              className="relative w-full sm:max-w-md h-[85vh] sm:h-[600px] bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700"
+              style={{ 
+                maxHeight: '100dvh',
+                // Mobile browser safe area support
+                paddingBottom: 'env(safe-area-inset-bottom)'
+              }}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700">
+              {/* Header with improved mobile handling */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 sticky top-0 z-10">
                 <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <div className="w-3 h-3 bg-green-500 rounded-full" />
-                    <div className="absolute inset-0 w-3 h-3 bg-green-500 rounded-full animate-ping opacity-75" />
+                  <div className="w-3 h-3 rounded-full bg-green-500 relative">
+                    <span className="absolute inset-0 rounded-full animate-ping opacity-60 bg-green-400"></span>
                   </div>
-                  <h2 id="chat-title" className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
-                    {conversationUuid ? "Live Chat" : "Start Conversation"}
-                  </h2>
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {conversationUuid ? "Live Chat" : "Start Conversation"}
+                    </h3>
+                    {conversationUuid && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {user?.name || 'Anonymous user'}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <button onClick={() => setIsOpen(false)} className="p-2 text-gray-500 hover:text-gray-700 rounded-lg" aria-label="Close chat"><X size={20} /></button>
+                <div className="flex items-center space-x-1">
+                  {/* Minimize button - shown when chat is active */}
+                  {conversationUuid && (
+                    <button
+                      onClick={handleMinimize}
+                      className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                      aria-label="Minimize chat"
+                    >
+                      <Minimize2 size={18} />
+                    </button>
+                  )}
+                  
+                  {/* End Chat button - desktop */}
+                  {conversationUuid && (
+                    <button
+                      onClick={handleEndChat}
+                      className="hidden sm:inline-flex items-center px-3 py-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg transition-colors font-medium"
+                    >
+                      End Chat
+                    </button>
+                  )}
+                  
+                  {/* Close button */}
+                  <button 
+                    onClick={handleClose}
+                    className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                    aria-label="Close chat"
+                  >
+                    <X size={20} />
+                  </button>
                 </div>
               </div>
 
-              {/* Content */}
+              {/* Body content */}
               <div className="flex-1 overflow-hidden flex flex-col">
-                {showLoadingState ? (
-                  <div className="flex-1 flex items-center justify-center p-4">
+                {showLoading ? (
+                  <div className="flex-1 flex items-center justify-center p-8">
                     <div className="text-center">
-                      <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-blue-600 mx-auto mb-3" />
-                      <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Loading...</p>
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-blue-600 mx-auto mb-4" />
+                      <div className="text-sm text-gray-600 dark:text-gray-400">Loading conversation...</div>
                     </div>
                   </div>
                 ) : showStartForm ? (
-                  <div className="flex-1 overflow-y-auto p-4">
-                    <MemoizedChatStartForm onStart={handleStart} isLoading={isLoading} />
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="p-4 pb-6">
+                      <ChatStartForm onStart={handleStart} />
+                    </div>
                   </div>
                 ) : showChatInterface ? (
                   <>
-                    <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800">
+                    {/* Messages area */}
+                    <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800/50">
                       {messages.length === 0 ? (
-                        <div className="flex items-center justify-center h-full">
-                          <p className="text-gray-500 dark:text-gray-400 text-sm">No messages yet. Start the conversation!</p>
+                        <div className="flex items-center justify-center h-full text-center p-8">
+                          <div>
+                            <MessageCircle size={48} className="mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              No messages yet — start the conversation.
+                            </p>
+                          </div>
                         </div>
                       ) : (
-                        <MemoizedMessageList messages={messages} currentUser={user?.name} />
+                        <MessageList messages={messages} currentUser={user?.name} />
                       )}
-                      {isTyping && <MemoizedTypingIndicator />}
+                      {isTyping && <TypingIndicator />}
                     </div>
 
-                    {/* ChatInput always present while a conversation exists.
-                        We pass isSending to indicate send-in-progress (input stays visible). */}
-                    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-                      <MemoizedChatInput onSend={handleSendMessage} isLoading={isSending} />
+                    {/* ChatInput with safe area support */}
+                    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 sticky bottom-0">
+                      <div className="p-3 safe-area-bottom">
+                        <ChatInput onSend={handleSendMessage} isLoading={isLoading} />
+                      </div>
                     </div>
                   </>
                 ) : null}
               </div>
 
+              {/* Mobile bottom actions - only show when chat is active */}
+              {conversationUuid && (
+                <div className="sm:hidden bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 safe-area-bottom">
+                  <div className="flex space-x-2 p-3">
+                    <button 
+                      onClick={handleMinimize}
+                      className="flex-1 py-3 px-4 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95"
+                    >
+                      Minimize
+                    </button>
+                    <button 
+                      onClick={handleEndChat}
+                      className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium transition-colors active:scale-95"
+                    >
+                      End Chat
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}

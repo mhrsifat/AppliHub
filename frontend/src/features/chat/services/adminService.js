@@ -1,4 +1,3 @@
-// filepath: src/features/chat/services/adminService.js
 import api from '@/services/api';
 
 const getConversations = async (params = {}) => {
@@ -8,7 +7,7 @@ const getConversations = async (params = {}) => {
 
 const getConversationById = async (conversationUuid) => {
   if (!conversationUuid) {
-    throw new Error('Conversation ID is required');
+    throw new Error('Conversation UUID is required');
   }
   
   const response = await api.get(`/message/conversations/${conversationUuid}`);
@@ -17,13 +16,19 @@ const getConversationById = async (conversationUuid) => {
 
 const sendReply = async ({ conversationUuid, message, file }) => {
   const formData = new FormData();
-  formData.append('message', message);
+  formData.append('body', message);
+  
   if (file) {
-    formData.append('file', file);
+    // Handle single file or array of files
+    if (Array.isArray(file)) {
+      file.forEach(f => formData.append('attachments[]', f));
+    } else {
+      formData.append('attachments[]', file);
+    }
   }
   
   const response = await api.post(
-    `/message/admin/conversations/${conversationUuid}/reply`,
+    `/message/conversations/${conversationUuid}/messages`,
     formData,
     { 
       headers: { 
@@ -34,10 +39,10 @@ const sendReply = async ({ conversationUuid, message, file }) => {
   return response.data;
 };
 
-const addNote = async (conversationUuid, note) => {
+const addNote = async (conversationUuid, body) => {
   const response = await api.post(
     `/message/conversations/${conversationUuid}/notes`, 
-    { note }
+    { body }
   );
   return response.data;
 };
@@ -52,11 +57,18 @@ const closeConversation = async (conversationUuid) => {
   return response.data;
 };
 
-const updateConversationStatus = async (conversationUuid, status) => {
-  const response = await api.patch(
-    `/message/conversations/${conversationUuid}/status`, 
-    { status }
-  );
+const markAsRead = async (conversationUuid) => {
+  const response = await api.post(`/message/conversations/${conversationUuid}/read`);
+  return response.data;
+};
+
+const assignConversation = async (conversationUuid) => {
+  const response = await api.post(`/message/conversations/${conversationUuid}/assign`);
+  return response.data;
+};
+
+const joinConversation = async (conversationUuid) => {
+  const response = await api.post(`/message/conversations/${conversationUuid}/join`);
   return response.data;
 };
 
@@ -67,5 +79,8 @@ export const adminService = {
   addNote,
   deleteConversation,
   closeConversation,
-  updateConversationStatus,
+  markAsRead,
+  assignConversation,
+  joinConversation,
+  updateConversationStatus: closeConversation, // Alias for backward compatibility
 };

@@ -1,4 +1,3 @@
-// filepath: src/features/chat/pages/AdminChatDashboard.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -8,6 +7,9 @@ import {
   addAdminNote,
   deleteConversation,
   closeConversation,
+  markAsRead,
+  assignConversation,
+  joinConversation,
   updateAdminFilters,
   updateAdminPagination,
   clearError,
@@ -16,7 +18,7 @@ import { useChat } from '../hooks/useChat';
 import ChatMessage from '../components/ChatMessage';
 import ChatInput from '../components/ChatInput';
 import TypingIndicator from '../components/TypingIndicator';
-import { Search, MessageCircle, User, Clock, Trash2, XCircle, RefreshCw } from 'lucide-react';
+import { Search, MessageCircle, User, Clock, Trash2, XCircle, RefreshCw, Mail, Eye } from 'lucide-react';
 
 const AdminChatDashboard = () => {
   const dispatch = useDispatch();
@@ -47,7 +49,7 @@ const AdminChatDashboard = () => {
     }));
   }, [dispatch, filters.search, filters.status, pagination.page, pagination.limit]);
 
-  // Debounced search (keeps existing logic)
+  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchTerm !== filters.search) {
@@ -61,6 +63,8 @@ const AdminChatDashboard = () => {
 
   const handleSelectConversation = useCallback((conversation) => {
     dispatch(fetchConversationDetails(conversation.uuid));
+    // Mark as read when selected
+    dispatch(markAsRead(conversation.uuid));
   }, [dispatch]);
 
   const handleAdminSend = useCallback(({ message, file }) => {
@@ -97,6 +101,16 @@ const AdminChatDashboard = () => {
     }
   }, [dispatch, selectedConversation]);
 
+  const handleAssign = useCallback(() => {
+    if (!selectedConversation) return;
+    dispatch(assignConversation(selectedConversation.uuid));
+  }, [dispatch, selectedConversation]);
+
+  const handleJoin = useCallback(() => {
+    if (!selectedConversation) return;
+    dispatch(joinConversation(selectedConversation.uuid));
+  }, [dispatch, selectedConversation]);
+
   const handleRefresh = useCallback(() => {
     dispatch(fetchConversations({
       search: filters.search,
@@ -122,13 +136,19 @@ const AdminChatDashboard = () => {
   };
 
   const getLastMessagePreview = (conversation) => {
-    if (!conversation.messages || conversation.messages.length === 0) {
-      return 'No messages yet';
-    }
-    const lastMessage = conversation.messages[conversation.messages.length - 1];
-    const text = lastMessage.text || lastMessage.message || '';
-    return text.length > 50 ? text.substring(0, 50) + '...' : text;
+    return conversation.last_message_preview || 'No messages yet';
   };
+
+  // Filter internal notes from regular messages
+  const getRegularMessages = useCallback(() => {
+    if (!selectedConversation?.messages) return [];
+    return selectedConversation.messages.filter(msg => !msg.is_internal);
+  }, [selectedConversation]);
+
+  const getInternalNotes = useCallback(() => {
+    if (!selectedConversation?.messages) return [];
+    return selectedConversation.messages.filter(msg => msg.is_internal);
+  }, [selectedConversation]);
 
   const clearErrorHandler = useCallback(() => {
     dispatch(clearError());
@@ -197,10 +217,10 @@ const AdminChatDashboard = () => {
             <div className="divide-y">
               {conversations.map((conversation) => (
                 <div
-                  key={conversation.id}
+                  key={conversation.uuid}
                   onClick={() => handleSelectConversation(conversation)}
                   className={`p-4 cursor-pointer transition-colors ${
-                    selectedConversation?.id === conversation.id
+                    selectedConversation?.uuid === conversation.uuid
                       ? 'bg-blue-50 border-r-2 border-blue-500'
                       : 'hover:bg-gray-50'
                   }`}
@@ -209,7 +229,7 @@ const AdminChatDashboard = () => {
                     <div className="flex items-center space-x-2">
                       <User size={16} className="text-gray-400" />
                       <span className="font-medium text-gray-900">
-                        {conversation.name || 'Anonymous'}
+                        {conversation.created_by_name || 'Anonymous'}
                       </span>
                     </div>
                     {conversation.status === 'closed' && (
@@ -220,7 +240,7 @@ const AdminChatDashboard = () => {
                   </div>
 
                   <div className="text-sm text-gray-600 mb-1">
-                    {conversation.contact}
+                    {conversation.created_by_contact}
                   </div>
 
                   <div className="text-sm text-gray-500 line-clamp-2 mb-2">
@@ -230,11 +250,11 @@ const AdminChatDashboard = () => {
                   <div className="flex items-center justify-between text-xs text-gray-400">
                     <div className="flex items-center space-x-1">
                       <Clock size={12} />
-                      <span>{formatTime(conversation.updatedAt || conversation.createdAt)}</span>
+                      <span>{formatTime(conversation.last_message_at || conversation.created_at)}</span>
                     </div>
-                    {conversation.messages && (
-                      <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                        {conversation.messages.length}
+                    {conversation.unread_count > 0 && (
+                      <span className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                        {conversation.unread_count}
                       </span>
                     )}
                   </div>
@@ -254,20 +274,37 @@ const AdminChatDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">
-                    Conversation with {selectedConversation.name || 'Anonymous'}
+                    Conversation with {selectedConversation.created_by_name || 'Anonymous'}
                   </h2>
-                  <p className="text-sm text-gray-600">{selectedConversation.contact}</p>
-                  {selectedConversation.status && (
-                    <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
+                  <p className="text-sm text-gray-600">{selectedConversation.created_by_contact}</p>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <span className={`inline-block px-2 py-1 text-xs rounded-full ${
                       selectedConversation.status === 'open'
                         ? 'bg-green-100 text-green-800'
                         : 'bg-gray-100 text-gray-800'
                     }`}>
                       {selectedConversation.status}
                     </span>
-                  )}
+                    {selectedConversation.subject && (
+                      <span className="text-xs text-gray-500">• {selectedConversation.subject}</span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex space-x-2">
+                  <button
+                    onClick={handleJoin}
+                    className="flex items-center space-x-1 px-3 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                  >
+                    <Mail size={16} />
+                    <span>Join</span>
+                  </button>
+                  <button
+                    onClick={handleAssign}
+                    className="flex items-center space-x-1 px-3 py-2 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors"
+                  >
+                    <User size={16} />
+                    <span>Assign to Me</span>
+                  </button>
                   {selectedConversation.status === 'open' && (
                     <button
                       onClick={handleClose}
@@ -291,12 +328,11 @@ const AdminChatDashboard = () => {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
               <div className="max-w-4xl mx-auto">
-                {(selectedConversation.messages || []).map((msg) => (
+                {getRegularMessages().map((msg) => (
                   <ChatMessage
                     key={msg.id}
                     message={msg}
-                    // For admin dashboard, currentUser can be omitted or explicitly set to 'admin'
-                    currentUser="admin"
+                    isStaff={msg.is_staff}
                   />
                 ))}
                 {isTyping && <TypingIndicator />}
@@ -306,14 +342,17 @@ const AdminChatDashboard = () => {
             {/* Admin Reply Input */}
             <div className="bg-white border-t p-4">
               <div className="max-w-4xl mx-auto">
-                <ChatInput onSend={handleAdminSend} />
+                <ChatInput onSend={handleAdminSend} placeholder="Type your reply..." />
               </div>
             </div>
 
             {/* Notes Section */}
             <div className="bg-white border-t p-4">
               <div className="max-w-4xl mx-auto">
-                <h3 className="font-semibold text-gray-900 mb-3">Internal Notes</h3>
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <Eye size={16} className="mr-2" />
+                  Internal Notes
+                </h3>
                 <div className="flex space-x-2 mb-3">
                   <textarea
                     className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -333,18 +372,20 @@ const AdminChatDashboard = () => {
 
                 {/* Notes List */}
                 <div className="space-y-2">
-                  {(selectedConversation.notes || []).map((note) => (
+                  {getInternalNotes().map((note) => (
                     <div
                       key={note.id}
                       className="bg-yellow-50 border border-yellow-200 rounded-lg p-3"
                     >
                       <div className="flex justify-between items-start mb-1">
-                        <span className="text-sm font-medium text-yellow-800">Admin Note</span>
+                        <span className="text-sm font-medium text-yellow-800">
+                          {note.sender_name} (Internal Note)
+                        </span>
                         <span className="text-xs text-yellow-600">
-                          {formatTime(note.createdAt)}
+                          {formatTime(note.created_at)}
                         </span>
                       </div>
-                      <p className="text-sm text-yellow-700">{note.note}</p>
+                      <p className="text-sm text-yellow-700">{note.body}</p>
                     </div>
                   ))}
                 </div>

@@ -8,64 +8,53 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use Modules\Message\Models\Message;
-use Modules\Message\Transformers\MessageResource;
 
 class MessageSent implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $message;
-    public $conversationUuid;
 
-    /**
-     * Create a new event instance.
-     */
     public function __construct(Message $message)
     {
-        // Load relationships
-        $message->load(['conversation', 'attachments']);
-        
-        $this->message = new MessageResource($message);
-        $this->conversationUuid = $message->conversation->uuid;
-        
-        \Log::info('MessageSent Event Created', [
-            'conversation_uuid' => $this->conversationUuid,
-            'message_id' => $message->id,
-            'channel' => 'conversation.' . $this->conversationUuid
-        ]);
+        $this->message = $message;
     }
 
-    /**
-     * Get the channels the event should broadcast on.
-     */
-    public function broadcastOn(): array
+    public function broadcastOn()
     {
-        $channelName = 'conversation.' . $this->conversationUuid;
-        
-        \Log::info('Broadcasting on channel: ' . $channelName);
-        
-        // Use public channel for anonymous access
-        return [
-            new Channel($channelName),
-        ];
+        // Broadcast to the specific conversation channel
+        return new Channel('conversation.' . $this->message->conversation->uuid);
     }
 
-    /**
-     * The event's broadcast name.
-     */
-    public function broadcastAs(): string
+    public function broadcastAs()
     {
-        return 'MessageSent';
+        return 'message.sent';
     }
 
-    /**
-     * Get the data to broadcast.
-     */
-    public function broadcastWith(): array
+    public function broadcastWith()
     {
         return [
-            'message' => $this->message,
-            'conversationUuid' => $this->conversationUuid,
+            'message' => [
+                'id' => $this->message->id,
+                'conversation_id' => $this->message->conversation_id,
+                'sender_name' => $this->message->sender_name,
+                'sender_contact' => $this->message->sender_contact,
+                'is_staff' => $this->message->is_staff,
+                'is_internal' => $this->message->is_internal,
+                'body' => $this->message->body,
+                'has_attachments' => $this->message->has_attachments,
+                'attachments' => $this->message->attachments->map(function($attachment) {
+                    return [
+                        'id' => $attachment->id,
+                        'filename' => $attachment->filename,
+                        'url' => storage_url($attachment->path),
+                        'mime' => $attachment->mime,
+                        'size' => $attachment->size,
+                    ];
+                }),
+                'created_at' => $this->message->created_at->toISOString(),
+                'updated_at' => $this->message->updated_at->toISOString(),
+            ]
         ];
     }
 }

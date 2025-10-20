@@ -8,18 +8,25 @@ class StoreConversationRequest extends FormRequest
 {
     public function authorize()
     {
-        return true;
+        return true; // Allow anonymous users
     }
 
     public function rules()
     {
         return [
-            'name' => 'required|string|max:191',
-            'contact' => 'required|string|max:191', // either phone or email - backend won't enforce format
-            'subject' => 'nullable|string|max:191',
-            'message' => 'nullable|string',
-            'attachments' => 'nullable|array|max:5',
-            'attachments.*' => 'file|mimes:jpg,jpeg,png,gif,pdf,doc,docx,txt|max:10240', // 10MB each
+            'name' => 'required|string|max:255',
+            'contact' => 'required|string|max:255',
+            'message' => 'required|string|min:1|max:5000',
+            'subject' => 'nullable|string|max:255',
+        ];
+    }
+
+    public function messages()
+    {
+        return [
+            'name.required' => 'Please provide your name',
+            'contact.required' => 'Please provide your email or phone number',
+            'message.required' => 'Please enter your message',
         ];
     }
 }
