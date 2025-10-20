@@ -6,8 +6,7 @@ import {
   fetchConversation,
   sendMessage,
   clearError,
-  // NOTE: implement this in your slice:
-  endConversation,
+  closeConversation,
 } from "../slices/chatSlice";
 import { useChat } from "../hooks/useChat";
 import ChatStartForm from "../components/ChatStartForm";
@@ -166,7 +165,7 @@ const ChatWidget = () => {
   }, []);
 
   // End conversation handler (stop session)
-  const handleEndConversation = useCallback(async () => {
+  const handleCloseConversation = useCallback(async () => {
     if (!conversationUuid) {
       setIsOpen(false);
       return;
@@ -175,10 +174,10 @@ const ChatWidget = () => {
     try {
       // dispatch action that your slice should implement to tell server to close conversation
       // If you don't have this action, implement it or handle cleanup in the slice.
-      await dispatch(endConversation(conversationUuid));
+      await dispatch(closeConversation(conversationUuid));
     } catch (err) {
       // best-effort: still close UI even if server fails
-      console.warn("endConversation failed:", err);
+      console.warn("closeConversation failed:", err);
     } finally {
       setIsOpen(false);
     }
@@ -318,7 +317,7 @@ const ChatWidget = () => {
                 <div className="flex items-center space-x-2">
                   {/* End Chat (stop conversation) */}
                   <button
-                    onClick={handleEndConversation}
+                    onClick={handleCloseConversation}
                     className="hidden sm:inline-flex items-center px-3 py-1.5 text-sm font-medium bg-red-50 text-red-700 border border-red-200 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-300"
                     aria-label="End conversation"
                     title="End conversation"
@@ -384,7 +383,7 @@ const ChatWidget = () => {
                     Close
                   </button>
                   <button
-                    onClick={handleEndConversation}
+                    onClick={handleCloseConversation}
                     className="flex-1 py-2 rounded-md bg-red-600 text-white text-sm font-medium"
                     aria-label="End conversation"
                   >
