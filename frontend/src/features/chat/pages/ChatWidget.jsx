@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import {
   startConversation,
   fetchConversation,
+  fetchConversationMessages,
   sendMessage,
   clearError,
   resetChat,
@@ -41,13 +42,28 @@ const ChatWidget = () => {
     }
   }, [conversationUuid]);
 
-  // fetch conversation once when opening if messages empty
+  // fetch conversation and messages when opening
   useEffect(() => {
-    if (isOpen && conversationUuid && messages.length === 0 && !isLoading && !fetchedOnceRef.current) {
+    if (isOpen && conversationUuid && !isLoading && !fetchedOnceRef.current) {
       fetchedOnceRef.current = true;
-      dispatch(fetchConversation(conversationUuid));
+      console.log('Fetching conversation and messages...');
+      
+      // First fetch conversation details, then fetch messages
+      dispatch(fetchConversation(conversationUuid))
+        .unwrap()
+        .then(() => {
+          console.log('Conversation loaded, now fetching messages...');
+          // Then fetch the messages separately
+          return dispatch(fetchConversationMessages(conversationUuid));
+        })
+        .then(() => {
+          console.log('Messages loaded successfully');
+        })
+        .catch((error) => {
+          console.error('Failed to load conversation or messages:', error);
+        });
     }
-  }, [isOpen, conversationUuid, messages.length, isLoading, dispatch]);
+  }, [isOpen, conversationUuid, isLoading, dispatch]);
 
   // reset fetch flag when conversation changes/cleared
   useEffect(() => {
@@ -110,7 +126,11 @@ const ChatWidget = () => {
         console.error("No active conversation to send a message");
         return;
       }
-      dispatch(sendMessage({ conversationUuid, body: message, attachments: file }));
+      dispatch(sendMessage({ 
+        conversationUuid, 
+        body: message, 
+        attachments: file 
+      }));
     },
     [conversationUuid, dispatch]
   );

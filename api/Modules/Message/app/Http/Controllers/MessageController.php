@@ -11,6 +11,7 @@ use Modules\Message\Events\MessageSent;
 use Modules\Message\Transformers\MessageResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class MessageController extends Controller
 {
@@ -82,7 +83,17 @@ class MessageController extends Controller
             'last_message_at' => $message->created_at,
         ]);
 
-        event(new MessageSent($message));
+        // Load relationships for broadcasting
+        $message->load('attachments', 'conversation');
+
+        // Broadcast the message - IMPORTANT: Add this line
+        broadcast(new MessageSent($message))->toOthers();
+
+        \Log::info('Message broadcasted', [
+            'conversation_uuid' => $conversation->uuid,
+            'message_id' => $message->id,
+            'channel' => 'conversation.' . $conversation->uuid
+        ]);
 
         return new MessageResource($message->load('attachments'));
     }

@@ -59,11 +59,32 @@ export const fetchConversation = createAsyncThunk(
   }
 );
 
+export const fetchConversationMessages = createAsyncThunk(
+  'chat/fetchConversationMessages',
+  async (conversationUuid, { rejectWithValue }) => {
+    try {
+      const res = await widgetService.fetchConversationMessages(conversationUuid);
+      return res;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
 export const sendMessage = createAsyncThunk(
   'chat/sendMessage',
-  async ({ conversationUuid, body, attachments }, { rejectWithValue }) => {
+  async ({ conversationUuid, body, attachments }, { getState, rejectWithValue }) => {
     try {
-      const res = await widgetService.sendMessage({ conversationUuid, body, attachments });
+      const state = getState();
+      const { name, contact } = state.chat.user;
+      
+      const res = await widgetService.sendMessage({ 
+        conversationUuid, 
+        name, 
+        contact, 
+        body, 
+        attachments 
+      });
       return res;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
@@ -90,6 +111,27 @@ export const fetchConversationDetails = createAsyncThunk(
     try {
       const res = await adminService.getConversationById(conversationUuid);
       return res;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
+// ADD THIS: New thunk to fetch conversation with messages for admin
+export const fetchAdminConversationWithMessages = createAsyncThunk(
+  'chat/fetchAdminConversationWithMessages',
+  async (conversationUuid, { rejectWithValue }) => {
+    try {
+      // Fetch both conversation details and messages
+      const [conversationRes, messagesRes] = await Promise.all([
+        adminService.getConversationById(conversationUuid),
+        widgetService.fetchConversationMessages(conversationUuid)
+      ]);
+      
+      return {
+        conversation: conversationRes,
+        messages: messagesRes
+      };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
@@ -202,18 +244,23 @@ const initialState = {
 };
 
 // -------- helpers --------
-const normalizeMessage = (m) => ({
-  id: m.id ?? m.uuid ?? null,
-  conversation_id: m.conversation_id ?? m.conversationUuid ?? m.conversation_uuid ?? null,
-  sender_name: m.sender_name ?? m.senderName ?? m.created_by_name ?? m.name ?? '',
-  sender_contact: m.sender_contact ?? m.senderContact ?? m.created_by_contact ?? m.contact ?? '',
-  is_staff: !!(m.is_staff ?? m.isStaff ?? m.isStaffFlag),
-  is_internal: !!(m.is_internal ?? m.isInternal),
-  body: m.body ?? m.message ?? m.text ?? '',
-  attachments: Array.isArray(m.attachments) ? m.attachments : (m.attachments ? [m.attachments] : []),
-  created_at: m.created_at ?? m.createdAt ?? m.timestamp ?? null,
-  updated_at: m.updated_at ?? m.updatedAt ?? null,
-});
+const normalizeMessage = (m) => {
+  if (!m) return null;
+  
+  return {
+    id: m.id ?? m.uuid ?? null,
+    conversation_id: m.conversation_id ?? m.conversationUuid ?? m.conversation_uuid ?? null,
+    sender_name: m.sender_name ?? m.senderName ?? m.created_by_name ?? m.name ?? 'Unknown',
+    sender_contact: m.sender_contact ?? m.senderContact ?? m.created_by_contact ?? m.contact ?? '',
+    is_staff: !!(m.is_staff ?? m.isStaff ?? false),
+    is_internal: !!(m.is_internal ?? m.isInternal ?? false),
+    body: m.body ?? m.message ?? m.text ?? '',
+    attachments: Array.isArray(m.attachments) ? m.attachments : (m.attachments ? [m.attachments] : []),
+    created_at: m.created_at ?? m.createdAt ?? m.timestamp ?? null,
+    updated_at: m.updated_at ?? m.updatedAt ?? null,
+    sender_user_id: m.sender_user_id ?? null,
+  };
+};
 
 const normalizeConversation = (c) => ({
   id: c.id ?? null,
@@ -234,7 +281,7 @@ const normalizeConversation = (c) => ({
   unread_count: c.unread_count ?? c.unreadCount ?? 0,
 });
 
-const normalizeMessagesArray = (arr) => (Array.isArray(arr) ? arr.map(normalizeMessage) : []);
+const normalizeMessagesArray = (arr) => (Array.isArray(arr) ? arr.map(normalizeMessage).filter(msg => msg !== null) : []);
 const normalizeConversationsArray = (arr) => (Array.isArray(arr) ? arr.map(normalizeConversation) : []);
 
 // -------- slice --------
@@ -338,11 +385,7 @@ const chatSlice = createSlice({
       if (uuid) {
         state.conversationUuid = uuid;
         state.user = { name, contact };
-        
-        // Set messages from the conversation response
-        if (conversationData.messages && Array.isArray(conversationData.messages)) {
-          state.messages = normalizeMessagesArray(conversationData.messages);
-        }
+        state.messages = []; // Clear messages - they will be fetched separately
         
         setStoredData('chat_conversationUuid', uuid);
         setStoredData('chat_user', { name, contact });
@@ -370,12 +413,8 @@ const chatSlice = createSlice({
       state.conversationUuid = uuid;
       state.user = { name, contact };
 
-      // Extract messages from conversation data
-      if (conversationData.messages && Array.isArray(conversationData.messages)) {
-        state.messages = normalizeMessagesArray(conversationData.messages);
-      } else if (Array.isArray(conversationData.data)) {
-        state.messages = normalizeMessagesArray(conversationData.data);
-      }
+      // Don't set messages from conversation data since it doesn't include messages
+      // Messages will be fetched separately using fetchConversationMessages
 
       if (uuid) setStoredData('chat_conversationUuid', uuid);
       if (name || contact) setStoredData('chat_user', { name, contact });
@@ -391,6 +430,70 @@ const chatSlice = createSlice({
         removeStoredData('chat_conversationUuid');
         removeStoredData('chat_user');
       }
+    });
+
+    // fetchConversationMessages
+    builder.addCase(fetchConversationMessages.pending, (state) => {
+      state.isLoading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchConversationMessages.fulfilled, (state, action) => {
+      state.isLoading = false;
+      const payload = action.payload;
+      console.log('Messages API payload:', payload);
+      
+      // Extract messages array from the API response
+      let messagesArray = [];
+      if (payload && payload.data && Array.isArray(payload.data)) {
+        messagesArray = payload.data;
+      } else if (Array.isArray(payload)) {
+        messagesArray = payload;
+      } else if (payload && Array.isArray(payload.messages)) {
+        messagesArray = payload.messages;
+      }
+      
+      console.log('Extracted messages array:', messagesArray);
+      state.messages = normalizeMessagesArray(messagesArray);
+      state.error = null;
+    });
+    builder.addCase(fetchConversationMessages.rejected, (state, action) => {
+      state.isLoading = false;
+      state.error = action.payload?.message ?? action.payload ?? action.error?.message ?? 'Failed to fetch messages';
+    });
+
+    // ADD THIS: fetchAdminConversationWithMessages
+    builder.addCase(fetchAdminConversationWithMessages.pending, (state) => {
+      state.admin.status = 'loading';
+    });
+    builder.addCase(fetchAdminConversationWithMessages.fulfilled, (state, action) => {
+      state.admin.status = 'succeeded';
+      const { conversation, messages } = action.payload;
+      
+      // Normalize conversation data
+      const conversationData = conversation?.data ?? conversation;
+      const normalizedConversation = normalizeConversation(conversationData);
+      
+      // Extract and normalize messages
+      let messagesArray = [];
+      const messagesData = messages?.data ?? messages;
+      
+      if (messagesData && Array.isArray(messagesData)) {
+        messagesArray = messagesData;
+      } else if (messagesData && messagesData.data && Array.isArray(messagesData.data)) {
+        messagesArray = messagesData.data;
+      }
+      
+      // Combine conversation with messages
+      state.admin.selectedConversation = {
+        ...normalizedConversation,
+        messages: normalizeMessagesArray(messagesArray)
+      };
+      
+      state.admin.error = null;
+    });
+    builder.addCase(fetchAdminConversationWithMessages.rejected, (state, action) => {
+      state.admin.status = 'failed';
+      state.admin.error = action.payload?.message ?? action.payload ?? action.error?.message ?? 'Failed to load conversation details';
     });
 
     // sendMessage
@@ -444,7 +547,7 @@ const chatSlice = createSlice({
       state.admin.error = action.payload?.message ?? action.payload ?? action.error?.message ?? 'Failed to load conversations';
     });
 
-    // fetchConversationDetails (admin)
+    // fetchConversationDetails (admin) - keep this for backward compatibility
     builder.addCase(fetchConversationDetails.pending, (state) => {
       state.admin.status = 'loading';
     });

@@ -6,8 +6,17 @@ const startConversation = async ({ name, contact, message, subject }) => {
   return response.data;
 };
 
-const sendMessage = async ({ conversationUuid, body, attachments }) => {
+const sendMessage = async ({ conversationUuid, name, contact, body, attachments }) => {
   const formData = new FormData();
+  
+  // Add name and contact to FormData
+  if (name) {
+    formData.append('name', name);
+  }
+  
+  if (contact) {
+    formData.append('contact', contact);
+  }
   
   if (body) {
     formData.append('body', body);

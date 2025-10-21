@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   fetchConversations,
-  fetchConversationDetails,
+  fetchAdminConversationWithMessages, // UPDATED: Use the new thunk
   sendAdminReply,
   addAdminNote,
   deleteConversation,
@@ -62,7 +62,8 @@ const AdminChatDashboard = () => {
   }, [searchTerm, dispatch, filters.search]);
 
   const handleSelectConversation = useCallback((conversation) => {
-    dispatch(fetchConversationDetails(conversation.uuid));
+    // UPDATED: Use the new thunk that fetches both conversation details and messages
+    dispatch(fetchAdminConversationWithMessages(conversation.uuid));
     // Mark as read when selected
     dispatch(markAsRead(conversation.uuid));
   }, [dispatch]);
@@ -328,13 +329,20 @@ const AdminChatDashboard = () => {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
               <div className="max-w-4xl mx-auto">
-                {getRegularMessages().map((msg) => (
-                  <ChatMessage
-                    key={msg.id}
-                    message={msg}
-                    isStaff={msg.is_staff}
-                  />
-                ))}
+                {getRegularMessages().length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />
+                    <p>No messages yet</p>
+                  </div>
+                ) : (
+                  getRegularMessages().map((msg) => (
+                    <ChatMessage
+                      key={msg.id}
+                      message={msg}
+                      isStaff={msg.is_staff}
+                    />
+                  ))
+                )}
                 {isTyping && <TypingIndicator />}
               </div>
             </div>
@@ -372,22 +380,26 @@ const AdminChatDashboard = () => {
 
                 {/* Notes List */}
                 <div className="space-y-2">
-                  {getInternalNotes().map((note) => (
-                    <div
-                      key={note.id}
-                      className="bg-yellow-50 border border-yellow-200 rounded-lg p-3"
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="text-sm font-medium text-yellow-800">
-                          {note.sender_name} (Internal Note)
-                        </span>
-                        <span className="text-xs text-yellow-600">
-                          {formatTime(note.created_at)}
-                        </span>
+                  {getInternalNotes().length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">No internal notes yet</p>
+                  ) : (
+                    getInternalNotes().map((note) => (
+                      <div
+                        key={note.id}
+                        className="bg-yellow-50 border border-yellow-200 rounded-lg p-3"
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-sm font-medium text-yellow-800">
+                            {note.sender_name} (Internal Note)
+                          </span>
+                          <span className="text-xs text-yellow-600">
+                            {formatTime(note.created_at)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-yellow-700">{note.body}</p>
                       </div>
-                      <p className="text-sm text-yellow-700">{note.body}</p>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>

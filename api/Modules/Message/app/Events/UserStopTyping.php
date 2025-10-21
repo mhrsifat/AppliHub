@@ -8,7 +8,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class UserTyping implements ShouldBroadcast
+class UserStopTyping implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -30,7 +30,7 @@ class UserTyping implements ShouldBroadcast
 
     public function broadcastAs()
     {
-        return 'UserTyping';
+        return 'UserStopTyping';
     }
 
     public function broadcastWith()

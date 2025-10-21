@@ -17,13 +17,16 @@ export const setAccessToken = (token) => {
   if (token) {
     const headerValue = `Bearer ${token}`;
     api.defaults.headers.common["Authorization"] = headerValue;
-    // 🔔 Broadcast with full header string
+    window.apiAccessToken = headerValue; // 🔹 global reference
     window.dispatchEvent(new CustomEvent("tokenChanged", { detail: headerValue }));
   } else {
     delete api.defaults.headers.common["Authorization"];
+    window.apiAccessToken = null; // 🔹 clear
     window.dispatchEvent(new CustomEvent("tokenChanged", { detail: null }));
   }
 };
+
+
 
 // Separate Axios instance for refresh to avoid interceptor recursion
 const refreshClient = axios.create({
