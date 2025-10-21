@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
-import { useDispatch } from 'react-redux';
+// filepath: src/features/chat/hooks/useChat.js
+import { useEffect, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import Pusher from 'pusher-js';
 import { receiveMessage, setTyping } from '../slices/chatSlice';
 
@@ -7,194 +8,136 @@ const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY;
 const PUSHER_CLUSTER = import.meta.env.VITE_PUSHER_CLUSTER;
 const API_BASE = import.meta.env.VITE_API_BASE;
 
-export const useChat = (conversationUuid, isAnonymous = false) => {
+export const useChat = (conversationUuid) => {
   const dispatch = useDispatch();
   const pusherRef = useRef(null);
   const channelRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const [authToken, setAuthToken] = useState(null);
 
-  const privateChannel = (uuid) => `private-conversation.${uuid}`;
+  const { user, employee, admin, isAuthenticated } = useSelector(
+    (state) => state.auth
+  );
+
+  // Listen for token changes broadcast from api.js
+  useEffect(() => {
+    const handler = (e) => setAuthToken(e.detail);
+    window.addEventListener('tokenChanged', handler);
+    return () => window.removeEventListener('tokenChanged', handler);
+  }, []);
 
   const getAnonymousAuthData = () => {
     try {
-      const chatUser = localStorage.getItem('chat_user');
-      if (chatUser) {
-        const userData = JSON.parse(chatUser);
-        return {
-          contact: userData.contact || ''
-        };
-      }
-    } catch (error) {
-      console.warn('Failed to get chat user from localStorage:', error);
-    }
+      const stored = localStorage.getItem('chat_user');
+      if (stored) return JSON.parse(stored);
+    } catch (_) {}
     return { contact: '' };
   };
+
+  const privateChannel = (uuid) => `private-conversation.${uuid}`;
 
   const initPusher = () => {
     if (pusherRef.current) return;
 
-    if (isAnonymous) {
+    const baseConfig = {
+      cluster: PUSHER_CLUSTER,
+      forceTLS: true,
+      logToConsole: import.meta.env.DEV,
+    };
+
+    // Anonymous
+    if (!isAuthenticated && !admin && !employee && !user) {
       const authData = getAnonymousAuthData();
-      
-      console.log('Initializing Pusher for anonymous user with:', authData);
+      console.log('🔹 Anonymous Pusher init', authData);
 
       pusherRef.current = new Pusher(PUSHER_KEY, {
-        cluster: PUSHER_CLUSTER,
-        forceTLS: true,
+        ...baseConfig,
         authEndpoint: `${API_BASE.replace(/\/$/, '')}/broadcasting/auth/anonymous`,
-        auth: {
-          params: authData
-        },
-        logToConsole: import.meta.env.DEV,
+        auth: { params: authData },
       });
     } else {
-      // Staff authentication
-      const authToken = localStorage.getItem('auth_token');
-      console.log('Initializing Pusher for staff with token:', !!authToken);
-      
+      // Authenticated (token comes from memory)
+      console.log('🔹 Authenticated Pusher init', authToken ? '(token active)' : '(no token)');
       pusherRef.current = new Pusher(PUSHER_KEY, {
-        cluster: PUSHER_CLUSTER,
-        forceTLS: true,
+        ...baseConfig,
         authEndpoint: `${API_BASE.replace(/\/$/, '')}/broadcasting/auth`,
         auth: {
           headers: {
-            Authorization: `Bearer ${authToken}`,
-            'Accept': 'application/json',
+            Authorization: authToken || '',
+            Accept: 'application/json',
             'Content-Type': 'application/json',
           },
         },
-        logToConsole: import.meta.env.DEV,
       });
     }
 
-    // Handle connection events
-    pusherRef.current.connection.bind('connected', () => {
-      console.log('Pusher connected successfully');
-    });
-
-    pusherRef.current.connection.bind('error', (err) => {
-      console.error('Pusher connection error:', err);
-    });
-
-    pusherRef.current.connection.bind('state_change', (states) => {
-      console.log('Pusher state changed:', states);
-    });
+    pusherRef.current.connection.bind('error', (err) =>
+      console.error('Pusher error:', err)
+    );
   };
 
   const subscribe = (uuid) => {
-    if (!pusherRef.current) {
-      console.error('Pusher not initialized');
-      return;
-    }
-
+    if (!pusherRef.current) return console.error('⚠️ Pusher not initialized');
     const chanName = privateChannel(uuid);
 
-    // If already subscribed to this channel, return
-    if (channelRef.current && channelRef.current.name === chanName) {
-      console.log('Already subscribed to:', chanName);
-      return;
-    }
-
-    // Clean up previous subscription
     if (channelRef.current) {
-      console.log('Unsubscribing from previous channel:', channelRef.current.name);
+      try {
+        pusherRef.current.unsubscribe(channelRef.current.name);
+      } catch (_) {}
       channelRef.current.unbind_all();
-      try { 
-        pusherRef.current.unsubscribe(channelRef.current.name); 
-      } catch (error) {
-        console.warn('Error unsubscribing from channel:', error);
-      }
       channelRef.current = null;
     }
 
-    try {
-      console.log('Attempting to subscribe to channel:', chanName);
-      channelRef.current = pusherRef.current.subscribe(chanName);
+    channelRef.current = pusherRef.current.subscribe(chanName);
+    console.log('📡 Subscribed to:', chanName);
 
-      channelRef.current.bind('pusher:subscription_error', (status) => {
-        console.error('Pusher subscription error:', status);
-      });
+    channelRef.current.bind('message.sent', (data) => {
+      if (data?.message) dispatch(receiveMessage(data.message));
+    });
+    channelRef.current.bind('MessageSent', (data) => {
+      if (data?.message) dispatch(receiveMessage(data.message));
+    });
 
-      channelRef.current.bind('pusher:subscription_succeeded', () => {
-        console.log('Successfully subscribed to:', chanName);
-      });
+    const handleTyping = (isTyping) => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      dispatch(setTyping(isTyping));
+      if (isTyping)
+        typingTimeoutRef.current = setTimeout(
+          () => dispatch(setTyping(false)),
+          3000
+        );
+    };
 
-      // Handle message events from backend
-      channelRef.current.bind('message.sent', (data) => {
-        console.log('Received message event:', data);
-        if (data?.message) {
-          dispatch(receiveMessage(data.message));
-        }
-      });
-
-      // Handle the Laravel-specific event name
-      channelRef.current.bind('MessageSent', (data) => {
-        console.log('Received MessageSent event:', data);
-        if (data?.message) {
-          dispatch(receiveMessage(data.message));
-        }
-      });
-
-      // Handle typing indicators
-      channelRef.current.bind('user.typing', (data) => {
-        console.log('User typing event:', data);
-        dispatch(setTyping(true));
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = setTimeout(() => dispatch(setTyping(false)), 3000);
-      });
-
-      channelRef.current.bind('user.typing.stopped', (data) => {
-        console.log('User stopped typing event:', data);
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        dispatch(setTyping(false));
-      });
-
-      // Handle the Laravel-specific typing event names
-      channelRef.current.bind('UserTyping', (data) => {
-        console.log('Received UserTyping event:', data);
-        dispatch(setTyping(true));
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = setTimeout(() => dispatch(setTyping(false)), 3000);
-      });
-
-      channelRef.current.bind('UserTypingStopped', (data) => {
-        console.log('Received UserTypingStopped event:', data);
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        dispatch(setTyping(false));
-      });
-
-    } catch (error) {
-      console.error('Failed to subscribe to channel:', error);
-    }
+    channelRef.current.bind('user.typing', () => handleTyping(true));
+    channelRef.current.bind('user.typing.stopped', () => handleTyping(false));
+    channelRef.current.bind('UserTyping', () => handleTyping(true));
+    channelRef.current.bind('UserTypingStopped', () => handleTyping(false));
   };
 
   useEffect(() => {
     if (!conversationUuid) {
-      console.log('No conversation UUID provided, skipping Pusher initialization');
+      console.log('⛔ No conversation UUID');
       return;
     }
 
-    console.log('Initializing Pusher for conversation:', conversationUuid, 'isAnonymous:', isAnonymous);
     initPusher();
     subscribe(conversationUuid);
 
     return () => {
-      console.log('Cleaning up Pusher subscription for:', conversationUuid);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      if (channelRef.current) {
+      if (channelRef.current && pusherRef.current) {
+        try {
+          pusherRef.current.unsubscribe(channelRef.current.name);
+        } catch (_) {}
         channelRef.current.unbind_all();
-        try { 
-          pusherRef.current.unsubscribe(channelRef.current.name); 
-        } catch (error) {
-          console.warn('Error unsubscribing from channel:', error);
-        }
-        channelRef.current = null;
       }
     };
-  }, [conversationUuid, isAnonymous]);
+  }, [conversationUuid, isAuthenticated, admin, employee, user, authToken]);
 
   return {
-    isConnected: !!pusherRef.current && pusherRef.current.connection?.state === 'connected',
+    isConnected:
+      !!pusherRef.current &&
+      pusherRef.current.connection.state === 'connected',
     pusher: pusherRef.current,
   };
 };
