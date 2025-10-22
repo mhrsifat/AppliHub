@@ -116,7 +116,6 @@ class OrderController extends Controller
      * Create an order and associated invoice
      */
 
-
 public function store(StoreOrderRequest $request)
 {
     $data = $request->only([
@@ -132,7 +131,8 @@ public function store(StoreOrderRequest $request)
         'items'
     ]);
 
-    return DB::transaction(function () use ($data) {
+    // 📦 Wrap only DB operations
+    $orderResult = DB::transaction(function () use ($data) {
         $order = Order::create([
             'customer_id' => $data['customer_id'] ?? null,
             'customer_name' => $data['customer_name'] ?? 'Guest',
@@ -149,10 +149,6 @@ public function store(StoreOrderRequest $request)
         ]);
 
         $items = $data['items'] ?? [];
-        if (!is_array($items)) {
-            throw new \InvalidArgumentException('items must be an array');
-        }
-
         foreach ($items as $i) {
             $order->items()->create([
                 'service_id' => $i['service_id'] ?? null,
@@ -170,55 +166,55 @@ public function store(StoreOrderRequest $request)
         $order->grand_total = round($order->total + $order->vat_amount - $order->coupon_discount, 2);
         $order->save();
 
-        // invoice তৈরি
         $invoicePayload = [
             'order_id' => $order->id,
             'vat_percent' => $order->vat_percent,
             'coupon_discount' => $order->coupon_discount,
-            'items' => $order->items->map(function ($it) {
-                return [
-                    'service_id' => $it->service_id,
-                    'service_name' => $it->service_name,
-                    'description' => $it->service_description,
-                    'unit_price' => $it->unit_price,
-                    'quantity' => $it->quantity,
-                    'meta' => null,
-                ];
-            })->toArray(),
+            'items' => $order->items->map(fn($it) => [
+                'service_id' => $it->service_id,
+                'service_name' => $it->service_name,
+                'description' => $it->service_description,
+                'unit_price' => $it->unit_price,
+                'quantity' => $it->quantity,
+                'meta' => null,
+            ])->toArray(),
         ];
 
-        $invoice = $this->invoiceService->createFromPayload($invoicePayload);
+        $invoice = app('App\Services\InvoiceService')->createFromPayload($invoicePayload);
 
         $order->payment_status = $invoice->status === 'paid'
             ? 'paid'
             : ($invoice->status === 'partially_paid' ? 'partially_paid' : $order->payment_status);
         $order->save();
 
-        // ✅ Direct Email পাঠানো
-        if ($order->customer_email) {
-            try {
-                $subject = 'Order Confirmation #' . $order->order_number;
-                $message = "Hello {$order->customer_name},\n\n"
-                    . "Your order has been placed successfully.\n"
-                    . "Order ID: {$order->order_number}\n"
-                    . "Total Amount: {$order->grand_total}\n\n"
-                    . "We’ll contact you soon.\n\n"
-                    . config('app.name');
-
-                Mail::raw($message, function ($mail) use ($order, $subject) {
-                    $mail->to($order->customer_email)
-                         ->subject($subject);
-                });
-            } catch (\Exception $e) {
-                \Log::error("Order email failed: " . $e->getMessage());
-            }
-        }
-
-        return response()->json([
-            'order' => new OrderResource($order->fresh('items')),
-            'invoice' => $invoice,
-        ], 201);
+        return [$order, $invoice];
     });
+
+    [$order, $invoice] = $orderResult;
+
+    // 📨 Email পাঠাও ট্রানজাকশনের বাইরে
+    if ($order->customer_email) {
+        try {
+            $subject = 'Order Confirmation #' . $order->order_number;
+            $message = "Hello {$order->customer_name},\n\n"
+                . "Your order has been placed successfully.\n"
+                . "Order ID: {$order->order_number}\n"
+                . "Total Amount: {$order->grand_total}\n\n"
+                . "We’ll contact you soon.\n\n"
+                . config('app.name');
+
+            Mail::raw($message, function ($mail) use ($order, $subject) {
+                $mail->to($order->customer_email)->subject($subject);
+            });
+        } catch (\Throwable $e) {
+            \Log::error("Order email failed: " . $e->getMessage());
+        }
+    }
+
+    return response()->json([
+        'order' => new OrderResource($order->fresh('items')),
+        'invoice' => $invoice,
+    ], 201);
 }
 
     /**
