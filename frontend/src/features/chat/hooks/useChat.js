@@ -29,7 +29,6 @@ export const useChat = (conversationUuid, options = {}) => {
   
   // State
   const [authToken, setAuthToken] = useState(() => {
-    // Support multiple token storage methods
     return window.apiAccessToken || 
            localStorage.getItem('auth_token') || 
            sessionStorage.getItem('auth_token') ||
@@ -54,12 +53,12 @@ export const useChat = (conversationUuid, options = {}) => {
     PUSHER_CLUSTER: options.pusherCluster || import.meta.env.VITE_PUSHER_CLUSTER || "ap1",
     API_BASE: options.apiBase || import.meta.env.VITE_API_BASE,
     autoConnect: options.autoConnect !== false,
-    enableLogging: options.enableLogging ?? import.meta.env.DEV,
+    enableLogging: options.enableLogging ?? false, // Disabled by default in production
   };
 
-  // Logging helper
+  // Logging helper - only logs in development or when explicitly enabled
   const log = useCallback((level, message, data = {}) => {
-    if (!config.enableLogging) return;
+    if (!config.enableLogging && !import.meta.env.DEV) return;
     
     const timestamp = new Date().toISOString();
     const logData = {
@@ -70,28 +69,29 @@ export const useChat = (conversationUuid, options = {}) => {
       ...data
     };
 
-    switch (level) {
-      case 'error':
-        console.error(`❌ [useChat] ${message}`, logData);
-        break;
-      case 'warn':
-        console.warn(`⚠️ [useChat] ${message}`, logData);
-        break;
-      case 'info':
-        console.info(`🔹 [useChat] ${message}`, logData);
-        break;
-      case 'debug':
-        console.debug(`🔍 [useChat] ${message}`, logData);
-        break;
-      default:
-        console.log(`📝 [useChat] ${message}`, logData);
+    if (import.meta.env.DEV) {
+      switch (level) {
+        case 'error':
+          console.error(`❌ [useChat] ${message}`, logData);
+          break;
+        case 'warn':
+          console.warn(`⚠️ [useChat] ${message}`, logData);
+          break;
+        case 'info':
+          console.info(`🔹 [useChat] ${message}`, logData);
+          break;
+        case 'debug':
+          console.debug(`🔍 [useChat] ${message}`, logData);
+          break;
+        default:
+          console.log(`📝 [useChat] ${message}`, logData);
+      }
     }
   }, [conversationUuid, isAuthenticated, user, employee, admin, config.enableLogging]);
 
-  // ✅ Get anonymous user data from various storage methods
+  // Get anonymous user data from various storage methods
   const getAnonymousAuthData = useCallback(() => {
     try {
-      // Try multiple storage locations for maximum compatibility
       const storageKeys = ['chat_user', 'anonymous_user', 'guest_user'];
       
       for (const key of storageKeys) {
@@ -108,12 +108,10 @@ export const useChat = (conversationUuid, options = {}) => {
             }
           }
         } catch (parseError) {
-          // Continue to next storage key
           log('debug', `Failed to parse ${key}`, { error: parseError.message });
         }
       }
 
-      // Check if contact info was passed via options
       if (optionsRef.current.contact) {
         return {
           contact: optionsRef.current.contact,
@@ -129,7 +127,7 @@ export const useChat = (conversationUuid, options = {}) => {
     }
   }, [conversationUuid, log]);
 
-  // ✅ Get authentication headers for authenticated users
+  // Get authentication headers for authenticated users
   const getAuthHeaders = useCallback(() => {
     const headers = {
       Accept: "application/json",
@@ -137,7 +135,6 @@ export const useChat = (conversationUuid, options = {}) => {
       "X-Requested-With": "XMLHttpRequest",
     };
 
-    // Support multiple token sources
     const token = authToken || 
                   window.apiAccessToken || 
                   localStorage.getItem('auth_token') ||
@@ -153,12 +150,12 @@ export const useChat = (conversationUuid, options = {}) => {
     return headers;
   }, [authToken, log]);
 
-  // ✅ Channel name helper
+  // Channel name helper
   const privateChannel = useCallback((uuid) => {
     return `private-conversation.${uuid}`;
   }, []);
 
-  // ✅ Create Pusher authentication response
+  // Create Pusher authentication response
   const createPusherAuthResponse = useCallback((channelName, socketId) => {
     try {
       const stringToSign = `${socketId}:${channelName}`;
@@ -170,7 +167,7 @@ export const useChat = (conversationUuid, options = {}) => {
     }
   }, [log]);
 
-  // ✅ Initialize Pusher connection
+  // Initialize Pusher connection
   const initPusher = useCallback(() => {
     if (pusherRef.current) {
       log('debug', 'Pusher already initialized');
@@ -193,14 +190,12 @@ export const useChat = (conversationUuid, options = {}) => {
       authTransport: "ajax",
       enableStats: false,
       disableStats: true,
-      logToConsole: config.enableLogging,
+      logToConsole: false, // Always disabled in production
     };
 
-    // Determine connection type and configure accordingly
     const isAnonymous = !isAuthenticated && !admin && !employee && !user;
     
     if (isAnonymous) {
-      // Anonymous connection
       const authData = getAnonymousAuthData();
       log('info', 'Initializing anonymous Pusher connection', { authData });
       
@@ -215,7 +210,6 @@ export const useChat = (conversationUuid, options = {}) => {
         },
       });
     } else {
-      // Authenticated connection
       log('info', 'Initializing authenticated Pusher connection', {
         hasToken: !!authToken,
         userType: admin ? 'admin' : employee ? 'employee' : user ? 'user' : 'unknown'
@@ -262,7 +256,6 @@ export const useChat = (conversationUuid, options = {}) => {
       setConnectionState(states.current);
     });
 
-    // Handle subscription events globally
     pusherRef.current.connection.bind("message", (data) => {
       log('debug', 'Global Pusher message', { data });
     });
@@ -271,7 +264,6 @@ export const useChat = (conversationUuid, options = {}) => {
     config.PUSHER_KEY,
     config.PUSHER_CLUSTER,
     config.API_BASE,
-    config.enableLogging,
     isAuthenticated,
     admin,
     employee,
@@ -282,7 +274,7 @@ export const useChat = (conversationUuid, options = {}) => {
     log
   ]);
 
-  // ✅ Subscribe to private channel
+  // Subscribe to private channel
   const subscribe = useCallback((uuid) => {
     if (!pusherRef.current) {
       log('error', 'Pusher not initialized for subscription');
@@ -331,7 +323,6 @@ export const useChat = (conversationUuid, options = {}) => {
           channel: chanName
         });
 
-        // Extract message from various possible payload structures
         const messageData = data.message || data.data || data;
         
         if (messageData) {
@@ -360,7 +351,7 @@ export const useChat = (conversationUuid, options = {}) => {
       channelRef.current.bind("UserTyping", () => handleTyping(true));
       channelRef.current.bind("UserStopTyping", () => handleTyping(false));
 
-      // Custom events can be added here
+      // Custom events
       if (optionsRef.current.customEvents) {
         Object.entries(optionsRef.current.customEvents).forEach(([event, handler]) => {
           channelRef.current.bind(event, handler);
@@ -376,7 +367,7 @@ export const useChat = (conversationUuid, options = {}) => {
     }
   }, [privateChannel, dispatch, log]);
 
-  // ✅ Unsubscribe and cleanup
+  // Unsubscribe and cleanup
   const unsubscribe = useCallback(() => {
     log('info', 'Cleaning up chat subscriptions');
     
@@ -398,7 +389,7 @@ export const useChat = (conversationUuid, options = {}) => {
     }
   }, [log]);
 
-  // ✅ Disconnect Pusher completely
+  // Disconnect Pusher completely
   const disconnect = useCallback(() => {
     log('info', 'Disconnecting Pusher');
     unsubscribe();
@@ -415,7 +406,7 @@ export const useChat = (conversationUuid, options = {}) => {
     }
   }, [unsubscribe, log]);
 
-  // ✅ Reconnect with new credentials
+  // Reconnect with new credentials
   const reconnect = useCallback((newToken = null) => {
     log('info', 'Reconnecting Pusher with new credentials');
     
@@ -425,7 +416,6 @@ export const useChat = (conversationUuid, options = {}) => {
     
     disconnect();
     
-    // Small delay to ensure clean disconnect
     setTimeout(() => {
       if (conversationUuid && config.autoConnect) {
         initPusher();
@@ -434,7 +424,7 @@ export const useChat = (conversationUuid, options = {}) => {
     }, 100);
   }, [conversationUuid, config.autoConnect, initPusher, subscribe, disconnect, log]);
 
-  // ✅ Send typing indicators
+  // Send typing indicators
   const sendTyping = useCallback((isTyping = true) => {
     if (!channelRef.current) {
       log('warn', 'Cannot send typing indicator - no active channel');
@@ -457,7 +447,7 @@ export const useChat = (conversationUuid, options = {}) => {
     }
   }, [conversationUuid, isAuthenticated, user, employee, admin, log]);
 
-  // ✅ Main effect: initialize and subscribe when conversationUuid changes
+  // Main effect: initialize and subscribe when conversationUuid changes
   useEffect(() => {
     if (!conversationUuid) {
       log('warn', 'No conversation UUID provided');
@@ -483,7 +473,7 @@ export const useChat = (conversationUuid, options = {}) => {
     };
   }, [conversationUuid, config.autoConnect, config.PUSHER_KEY, initPusher, subscribe, unsubscribe, log]);
 
-  // ✅ Listen for global token changes (multi-website support)
+  // Listen for global token changes
   useEffect(() => {
     const handleTokenChange = (event) => {
       log('info', 'Global token change detected', { 
@@ -503,27 +493,26 @@ export const useChat = (conversationUuid, options = {}) => {
       }
     };
 
-    // Multiple event listeners for maximum compatibility
-    window.addEventListener("tokenChanged", handleTokenChange);
-    window.addEventListener("storage", handleStorageChange);
-    
-    // Custom event for cross-domain communication
-    window.addEventListener("message", (event) => {
+    const handleMessage = (event) => {
       if (event.data?.type === 'chat_token_update') {
         log('info', 'Cross-domain token update received');
         setAuthToken(event.data.token);
         reconnect(event.data.token);
       }
-    });
+    };
+
+    window.addEventListener("tokenChanged", handleTokenChange);
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("message", handleMessage);
 
     return () => {
       window.removeEventListener("tokenChanged", handleTokenChange);
       window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("message", handleTokenChange);
+      window.removeEventListener("message", handleMessage);
     };
   }, [reconnect, log]);
 
-  // ✅ Manual connection control
+  // Manual connection control
   const connect = useCallback(() => {
     if (!conversationUuid) {
       const error = "Cannot connect: no conversation UUID";
@@ -545,7 +534,7 @@ export const useChat = (conversationUuid, options = {}) => {
     return true;
   }, [conversationUuid, config.PUSHER_KEY, initPusher, subscribe, log]);
 
-  // ✅ Public API
+  // Public API
   const chatInterface = {
     // Connection state
     isConnected: connectionState === 'connected',
@@ -572,8 +561,8 @@ export const useChat = (conversationUuid, options = {}) => {
       reconnect(newToken);
     },
     
-    // Debug info
-    getDebugInfo: () => ({
+    // Debug info (only in development)
+    getDebugInfo: () => import.meta.env.DEV ? {
       conversationUuid,
       connectionState,
       isAuthenticated,
@@ -585,18 +574,17 @@ export const useChat = (conversationUuid, options = {}) => {
         apiBase: config.API_BASE,
         autoConnect: config.autoConnect
       }
-    })
+    } : null
   };
 
   return chatInterface;
 };
 
-// ✅ Export as default and named export for maximum compatibility
 export default useChat;
 
-// ✅ Additional utilities for multi-website integration
+// Global token management utilities
 export const ChatAPI = {
-  // Global token management for cross-website communication
+  // Set global token with silent error handling
   setGlobalToken: (token, storageType = 'localStorage') => {
     try {
       if (storageType === 'localStorage') {
@@ -607,25 +595,24 @@ export const ChatAPI = {
       
       window.apiAccessToken = token;
       
-      // Dispatch custom event
       const event = new CustomEvent('tokenChanged', { detail: token });
       window.dispatchEvent(event);
       
-      // For cross-domain communication
       if (window.parent !== window) {
         window.parent.postMessage({
           type: 'chat_token_update',
           token: token
         }, '*');
       }
-      
-      console.info('🔑 Global chat token updated');
     } catch (error) {
-      console.error('❌ Failed to set global token:', error);
+      // Silent fail in production
+      if (import.meta.env.DEV) {
+        console.error('Failed to set global token:', error);
+      }
     }
   },
 
-  // Clear authentication
+  // Clear authentication with silent error handling
   clearAuth: () => {
     try {
       localStorage.removeItem('auth_token');
@@ -634,26 +621,28 @@ export const ChatAPI = {
       
       const event = new CustomEvent('tokenChanged', { detail: null });
       window.dispatchEvent(event);
-      
-      console.info('🔑 Chat authentication cleared');
     } catch (error) {
-      console.error('❌ Failed to clear auth:', error);
+      // Silent fail in production
+      if (import.meta.env.DEV) {
+        console.error('Failed to clear auth:', error);
+      }
     }
   },
 
-  // Set anonymous user data
+  // Set anonymous user data with silent error handling
   setAnonymousUser: (userData, storageType = 'localStorage') => {
     try {
       const storage = storageType === 'localStorage' ? localStorage : sessionStorage;
       storage.setItem('chat_user', JSON.stringify(userData));
-      console.info('👤 Anonymous user data set');
     } catch (error) {
-      console.error('❌ Failed to set anonymous user:', error);
+      // Silent fail in production
+      if (import.meta.env.DEV) {
+        console.error('Failed to set anonymous user:', error);
+      }
     }
   }
 };
 
-// ✅ Type definitions for better IDE support (JSDoc)
 /**
  * @typedef {Object} ChatOptions
  * @property {string} [apiBase] - Override default API base URL
@@ -680,5 +669,5 @@ export const ChatAPI = {
  * @property {string|null} currentChannel - Current channel name
  * @property {Object|null} pusherInstance - Raw Pusher instance
  * @property {Function} updateToken - Update auth token
- * @property {Function} getDebugInfo - Get debug information
+ * @property {Function} getDebugInfo - Get debug information (dev only)
  */
