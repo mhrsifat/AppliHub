@@ -180,7 +180,7 @@ public function store(StoreOrderRequest $request)
             ])->toArray(),
         ];
 
-        $invoice = app('App\Services\InvoiceService')->createFromPayload($invoicePayload);
+        $invoice = app('Modules\Invoice\Services\InvoiceService')->createFromPayload($invoicePayload);
 
         $order->payment_status = $invoice->status === 'paid'
             ? 'paid'
