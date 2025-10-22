@@ -1,9 +1,10 @@
+// filepath: src/features/chat/hooks/useChat.js
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import Pusher from 'pusher-js';
 import { receiveMessage, setTyping } from '../slices/chatSlice';
 
-// ✅ Use the correct environment variable names that you have
+// ✅ Environment variables
 const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY;
 const PUSHER_CLUSTER = import.meta.env.VITE_PUSHER_CLUSTER;
 const API_BASE = import.meta.env.VITE_API_BASE;
@@ -13,38 +14,28 @@ export const useChat = (conversationUuid) => {
   const pusherRef = useRef(null);
   const channelRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-
-  // ✅ Add validation for Pusher key
-  useEffect(() => {
-    if (!PUSHER_KEY) {
-      console.error('❌ Pusher app key is missing. Check your environment variables.');
-      return;
-    }
-  }, []);
-
-  // ✅ Initial token from memory (window.apiAccessToken)
   const [authToken, setAuthToken] = useState(() => window.apiAccessToken);
 
   const { user, employee, admin, isAuthenticated } = useSelector(
     (state) => state.auth
   );
 
-  // Listen for token changes
+  // ✅ Listen for global token updates
   useEffect(() => {
     const handler = (e) => setAuthToken(e.detail);
     window.addEventListener('tokenChanged', handler);
     return () => window.removeEventListener('tokenChanged', handler);
   }, []);
 
-  // Get anonymous user data from localStorage
+  // ✅ Anonymous fallback auth
   const getAnonymousAuthData = () => {
     try {
       const stored = localStorage.getItem('chat_user');
       if (stored) {
         const userData = JSON.parse(stored);
-        return { 
+        return {
           contact: userData.contact || '',
-          conversation_uuid: conversationUuid || ''
+          conversation_uuid: conversationUuid || '',
         };
       }
     } catch (_) {}
@@ -53,12 +44,11 @@ export const useChat = (conversationUuid) => {
 
   const privateChannel = (uuid) => `private-conversation.${uuid}`;
 
+  // ✅ Initialize Pusher
   const initPusher = () => {
     if (pusherRef.current) return;
-
-    // ✅ Validate Pusher key before initializing
     if (!PUSHER_KEY) {
-      console.error('❌ Cannot initialize Pusher: App key is missing');
+      console.error('❌ Cannot initialize Pusher: App key missing');
       return;
     }
 
@@ -68,34 +58,25 @@ export const useChat = (conversationUuid) => {
       authTransport: 'ajax',
       auth: {
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
           'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
+          'X-Requested-With': 'XMLHttpRequest',
         },
       },
       logToConsole: import.meta.env.DEV,
     };
 
-    console.log('🔧 Pusher Config:', {
-      hasKey: !!PUSHER_KEY,
-      cluster: PUSHER_CLUSTER,
-      apiBase: API_BASE
-    });
-
     if (!isAuthenticated && !admin && !employee && !user) {
-      // Anonymous Pusher
+      // Anonymous connection
       const authData = getAnonymousAuthData();
       console.log('🔹 Anonymous Pusher init', authData);
-
       pusherRef.current = new Pusher(PUSHER_KEY, {
         ...baseConfig,
         authEndpoint: `${API_BASE}/broadcasting/auth/anonymous`,
-        auth: { 
-          params: authData 
-        },
+        auth: { params: authData },
       });
     } else {
-      // Authenticated Pusher (memory token)
+      // Authenticated connection
       console.log('🔹 Authenticated Pusher init', authToken ? '(token active)' : '(no token)');
       pusherRef.current = new Pusher(PUSHER_KEY, {
         ...baseConfig,
@@ -109,31 +90,22 @@ export const useChat = (conversationUuid) => {
       });
     }
 
-    // Connection event handlers
-    pusherRef.current.connection.bind('connected', () => {
-      console.log('✅ Pusher connected successfully');
-    });
-
-    pusherRef.current.connection.bind('error', (err) => {
-      console.error('❌ Pusher connection error:', err);
-      if (err.error) {
-        console.error('Pusher error details:', {
-          type: err.type,
-          error: err.error,
-          status: err.status
-        });
-      }
-    });
-
-    pusherRef.current.connection.bind('disconnected', () => {
-      console.log('🔴 Pusher disconnected');
-    });
-
-    pusherRef.current.connection.bind('state_change', (states) => {
-      console.log('🔄 Pusher state change:', states.previous, '->', states.current);
-    });
+    // ✅ Connection state logging
+    pusherRef.current.connection.bind('connected', () =>
+      console.log('✅ Pusher connected successfully')
+    );
+    pusherRef.current.connection.bind('error', (err) =>
+      console.error('❌ Pusher connection error:', err)
+    );
+    pusherRef.current.connection.bind('disconnected', () =>
+      console.log('🔴 Pusher disconnected')
+    );
+    pusherRef.current.connection.bind('state_change', (states) =>
+      console.log('🔄 Pusher state change:', states.previous, '->', states.current)
+    );
   };
 
+  // ✅ Subscribe to private channel
   const subscribe = (uuid) => {
     if (!pusherRef.current) {
       console.error('⚠️ Pusher not initialized');
@@ -141,13 +113,12 @@ export const useChat = (conversationUuid) => {
     }
 
     const chanName = privateChannel(uuid);
-    console.log('📡 Attempting to subscribe to:', chanName);
+    console.log('📡 Subscribing to:', chanName);
 
-    // Cleanup previous channel
+    // Unsubscribe previous
     if (channelRef.current) {
       try {
         pusherRef.current.unsubscribe(channelRef.current.name);
-        console.log('🔄 Unsubscribed from previous channel:', channelRef.current.name);
       } catch (_) {}
       channelRef.current.unbind_all();
       channelRef.current = null;
@@ -155,26 +126,18 @@ export const useChat = (conversationUuid) => {
 
     try {
       channelRef.current = pusherRef.current.subscribe(chanName);
-      
-      channelRef.current.bind('pusher:subscription_succeeded', () => {
-        console.log('✅ Successfully subscribed to:', chanName);
-      });
 
-      channelRef.current.bind('pusher:subscription_error', (err) => {
-        console.error('❌ Subscription error:', err);
-        console.error('Subscription error details:', {
-          type: err.type,
-          error: err.error,
-          status: err.status
-        });
-      });
+      channelRef.current.bind('pusher:subscription_succeeded', () =>
+        console.log('✅ Subscribed to:', chanName)
+      );
+      channelRef.current.bind('pusher:subscription_error', (err) =>
+        console.error('❌ Subscription error:', err)
+      );
 
-      // Messages - listen for MessageSent event
+      // Message event
       channelRef.current.bind('MessageSent', (data) => {
-        console.log('📨 Message received via broadcast:', data);
-        if (data?.message) {
-          dispatch(receiveMessage(data.message));
-        }
+        console.log('📨 Message received:', data);
+        if (data?.message) dispatch(receiveMessage(data.message));
       });
 
       // Typing events
@@ -189,57 +152,55 @@ export const useChat = (conversationUuid) => {
         }
       };
 
-      channelRef.current.bind('UserTyping', () => {
-        console.log('⌨️ User typing event received');
-        handleTyping(true);
-      });
-      
-      channelRef.current.bind('UserStopTyping', () => {
-        console.log('💤 User stopped typing event received');
-        handleTyping(false);
-      });
-
-    } catch (error) {
-      console.error('❌ Error subscribing to channel:', error);
+      channelRef.current.bind('UserTyping', () => handleTyping(true));
+      channelRef.current.bind('UserStopTyping', () => handleTyping(false));
+    } catch (err) {
+      console.error('❌ Error subscribing:', err);
     }
   };
 
+  // ✅ Effect: initialize + subscribe
   useEffect(() => {
     if (!conversationUuid) {
-      console.log('⛔ No conversation UUID provided');
+      console.log('⛔ No conversation UUID');
       return;
     }
-
-    // ✅ Check if Pusher key exists before proceeding
     if (!PUSHER_KEY) {
-      console.error('❌ Pusher app key is missing. Cannot initialize chat.');
+      console.error('❌ Missing Pusher key');
       return;
     }
 
-    console.log('🔄 useChat effect running for conversation:', conversationUuid);
-    console.log('🔐 Auth status:', {
-      isAuthenticated,
-      hasToken: !!authToken,
-      user: !!user,
-      employee: !!employee,
-      admin: !!admin
-    });
-    
     initPusher();
     subscribe(conversationUuid);
 
     return () => {
-      console.log('🧹 Cleaning up useChat for conversation:', conversationUuid);
+      console.log('🧹 Cleaning up chat:', conversationUuid);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       if (channelRef.current && pusherRef.current) {
         try {
           pusherRef.current.unsubscribe(channelRef.current.name);
-          console.log('🔴 Unsubscribed from channel:', channelRef.current.name);
         } catch (_) {}
         channelRef.current.unbind_all();
       }
     };
   }, [conversationUuid, isAuthenticated, admin, employee, user, authToken]);
+
+  // ✅ Reconnect on token change
+  useEffect(() => {
+    const reconnect = (e) => {
+      setAuthToken(e.detail);
+      if (pusherRef.current) {
+        try {
+          pusherRef.current.disconnect();
+        } catch (_) {}
+        pusherRef.current = null;
+        initPusher();
+        subscribe(conversationUuid);
+      }
+    };
+    window.addEventListener('tokenChanged', reconnect);
+    return () => window.removeEventListener('tokenChanged', reconnect);
+  }, [conversationUuid]);
 
   return {
     isConnected:
