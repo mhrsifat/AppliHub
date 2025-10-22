@@ -1,213 +1,684 @@
 // filepath: src/features/chat/hooks/useChat.js
-import { useEffect, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import Pusher from 'pusher-js';
-import { receiveMessage, setTyping } from '../slices/chatSlice';
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import Pusher from "pusher-js";
+import { receiveMessage, setTyping } from "../slices/chatSlice";
 
-// ✅ Environment variables
-const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY;
-const PUSHER_CLUSTER = import.meta.env.VITE_PUSHER_CLUSTER;
-const API_BASE = import.meta.env.VITE_API_BASE;
-
-export const useChat = (conversationUuid) => {
+/**
+ * Custom hook for real-time chat functionality
+ * Supports multiple websites, platforms, and both authenticated/anonymous users
+ * 
+ * @param {string} conversationUuid - The UUID of the conversation
+ * @param {Object} options - Configuration options
+ * @param {string} options.apiBase - Override default API base URL
+ * @param {string} options.pusherKey - Override default Pusher key
+ * @param {string} options.pusherCluster - Override default Pusher cluster
+ * @param {boolean} options.autoConnect - Whether to auto-connect (default: true)
+ * @param {Function} options.onConnected - Callback when connected
+ * @param {Function} options.onError - Callback when error occurs
+ * @returns {Object} Chat interface object
+ */
+export const useChat = (conversationUuid, options = {}) => {
   const dispatch = useDispatch();
+  
+  // Refs for stable references
   const pusherRef = useRef(null);
   const channelRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-  const [authToken, setAuthToken] = useState(() => window.apiAccessToken);
+  const optionsRef = useRef(options);
+  
+  // State
+  const [authToken, setAuthToken] = useState(() => {
+    // Support multiple token storage methods
+    return window.apiAccessToken || 
+           localStorage.getItem('auth_token') || 
+           sessionStorage.getItem('auth_token') ||
+           '';
+  });
+  const [connectionState, setConnectionState] = useState('disconnected');
+  const [lastError, setLastError] = useState(null);
 
+  // Get user authentication state
   const { user, employee, admin, isAuthenticated } = useSelector(
-    (state) => state.auth
+    (state) => state.auth || {}
   );
 
-  // ✅ Listen for global token updates
+  // Update options ref when options change
   useEffect(() => {
-    const handler = (e) => setAuthToken(e.detail);
-    window.addEventListener('tokenChanged', handler);
-    return () => window.removeEventListener('tokenChanged', handler);
-  }, []);
+    optionsRef.current = options;
+  }, [options]);
 
-  // ✅ Anonymous fallback auth
-  const getAnonymousAuthData = () => {
+  // Configuration with overrides
+  const config = {
+    PUSHER_KEY: options.pusherKey || import.meta.env.VITE_PUSHER_KEY,
+    PUSHER_CLUSTER: options.pusherCluster || import.meta.env.VITE_PUSHER_CLUSTER || "ap1",
+    API_BASE: options.apiBase || import.meta.env.VITE_API_BASE,
+    autoConnect: options.autoConnect !== false,
+    enableLogging: options.enableLogging ?? import.meta.env.DEV,
+  };
+
+  // Logging helper
+  const log = useCallback((level, message, data = {}) => {
+    if (!config.enableLogging) return;
+    
+    const timestamp = new Date().toISOString();
+    const logData = {
+      timestamp,
+      conversationUuid,
+      userType: isAuthenticated ? 'authenticated' : 'anonymous',
+      userId: user?.id || employee?.id || admin?.id || 'anonymous',
+      ...data
+    };
+
+    switch (level) {
+      case 'error':
+        console.error(`❌ [useChat] ${message}`, logData);
+        break;
+      case 'warn':
+        console.warn(`⚠️ [useChat] ${message}`, logData);
+        break;
+      case 'info':
+        console.info(`🔹 [useChat] ${message}`, logData);
+        break;
+      case 'debug':
+        console.debug(`🔍 [useChat] ${message}`, logData);
+        break;
+      default:
+        console.log(`📝 [useChat] ${message}`, logData);
+    }
+  }, [conversationUuid, isAuthenticated, user, employee, admin, config.enableLogging]);
+
+  // ✅ Get anonymous user data from various storage methods
+  const getAnonymousAuthData = useCallback(() => {
     try {
-      const stored = localStorage.getItem('chat_user');
-      if (stored) {
-        const userData = JSON.parse(stored);
+      // Try multiple storage locations for maximum compatibility
+      const storageKeys = ['chat_user', 'anonymous_user', 'guest_user'];
+      
+      for (const key of storageKeys) {
+        try {
+          const stored = localStorage.getItem(key) || sessionStorage.getItem(key);
+          if (stored) {
+            const userData = JSON.parse(stored);
+            if (userData.contact || userData.email || userData.phone) {
+              log('debug', `Found anonymous user data in ${key}`, { userData });
+              return {
+                contact: userData.contact || userData.email || userData.phone || '',
+                conversation_uuid: conversationUuid || userData.conversationUuid || '',
+              };
+            }
+          }
+        } catch (parseError) {
+          // Continue to next storage key
+          log('debug', `Failed to parse ${key}`, { error: parseError.message });
+        }
+      }
+
+      // Check if contact info was passed via options
+      if (optionsRef.current.contact) {
         return {
-          contact: userData.contact || '',
+          contact: optionsRef.current.contact,
           conversation_uuid: conversationUuid || '',
         };
       }
-    } catch (_) {}
-    return { contact: '', conversation_uuid: conversationUuid || '' };
-  };
 
-  const privateChannel = (uuid) => `private-conversation.${uuid}`;
+      log('warn', 'No anonymous user data found');
+      return { contact: '', conversation_uuid: conversationUuid || '' };
+    } catch (error) {
+      log('error', 'Error getting anonymous auth data', { error: error.message });
+      return { contact: '', conversation_uuid: conversationUuid || '' };
+    }
+  }, [conversationUuid, log]);
 
-  // ✅ Initialize Pusher
-  const initPusher = () => {
-    if (pusherRef.current) return;
-    if (!PUSHER_KEY) {
-      console.error('❌ Cannot initialize Pusher: App key missing');
+  // ✅ Get authentication headers for authenticated users
+  const getAuthHeaders = useCallback(() => {
+    const headers = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+    };
+
+    // Support multiple token sources
+    const token = authToken || 
+                  window.apiAccessToken || 
+                  localStorage.getItem('auth_token') ||
+                  sessionStorage.getItem('auth_token');
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+      log('debug', 'Added Bearer token to auth headers');
+    } else {
+      log('warn', 'No auth token available for authenticated user');
+    }
+
+    return headers;
+  }, [authToken, log]);
+
+  // ✅ Channel name helper
+  const privateChannel = useCallback((uuid) => {
+    return `private-conversation.${uuid}`;
+  }, []);
+
+  // ✅ Create Pusher authentication response
+  const createPusherAuthResponse = useCallback((channelName, socketId) => {
+    try {
+      const stringToSign = `${socketId}:${channelName}`;
+      log('debug', 'Created Pusher auth string', { stringToSign });
+      return { auth: stringToSign };
+    } catch (error) {
+      log('error', 'Failed to create Pusher auth response', { error: error.message });
+      throw error;
+    }
+  }, [log]);
+
+  // ✅ Initialize Pusher connection
+  const initPusher = useCallback(() => {
+    if (pusherRef.current) {
+      log('debug', 'Pusher already initialized');
+      return;
+    }
+
+    if (!config.PUSHER_KEY) {
+      const error = "Cannot initialize Pusher: App key missing";
+      log('error', error);
+      setLastError(error);
+      if (optionsRef.current.onError) {
+        optionsRef.current.onError(new Error(error));
+      }
       return;
     }
 
     const baseConfig = {
-      cluster: PUSHER_CLUSTER || 'ap1',
+      cluster: config.PUSHER_CLUSTER,
       forceTLS: true,
-      authTransport: 'ajax',
-      auth: {
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-      },
-      logToConsole: import.meta.env.DEV,
+      authTransport: "ajax",
+      enableStats: false,
+      disableStats: true,
+      logToConsole: config.enableLogging,
     };
 
-    if (!isAuthenticated && !admin && !employee && !user) {
+    // Determine connection type and configure accordingly
+    const isAnonymous = !isAuthenticated && !admin && !employee && !user;
+    
+    if (isAnonymous) {
       // Anonymous connection
       const authData = getAnonymousAuthData();
-      console.log('🔹 Anonymous Pusher init', authData);
-      pusherRef.current = new Pusher(PUSHER_KEY, {
+      log('info', 'Initializing anonymous Pusher connection', { authData });
+      
+      pusherRef.current = new Pusher(config.PUSHER_KEY, {
         ...baseConfig,
-        authEndpoint: `${API_BASE}/broadcasting/auth/anonymous`,
-        auth: { params: authData },
+        authEndpoint: `${config.API_BASE}/broadcasting/auth/anonymous`,
+        auth: {
+          params: authData,
+          headers: {
+            ...baseConfig.auth?.headers,
+          },
+        },
       });
     } else {
       // Authenticated connection
-      console.log('🔹 Authenticated Pusher init', authToken ? '(token active)' : '(no token)');
-      pusherRef.current = new Pusher(PUSHER_KEY, {
+      log('info', 'Initializing authenticated Pusher connection', {
+        hasToken: !!authToken,
+        userType: admin ? 'admin' : employee ? 'employee' : user ? 'user' : 'unknown'
+      });
+      
+      pusherRef.current = new Pusher(config.PUSHER_KEY, {
         ...baseConfig,
-        authEndpoint: `${API_BASE}/broadcasting/auth`,
+        authEndpoint: `${config.API_BASE}/broadcasting/auth`,
         auth: {
-          headers: {
-            ...baseConfig.auth.headers,
-            Authorization: authToken ? `Bearer ${authToken}` : '',
-          },
+          headers: getAuthHeaders(),
         },
       });
     }
 
-    // ✅ Connection state logging
-    pusherRef.current.connection.bind('connected', () =>
-      console.log('✅ Pusher connected successfully')
-    );
-    pusherRef.current.connection.bind('error', (err) =>
-      console.error('❌ Pusher connection error:', err)
-    );
-    pusherRef.current.connection.bind('disconnected', () =>
-      console.log('🔴 Pusher disconnected')
-    );
-    pusherRef.current.connection.bind('state_change', (states) =>
-      console.log('🔄 Pusher state change:', states.previous, '->', states.current)
-    );
-  };
+    // Connection state management
+    pusherRef.current.connection.bind("connected", () => {
+      log('info', 'Pusher connected successfully');
+      setConnectionState('connected');
+      setLastError(null);
+      if (optionsRef.current.onConnected) {
+        optionsRef.current.onConnected();
+      }
+    });
+
+    pusherRef.current.connection.bind("error", (err) => {
+      log('error', 'Pusher connection error', { error: err });
+      setConnectionState('error');
+      setLastError(err);
+      if (optionsRef.current.onError) {
+        optionsRef.current.onError(err);
+      }
+    });
+
+    pusherRef.current.connection.bind("disconnected", () => {
+      log('info', 'Pusher disconnected');
+      setConnectionState('disconnected');
+    });
+
+    pusherRef.current.connection.bind("state_change", (states) => {
+      log('debug', 'Pusher state change', {
+        previous: states.previous,
+        current: states.current
+      });
+      setConnectionState(states.current);
+    });
+
+    // Handle subscription events globally
+    pusherRef.current.connection.bind("message", (data) => {
+      log('debug', 'Global Pusher message', { data });
+    });
+
+  }, [
+    config.PUSHER_KEY,
+    config.PUSHER_CLUSTER,
+    config.API_BASE,
+    config.enableLogging,
+    isAuthenticated,
+    admin,
+    employee,
+    user,
+    authToken,
+    getAnonymousAuthData,
+    getAuthHeaders,
+    log
+  ]);
 
   // ✅ Subscribe to private channel
-  const subscribe = (uuid) => {
+  const subscribe = useCallback((uuid) => {
     if (!pusherRef.current) {
-      console.error('⚠️ Pusher not initialized');
+      log('error', 'Pusher not initialized for subscription');
       return;
     }
 
     const chanName = privateChannel(uuid);
-    console.log('📡 Subscribing to:', chanName);
+    log('info', 'Subscribing to channel', { channel: chanName });
 
-    // Unsubscribe previous
+    // Unsubscribe from previous channel
     if (channelRef.current) {
       try {
         pusherRef.current.unsubscribe(channelRef.current.name);
-      } catch (_) {}
-      channelRef.current.unbind_all();
+        channelRef.current.unbind_all();
+        log('debug', 'Unsubscribed from previous channel', { 
+          previousChannel: channelRef.current.name 
+        });
+      } catch (error) {
+        log('warn', 'Error unsubscribing from previous channel', { 
+          error: error.message 
+        });
+      }
       channelRef.current = null;
     }
 
     try {
       channelRef.current = pusherRef.current.subscribe(chanName);
 
-      channelRef.current.bind('pusher:subscription_succeeded', () =>
-        console.log('✅ Subscribed to:', chanName)
-      );
-      channelRef.current.bind('pusher:subscription_error', (err) =>
-        console.error('❌ Subscription error:', err)
-      );
-
-      // Message event
-      channelRef.current.bind('MessageSent', (data) => {
-        console.log('📨 Message received:', data);
-        if (data?.message) dispatch(receiveMessage(data.message));
+      // Channel subscription events
+      channelRef.current.bind("pusher:subscription_succeeded", () => {
+        log('info', 'Successfully subscribed to channel', { channel: chanName });
       });
 
-      // Typing events
+      channelRef.current.bind("pusher:subscription_error", (err) => {
+        log('error', 'Channel subscription error', { 
+          channel: chanName, 
+          error: err 
+        });
+        setLastError(err);
+      });
+
+      // Message events
+      channelRef.current.bind("MessageSent", (data) => {
+        log('info', 'Message received via Pusher', { 
+          messageId: data.message?.id || data.id,
+          channel: chanName
+        });
+
+        // Extract message from various possible payload structures
+        const messageData = data.message || data.data || data;
+        
+        if (messageData) {
+          log('debug', 'Dispatching receiveMessage', { messageData });
+          dispatch(receiveMessage(messageData));
+        } else {
+          log('warn', 'Received empty or invalid message data', { data });
+        }
+      });
+
+      // Typing indicators
       const handleTyping = (isTyping) => {
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+        
         dispatch(setTyping(isTyping));
+        
         if (isTyping) {
-          typingTimeoutRef.current = setTimeout(
-            () => dispatch(setTyping(false)),
-            3000
-          );
+          typingTimeoutRef.current = setTimeout(() => {
+            dispatch(setTyping(false));
+          }, 3000);
         }
       };
 
-      channelRef.current.bind('UserTyping', () => handleTyping(true));
-      channelRef.current.bind('UserStopTyping', () => handleTyping(false));
-    } catch (err) {
-      console.error('❌ Error subscribing:', err);
-    }
-  };
+      channelRef.current.bind("UserTyping", () => handleTyping(true));
+      channelRef.current.bind("UserStopTyping", () => handleTyping(false));
 
-  // ✅ Effect: initialize + subscribe
-  useEffect(() => {
-    if (!conversationUuid) {
-      console.log('⛔ No conversation UUID');
-      return;
-    }
-    if (!PUSHER_KEY) {
-      console.error('❌ Missing Pusher key');
-      return;
-    }
-
-    initPusher();
-    subscribe(conversationUuid);
-
-    return () => {
-      console.log('🧹 Cleaning up chat:', conversationUuid);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      if (channelRef.current && pusherRef.current) {
-        try {
-          pusherRef.current.unsubscribe(channelRef.current.name);
-        } catch (_) {}
-        channelRef.current.unbind_all();
+      // Custom events can be added here
+      if (optionsRef.current.customEvents) {
+        Object.entries(optionsRef.current.customEvents).forEach(([event, handler]) => {
+          channelRef.current.bind(event, handler);
+        });
       }
-    };
-  }, [conversationUuid, isAuthenticated, admin, employee, user, authToken]);
 
-  // ✅ Reconnect on token change
-  useEffect(() => {
-    const reconnect = (e) => {
-      setAuthToken(e.detail);
-      if (pusherRef.current) {
-        try {
-          pusherRef.current.disconnect();
-        } catch (_) {}
+    } catch (error) {
+      log('error', 'Error subscribing to channel', { 
+        channel: chanName, 
+        error: error.message 
+      });
+      setLastError(error);
+    }
+  }, [privateChannel, dispatch, log]);
+
+  // ✅ Unsubscribe and cleanup
+  const unsubscribe = useCallback(() => {
+    log('info', 'Cleaning up chat subscriptions');
+    
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+
+    if (channelRef.current && pusherRef.current) {
+      try {
+        const channelName = channelRef.current.name;
+        pusherRef.current.unsubscribe(channelName);
+        channelRef.current.unbind_all();
+        channelRef.current = null;
+        log('debug', 'Unsubscribed from channel', { channel: channelName });
+      } catch (error) {
+        log('warn', 'Error during unsubscribe', { error: error.message });
+      }
+    }
+  }, [log]);
+
+  // ✅ Disconnect Pusher completely
+  const disconnect = useCallback(() => {
+    log('info', 'Disconnecting Pusher');
+    unsubscribe();
+    
+    if (pusherRef.current) {
+      try {
+        pusherRef.current.disconnect();
         pusherRef.current = null;
+        setConnectionState('disconnected');
+        log('info', 'Pusher disconnected successfully');
+      } catch (error) {
+        log('error', 'Error disconnecting Pusher', { error: error.message });
+      }
+    }
+  }, [unsubscribe, log]);
+
+  // ✅ Reconnect with new credentials
+  const reconnect = useCallback((newToken = null) => {
+    log('info', 'Reconnecting Pusher with new credentials');
+    
+    if (newToken) {
+      setAuthToken(newToken);
+    }
+    
+    disconnect();
+    
+    // Small delay to ensure clean disconnect
+    setTimeout(() => {
+      if (conversationUuid && config.autoConnect) {
         initPusher();
         subscribe(conversationUuid);
       }
-    };
-    window.addEventListener('tokenChanged', reconnect);
-    return () => window.removeEventListener('tokenChanged', reconnect);
-  }, [conversationUuid]);
+    }, 100);
+  }, [conversationUuid, config.autoConnect, initPusher, subscribe, disconnect, log]);
 
-  return {
-    isConnected:
-      !!pusherRef.current &&
-      pusherRef.current.connection.state === 'connected',
-    pusher: pusherRef.current,
+  // ✅ Send typing indicators
+  const sendTyping = useCallback((isTyping = true) => {
+    if (!channelRef.current) {
+      log('warn', 'Cannot send typing indicator - no active channel');
+      return;
+    }
+
+    const eventName = isTyping ? "client-typing" : "client-stop-typing";
+    
+    try {
+      channelRef.current.trigger(eventName, {
+        conversationUuid,
+        timestamp: new Date().toISOString(),
+        userType: isAuthenticated ? 'authenticated' : 'anonymous',
+        userId: user?.id || employee?.id || admin?.id || 'anonymous'
+      });
+      
+      log('debug', `Sent typing indicator: ${isTyping ? 'typing' : 'stop typing'}`);
+    } catch (error) {
+      log('error', 'Failed to send typing indicator', { error: error.message });
+    }
+  }, [conversationUuid, isAuthenticated, user, employee, admin, log]);
+
+  // ✅ Main effect: initialize and subscribe when conversationUuid changes
+  useEffect(() => {
+    if (!conversationUuid) {
+      log('warn', 'No conversation UUID provided');
+      return;
+    }
+
+    if (!config.PUSHER_KEY) {
+      const error = "Missing Pusher key - cannot initialize chat";
+      log('error', error);
+      setLastError(error);
+      return;
+    }
+
+    if (config.autoConnect) {
+      log('info', 'Auto-connecting to chat', { conversationUuid });
+      initPusher();
+      subscribe(conversationUuid);
+    }
+
+    return () => {
+      log('info', 'Cleaning up chat hook', { conversationUuid });
+      unsubscribe();
+    };
+  }, [conversationUuid, config.autoConnect, config.PUSHER_KEY, initPusher, subscribe, unsubscribe, log]);
+
+  // ✅ Listen for global token changes (multi-website support)
+  useEffect(() => {
+    const handleTokenChange = (event) => {
+      log('info', 'Global token change detected', { 
+        hasToken: !!event.detail,
+        tokenLength: event.detail ? event.detail.length : 0
+      });
+      setAuthToken(event.detail);
+      reconnect(event.detail);
+    };
+
+    const handleStorageChange = (event) => {
+      if (event.key === 'auth_token' || event.key === 'apiAccessToken') {
+        const newToken = event.newValue || localStorage.getItem('auth_token');
+        log('info', 'Storage token change detected', { key: event.key });
+        setAuthToken(newToken);
+        reconnect(newToken);
+      }
+    };
+
+    // Multiple event listeners for maximum compatibility
+    window.addEventListener("tokenChanged", handleTokenChange);
+    window.addEventListener("storage", handleStorageChange);
+    
+    // Custom event for cross-domain communication
+    window.addEventListener("message", (event) => {
+      if (event.data?.type === 'chat_token_update') {
+        log('info', 'Cross-domain token update received');
+        setAuthToken(event.data.token);
+        reconnect(event.data.token);
+      }
+    });
+
+    return () => {
+      window.removeEventListener("tokenChanged", handleTokenChange);
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("message", handleTokenChange);
+    };
+  }, [reconnect, log]);
+
+  // ✅ Manual connection control
+  const connect = useCallback(() => {
+    if (!conversationUuid) {
+      const error = "Cannot connect: no conversation UUID";
+      log('error', error);
+      setLastError(error);
+      return false;
+    }
+
+    if (!config.PUSHER_KEY) {
+      const error = "Cannot connect: missing Pusher key";
+      log('error', error);
+      setLastError(error);
+      return false;
+    }
+
+    log('info', 'Manual connection initiated');
+    initPusher();
+    subscribe(conversationUuid);
+    return true;
+  }, [conversationUuid, config.PUSHER_KEY, initPusher, subscribe, log]);
+
+  // ✅ Public API
+  const chatInterface = {
+    // Connection state
+    isConnected: connectionState === 'connected',
+    connectionState,
+    lastError,
+    
+    // Connection control
+    connect,
+    disconnect,
+    reconnect: () => reconnect(authToken),
+    
+    // Messaging
+    sendTyping: () => sendTyping(true),
+    stopTyping: () => sendTyping(false),
+    
+    // Channel info
+    currentChannel: channelRef.current?.name || null,
+    pusherInstance: pusherRef.current,
+    
+    // Utilities
+    updateToken: (newToken) => {
+      log('info', 'Updating auth token via API');
+      setAuthToken(newToken);
+      reconnect(newToken);
+    },
+    
+    // Debug info
+    getDebugInfo: () => ({
+      conversationUuid,
+      connectionState,
+      isAuthenticated,
+      userType: admin ? 'admin' : employee ? 'employee' : user ? 'user' : 'anonymous',
+      channel: channelRef.current?.name,
+      pusherState: pusherRef.current?.connection?.state,
+      config: {
+        hasPusherKey: !!config.PUSHER_KEY,
+        apiBase: config.API_BASE,
+        autoConnect: config.autoConnect
+      }
+    })
   };
+
+  return chatInterface;
 };
 
+// ✅ Export as default and named export for maximum compatibility
 export default useChat;
+
+// ✅ Additional utilities for multi-website integration
+export const ChatAPI = {
+  // Global token management for cross-website communication
+  setGlobalToken: (token, storageType = 'localStorage') => {
+    try {
+      if (storageType === 'localStorage') {
+        localStorage.setItem('auth_token', token);
+      } else if (storageType === 'sessionStorage') {
+        sessionStorage.setItem('auth_token', token);
+      }
+      
+      window.apiAccessToken = token;
+      
+      // Dispatch custom event
+      const event = new CustomEvent('tokenChanged', { detail: token });
+      window.dispatchEvent(event);
+      
+      // For cross-domain communication
+      if (window.parent !== window) {
+        window.parent.postMessage({
+          type: 'chat_token_update',
+          token: token
+        }, '*');
+      }
+      
+      console.info('🔑 Global chat token updated');
+    } catch (error) {
+      console.error('❌ Failed to set global token:', error);
+    }
+  },
+
+  // Clear authentication
+  clearAuth: () => {
+    try {
+      localStorage.removeItem('auth_token');
+      sessionStorage.removeItem('auth_token');
+      delete window.apiAccessToken;
+      
+      const event = new CustomEvent('tokenChanged', { detail: null });
+      window.dispatchEvent(event);
+      
+      console.info('🔑 Chat authentication cleared');
+    } catch (error) {
+      console.error('❌ Failed to clear auth:', error);
+    }
+  },
+
+  // Set anonymous user data
+  setAnonymousUser: (userData, storageType = 'localStorage') => {
+    try {
+      const storage = storageType === 'localStorage' ? localStorage : sessionStorage;
+      storage.setItem('chat_user', JSON.stringify(userData));
+      console.info('👤 Anonymous user data set');
+    } catch (error) {
+      console.error('❌ Failed to set anonymous user:', error);
+    }
+  }
+};
+
+// ✅ Type definitions for better IDE support (JSDoc)
+/**
+ * @typedef {Object} ChatOptions
+ * @property {string} [apiBase] - Override default API base URL
+ * @property {string} [pusherKey] - Override default Pusher key
+ * @property {string} [pusherCluster] - Override default Pusher cluster
+ * @property {boolean} [autoConnect] - Whether to auto-connect (default: true)
+ * @property {string} [contact] - Contact info for anonymous users
+ * @property {boolean} [enableLogging] - Enable debug logging
+ * @property {Function} [onConnected] - Callback when connected
+ * @property {Function} [onError] - Callback when error occurs
+ * @property {Object} [customEvents] - Custom event handlers
+ */
+
+/**
+ * @typedef {Object} ChatInterface
+ * @property {boolean} isConnected - Whether chat is connected
+ * @property {string} connectionState - Current connection state
+ * @property {Error|null} lastError - Last error encountered
+ * @property {Function} connect - Manual connect function
+ * @property {Function} disconnect - Manual disconnect function
+ * @property {Function} reconnect - Reconnect function
+ * @property {Function} sendTyping - Send typing indicator
+ * @property {Function} stopTyping - Send stop typing indicator
+ * @property {string|null} currentChannel - Current channel name
+ * @property {Object|null} pusherInstance - Raw Pusher instance
+ * @property {Function} updateToken - Update auth token
+ * @property {Function} getDebugInfo - Get debug information
+ */

@@ -10,6 +10,12 @@ const MessageList = ({ messages, currentUser }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Add debug logging
+  useEffect(() => {
+    console.log('📋 MessageList rendering with messages:', messages);
+    console.log('👤 Current user:', currentUser);
+  }, [messages, currentUser]);
+
   if (!messages || messages.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-gray-500">
@@ -21,7 +27,9 @@ const MessageList = ({ messages, currentUser }) => {
   return (
     <div className="space-y-4">
       {messages.map((message) => {
-        // Handle different message field names
+        console.log('💬 Rendering message:', message);
+        
+        // Handle different message field names with fallbacks
         const messageText = message.body || message.message || message.text || '';
         const senderName = message.sender_name || message.senderName || message.name || 'Unknown';
         const isStaff = message.is_staff || message.isStaff || false;
@@ -29,8 +37,10 @@ const MessageList = ({ messages, currentUser }) => {
         const attachments = message.attachments || [];
         
         // Check if message is from current user
-        const isCurrentUser = senderName === currentUser;
-        const isAdmin = isStaff;
+        // Use more flexible comparison for anonymous users
+        const isCurrentUser = currentUser ? 
+          senderName === currentUser : 
+          !isStaff; // If no currentUser, assume staff messages are not from current user
 
         return (
           <div
@@ -45,14 +55,14 @@ const MessageList = ({ messages, currentUser }) => {
               {/* Avatar */}
               <div
                 className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  isAdmin
+                  isStaff
                     ? 'bg-purple-500 text-white'
                     : isCurrentUser
                     ? 'bg-blue-500 text-white'
                     : 'bg-gray-300 text-gray-700'
                 }`}
               >
-                {isAdmin ? (
+                {isStaff ? (
                   <UserCircle size={20} />
                 ) : (
                   <User size={16} />
@@ -65,26 +75,28 @@ const MessageList = ({ messages, currentUser }) => {
                   isCurrentUser ? 'items-end' : 'items-start'
                 }`}
               >
-                {/* Sender Name */}
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
-                    {isAdmin ? '👨‍💼 ' : ''}{senderName}
-                  </span>
-                  {timestamp && (
-                    <span className="text-xs text-gray-400">
-                      {new Date(timestamp).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                {/* Sender Name - Only show for others or staff */}
+                {!isCurrentUser && (
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+                      {isStaff ? '👨‍💼 ' : ''}{senderName}
                     </span>
-                  )}
-                </div>
+                    {timestamp && (
+                      <span className="text-xs text-gray-400">
+                        {new Date(timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Message Content */}
                 {messageText && (
                   <div
                     className={`px-4 py-2 rounded-lg ${
-                      isAdmin
+                      isStaff
                         ? 'bg-purple-100 text-purple-900 dark:bg-purple-900 dark:text-purple-100'
                         : isCurrentUser
                         ? 'bg-blue-500 text-white'
@@ -95,6 +107,16 @@ const MessageList = ({ messages, currentUser }) => {
                       {messageText}
                     </p>
                   </div>
+                )}
+
+                {/* Timestamp for current user */}
+                {isCurrentUser && timestamp && (
+                  <span className="text-xs text-gray-400 mt-1">
+                    {new Date(timestamp).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
                 )}
 
                 {/* Attachments */}
