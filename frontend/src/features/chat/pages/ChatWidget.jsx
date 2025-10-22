@@ -1,3 +1,4 @@
+// filepath: src/features/chat/components/ChatWidget.jsx
 import React, { useEffect, useState, useCallback, useRef, memo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
@@ -24,7 +25,7 @@ const ChatWidget = () => {
   const fetchedOnceRef = useRef(false);
   const modalRef = useRef(null);
 
-  // Redux state
+  // Redux state - add debugging
   const conversationUuid = useSelector((s) => s.chat.conversationUuid);
   const user = useSelector((s) => s.chat.user);
   const messages = useSelector((s) => s.chat.messages);
@@ -32,8 +33,21 @@ const ChatWidget = () => {
   const error = useSelector((s) => s.chat.error);
   const isLoading = useSelector((s) => s.chat.isLoading);
 
-  // hook: realtime - pass true for anonymous users
-  useChat(conversationUuid, true);
+  // Debug Redux state
+  useEffect(() => {
+    console.log('🔄 ChatWidget Redux State:', {
+      conversationUuid,
+      user,
+      messagesCount: messages.length,
+      messages,
+      isTyping,
+      error,
+      isLoading
+    });
+  }, [conversationUuid, user, messages, isTyping, error, isLoading]);
+
+  // hook: realtime
+  useChat(conversationUuid);
 
   // auto-open if there is an ongoing conversation
   useEffect(() => {

@@ -1,3 +1,4 @@
+// filepath: src/features/chat/slices/chatSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { widgetService } from '../services/widgetService';
 import { adminService } from '../services/adminService';
@@ -289,13 +290,24 @@ const chatSlice = createSlice({
   name: 'chat',
   initialState,
   reducers: {
+    // FIXED: Properly handle Pusher message format and always add to messages
     receiveMessage(state, action) {
+      console.log('🟢 receiveMessage action payload:', action.payload);
+      
+      // The message data is already extracted in useChat hook
       const normalized = normalizeMessage(action.payload);
+      console.log('🟢 Normalized message:', normalized);
+
       if (!normalized || !normalized.id) return;
 
       const exists = state.messages.some((m) => m.id === normalized.id);
-      if (!exists && normalized.conversation_id === state.conversationUuid) {
+      
+      // Always add to messages if it doesn't exist (Pusher channel ensures correct conversation)
+      if (!exists) {
         state.messages.push(normalized);
+        
+        // Sort messages by timestamp to ensure correct order
+        state.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       }
 
       // admin selected conversation update
@@ -305,6 +317,8 @@ const chatSlice = createSlice({
         state.admin.selectedConversation.messages = state.admin.selectedConversation.messages || [];
         if (!state.admin.selectedConversation.messages.some((m) => m.id === normalized.id)) {
           state.admin.selectedConversation.messages.push(normalized);
+          // Sort admin messages too
+          state.admin.selectedConversation.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
         }
         
         // Update last message preview and timestamp

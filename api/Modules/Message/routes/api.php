@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Message\Http\Controllers\ConversationController;
 use Modules\Message\Http\Controllers\MessageController;
 use Modules\Message\Http\Controllers\AttachmentController;
+use Illuminate\Http\Request;
 
 /*
 |--------------------------------------------------------------------------
@@ -77,22 +78,16 @@ Route::prefix('message')->name('message.')->middleware(['multi-auth'])->group(fu
         ->name('attachments.destroy');
 });
 
-// Broadcasting authentication routes
-Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate'])
-    ->middleware(['multi-auth']);
+/*
+|--------------------------------------------------------------------------
+| Broadcasting Authentication Routes
+|--------------------------------------------------------------------------
+*/
 
+// For authenticated users (both regular users and staff)
+Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate'])
+    ->middleware(['auth:sanctum']);
+
+// For anonymous users - use web middleware for form parsing
 Route::post('/broadcasting/auth/anonymous', [BroadcastAuthController::class, 'authenticateAnonymous'])
     ->middleware(['api']);
-
-
-// In routes/api.php
-Route::get('/test-broadcast-config', function () {
-    return response()->json([
-        'broadcast_driver' => config('broadcasting.default'),
-        'pusher_config' => config('broadcasting.connections.pusher'),
-        'app_key' => config('broadcasting.connections.pusher.key'),
-        'app_id' => config('broadcasting.connections.pusher.app_id'),
-        'app_secret' => config('broadcasting.connections.pusher.secret') ? '***' : 'MISSING',
-        'cluster' => config('broadcasting.connections.pusher.options.cluster'),
-    ]);
-});
