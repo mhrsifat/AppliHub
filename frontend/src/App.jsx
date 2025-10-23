@@ -67,7 +67,7 @@ function AppWrapper() {
           </Route>
 
           {/* Catch-all redirect */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/not-found" replace />} />
         </Routes>
     </Router>
   );

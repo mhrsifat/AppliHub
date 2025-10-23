@@ -7,6 +7,8 @@ const RequestService = lazy(() => import("../features/client/pages/RequestServic
 const BlogListPage = lazy(() => import("../features/client/pages/BlogListPage"));
 const BlogDetailsPage = lazy(() => import("../features/client/pages/BlogDetailsPage"));
 const TrackOrder = lazy(() => import("../features/client/pages/TrackOrder"));
+const TrackOrder = lazy(() => import("../features/client/pages/About"));
+const TrackOrder = lazy(() => import("../features/client/pages/NotFound"));
 
 const ClientRoutes = [
   {
@@ -41,6 +43,22 @@ const ClientRoutes = [
     element: (
       <Suspense fallback={<Loader size="medium" />}>
         <BlogDetailsPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/about",
+    element: (
+      <Suspense fallback={<Loader size="medium" />}>
+        <About />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/not-found",
+    element: (
+      <Suspense fallback={<Loader size="medium" />}>
+        <NotFound />
       </Suspense>
     ),
   },
