@@ -7,8 +7,8 @@ const RequestService = lazy(() => import("../features/client/pages/RequestServic
 const BlogListPage = lazy(() => import("../features/client/pages/BlogListPage"));
 const BlogDetailsPage = lazy(() => import("../features/client/pages/BlogDetailsPage"));
 const TrackOrder = lazy(() => import("../features/client/pages/TrackOrder"));
-const TrackOrder = lazy(() => import("../features/client/pages/About"));
-const TrackOrder = lazy(() => import("../features/client/pages/NotFound"));
+const About = lazy(() => import("../features/client/pages/About"));
+const NotFound = lazy(() => import("../features/client/pages/NotFound"));
 
 const ClientRoutes = [
   {
