@@ -2,13 +2,13 @@
 
 Full-featured service management platform with real-time chat, order tracking, invoice generation, and SSL Commerz payment integration.
 
-![React](https://img.shields.io/badge/React-18.x-61dafb.svg)
+![React](https://img.shields.io/badge/React-19.x-61dafb.svg)
 ![Redux](https://img.shields.io/badge/Redux-Toolkit-764abc.svg)
 ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38bdf8.svg)
 
 ## ✨ Features
 
-- 🎯 **Multi-Role System** - Admin, Employee, Client portals
+- 🎯 **Multi-Role System** - Admin, Employee portals
 - 💬 **Real-Time Chat** - Anonymous user support with Pusher
 - 📦 **Order Management** - Complete lifecycle tracking
 - 📄 **Invoice System** - Create, edit, and manage invoices
@@ -18,8 +18,8 @@ Full-featured service management platform with real-time chat, order tracking, i
 
 ## 🛠️ Tech Stack
 
-- React 18 + Redux Toolkit
-- React Router v6
+- React 19 + Redux Toolkit
+- React Router v7
 - Tailwind CSS
 - Pusher (Real-time)
 - SSL Commerz (Payments)
